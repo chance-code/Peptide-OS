@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Lock } from 'lucide-react'
@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const callbackUrl = searchParams.get('callbackUrl') || '/today'
@@ -43,6 +43,37 @@ export default function LoginPage() {
   }
 
   return (
+    <Card>
+      <CardContent className="pt-6">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <Input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Password"
+            autoFocus
+            autoComplete="current-password"
+          />
+
+          {error && (
+            <div className="text-red-600 text-sm text-center">{error}</div>
+          )}
+
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={isLoading || !password}
+          >
+            {isLoading ? 'Signing in...' : 'Sign In'}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
+  )
+}
+
+export default function LoginPage() {
+  return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
@@ -53,32 +84,9 @@ export default function LoginPage() {
           <p className="text-slate-500 mt-1">Enter password to continue</p>
         </div>
 
-        <Card>
-          <CardContent className="pt-6">
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <Input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Password"
-                autoFocus
-                autoComplete="current-password"
-              />
-
-              {error && (
-                <div className="text-red-600 text-sm text-center">{error}</div>
-              )}
-
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={isLoading || !password}
-              >
-                {isLoading ? 'Signing in...' : 'Sign In'}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+        <Suspense fallback={<div className="text-center text-slate-500">Loading...</div>}>
+          <LoginForm />
+        </Suspense>
 
         <p className="text-center text-xs text-slate-400 mt-6">
           Switch profiles in Settings after signing in
