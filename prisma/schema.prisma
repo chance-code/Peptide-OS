@@ -1,0 +1,253 @@
+// Prisma Schema for Peptide OS
+// Local-first SQLite database
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// USER PROFILE
+// ============================================
+model UserProfile {
+  id        String   @id @default(cuid())
+  name      String
+  notes     String?
+  isActive  Boolean  @default(false) // Currently selected profile
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  protocols      Protocol[]
+  inventoryVials InventoryVial[]
+  doseLogs       DoseLog[]
+  reconstitutions Reconstitution[]
+}
+
+// ============================================
+// PEPTIDE DEFINITIONS
+// ============================================
+model Peptide {
+  id           String   @id @default(cuid())
+  name         String   @unique
+  category     String?
+  description  String?
+  storageNotes String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  protocols      Protocol[]
+  inventoryVials InventoryVial[]
+  reconstitutions Reconstitution[]
+}
+
+// ============================================
+// PROTOCOLS & CYCLES
+// ============================================
+model Protocol {
+  id          String    @id @default(cuid())
+  userId      String
+  peptideId   String
+
+  // Schedule
+  startDate   DateTime
+  endDate     DateTime? // null = indefinite
+  frequency   String    // 'daily', 'weekly', 'custom'
+  customDays  String?   // JSON array for custom schedules, e.g. ["mon","wed","fri"]
+
+  // Dosing
+  doseAmount  Float
+  doseUnit    String    // 'mcg', 'mg', 'IU'
+  timing      String?   // e.g., 'morning', 'evening', 'before bed'
+
+  // Status
+  status      String    @default("active") // 'active', 'paused', 'completed'
+  pausedAt    DateTime?
+
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  user        UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  peptide     Peptide     @relation(fields: [peptideId], references: [id])
+  doseLogs    DoseLog[]
+  schedules   DoseSchedule[]
+  history     ProtocolHistory[]
+}
+
+// ============================================
+// DOSE SCHEDULE (Pre-generated daily entries)
+// ============================================
+model DoseSchedule {
+  id          String   @id @default(cuid())
+  protocolId  String
+  scheduledDate DateTime // The date this dose is scheduled
+
+  doseAmount  Float
+  doseUnit    String
+  timing      String?
+
+  createdAt   DateTime @default(now())
+
+  // Relations
+  protocol    Protocol @relation(fields: [protocolId], references: [id], onDelete: Cascade)
+  doseLog     DoseLog?
+
+  @@unique([protocolId, scheduledDate])
+}
+
+// ============================================
+// DOSE LOG (Actual adherence tracking)
+// ============================================
+model DoseLog {
+  id           String   @id @default(cuid())
+  userId       String
+  scheduleId   String?  @unique // Links to pre-generated schedule
+  protocolId   String
+
+  scheduledDate DateTime
+  completedAt   DateTime?
+
+  status       String   // 'pending', 'completed', 'skipped', 'missed'
+  actualDose   Float?   // If different from scheduled
+  actualUnit   String?
+
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  user        UserProfile   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  protocol    Protocol      @relation(fields: [protocolId], references: [id], onDelete: Cascade)
+  schedule    DoseSchedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+}
+
+// ============================================
+// INVENTORY VIAL
+// ============================================
+model InventoryVial {
+  id              String    @id @default(cuid())
+  userId          String
+  peptideId       String
+
+  identifier      String?   // User-defined label
+
+  // Vial specs
+  totalAmount     Float     // Total peptide amount in vial
+  totalUnit       String    // 'mg', 'mcg', 'IU'
+
+  // Reconstitution info
+  diluentVolume   Float?    // ml of BAC water added
+  concentration   Float?    // calculated: amount per ml
+  concentrationUnit String? // e.g., 'mg/ml'
+
+  dateReceived    DateTime?
+  dateReconstituted DateTime?
+  expirationDate  DateTime?
+
+  // Usage tracking
+  remainingAmount Float?
+  isExpired       Boolean   @default(false)
+  isExhausted     Boolean   @default(false) // All doses used
+
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  user            UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  peptide         Peptide     @relation(fields: [peptideId], references: [id])
+}
+
+// ============================================
+// RECONSTITUTION CALCULATOR SAVED ENTRIES
+// ============================================
+model Reconstitution {
+  id            String   @id @default(cuid())
+  userId        String
+  peptideId     String
+
+  // Input values
+  vialAmount    Float    // Total peptide in vial
+  vialUnit      String   // 'mg', 'mcg', 'IU'
+  diluentVolume Float    // ml of diluent added
+
+  // Calculated results
+  concentration     Float    // Amount per ml
+  concentrationUnit String   // e.g., 'mcg/ml'
+
+  // Dose calculation
+  targetDose    Float?   // Desired dose per injection
+  targetUnit    String?  // Unit for target dose
+  volumePerDose Float?   // ml to draw for target dose
+
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  user          UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+  peptide       Peptide     @relation(fields: [peptideId], references: [id])
+}
+
+// ============================================
+// PROTOCOL HISTORY (Audit trail)
+// ============================================
+model ProtocolHistory {
+  id          String   @id @default(cuid())
+  protocolId  String
+
+  changeType  String   // 'created', 'updated', 'paused', 'resumed', 'completed'
+  changeData  String   // JSON of what changed
+
+  createdAt   DateTime @default(now())
+
+  // Relations
+  protocol    Protocol @relation(fields: [protocolId], references: [id], onDelete: Cascade)
+}
+
+// ============================================
+// GENERAL NOTES
+// ============================================
+model Note {
+  id          String   @id @default(cuid())
+  entityType  String   // 'protocol', 'inventory', 'dose', etc.
+  entityId    String
+  content     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([entityType, entityId])
+}
+
+// ============================================
+// PUSH SUBSCRIPTIONS
+// ============================================
+model PushSubscription {
+  id          String   @id @default(cuid())
+
+  // Subscription data from browser
+  endpoint    String   @unique
+  p256dh      String   // Public key
+  auth        String   // Auth secret
+
+  // User association (optional - for user-specific notifications)
+  userId      String?
+
+  // Notification preferences
+  enabled     Boolean  @default(true)
+  morningTime String?  // e.g., "08:00"
+  eveningTime String?  // e.g., "20:00"
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+}
