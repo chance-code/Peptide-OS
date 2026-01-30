@@ -43,10 +43,16 @@ export function NotificationSettings() {
     if (supported) {
       setPermission(Notification.permission)
 
-      // Check if already subscribed
-      const registration = await navigator.serviceWorker.ready
-      const subscription = await registration.pushManager.getSubscription()
-      setIsSubscribed(!!subscription)
+      // Check if already subscribed (only if service worker is already registered)
+      try {
+        const registration = await navigator.serviceWorker.getRegistration('/sw.js')
+        if (registration) {
+          const subscription = await registration.pushManager.getSubscription()
+          setIsSubscribed(!!subscription)
+        }
+      } catch (error) {
+        console.log('No existing service worker registration')
+      }
     }
 
     setIsLoading(false)

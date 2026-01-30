@@ -33,6 +33,8 @@ function LoginForm() {
         setError('Incorrect password')
         setIsLoading(false)
       } else if (result?.ok) {
+        // Clear cached user ID so session profile takes precedence
+        localStorage.removeItem('peptide-os-storage')
         router.push(callbackUrl)
         router.refresh()
       }

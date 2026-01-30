@@ -6,37 +6,32 @@ import { BottomNav, TopHeader } from '@/components/nav'
 import { ProfileSelector } from '@/components/profile-selector'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { currentUserId, setCurrentUser } = useAppStore()
+  const { setCurrentUser } = useAppStore()
   const [showProfileSelector, setShowProfileSelector] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [currentUserId, setLocalCurrentUserId] = useState<string | null>(null)
 
   useEffect(() => {
     async function loadUser() {
       try {
-        // First, check if we have a stored user ID
-        if (currentUserId) {
-          const res = await fetch(`/api/users/${currentUserId}`)
-          if (res.ok) {
-            const user = await res.json()
-            setCurrentUser(user)
-            setIsLoading(false)
-            return
-          }
+        // Fetch all users
+        const usersRes = await fetch('/api/users')
+        if (!usersRes.ok) {
+          setIsLoading(false)
+          return
         }
 
-        // If no stored user, check for any users
-        const usersRes = await fetch('/api/users')
-        if (usersRes.ok) {
-          const users = await usersRes.json()
-          if (users.length > 0) {
-            // Find active user or use first
-            const activeUser = users.find((u: { isActive: boolean }) => u.isActive) || users[0]
-            setCurrentUser(activeUser)
-          } else {
-            // No users, show profile selector
-            setShowProfileSelector(true)
-          }
+        const users = await usersRes.json()
+        if (users.length === 0) {
+          setShowProfileSelector(true)
+          setIsLoading(false)
+          return
         }
+
+        // Always use the active user from the database
+        const activeUser = users.find((u: { isActive: boolean }) => u.isActive) || users[0]
+        setCurrentUser(activeUser)
+        setLocalCurrentUserId(activeUser.id)
       } catch (error) {
         console.error('Error loading user:', error)
       } finally {
@@ -45,7 +40,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
 
     loadUser()
-  }, [currentUserId, setCurrentUser])
+  }, [setCurrentUser])
 
   if (isLoading) {
     return (
@@ -64,9 +59,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="h-dvh flex flex-col bg-slate-50">
       <TopHeader />
-      <main className="pb-20 max-w-lg mx-auto">{children}</main>
+      <main className="flex-1 pb-14 max-w-lg mx-auto w-full overflow-auto">{children}</main>
       <BottomNav />
     </div>
   )

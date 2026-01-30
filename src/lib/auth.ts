@@ -1,6 +1,18 @@
 import type { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import bcrypt from 'bcryptjs'
+import prisma from '@/lib/prisma'
+
+// User configurations with their password hashes and profile names
+interface UserConfig {
+  name: string
+  hashEnvVar: string
+}
+
+const users: UserConfig[] = [
+  { name: 'Chance Olson', hashEnvVar: 'AUTH_PASSWORD_HASH' },
+  { name: 'Angela Olson', hashEnvVar: 'AUTH_PASSWORD_HASH_ANGELA' },
+]
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -17,25 +29,43 @@ export const authOptions: NextAuthOptions = {
           return null
         }
 
-        const passwordHash = process.env.AUTH_PASSWORD_HASH
-        console.log('Hash from env:', passwordHash ? `${passwordHash.substring(0, 20)}...` : 'NOT SET')
+        // Try each user's password
+        for (const userConfig of users) {
+          const encodedHash = process.env[userConfig.hashEnvVar]
+          if (!encodedHash) continue
 
-        if (!passwordHash) {
-          console.error('AUTH_PASSWORD_HASH not configured')
-          return null
-        }
+          const passwordHash = Buffer.from(encodedHash, 'base64').toString('utf-8')
+          const isValid = await bcrypt.compare(credentials.password, passwordHash)
 
-        const isValid = await bcrypt.compare(credentials.password, passwordHash)
-        console.log('Password valid:', isValid)
+          if (isValid) {
+            console.log(`Login successful for ${userConfig.name}`)
 
-        if (isValid) {
-          // Return a simple user object
-          return {
-            id: '1',
-            name: 'User',
+            // Set this user as active in the database
+            try {
+              // First, deactivate all users
+              await prisma.userProfile.updateMany({
+                data: { isActive: false }
+              })
+
+              // Then activate the matching user
+              await prisma.userProfile.updateMany({
+                where: { name: userConfig.name },
+                data: { isActive: true }
+              })
+
+              console.log(`Set ${userConfig.name} as active user`)
+            } catch (error) {
+              console.error('Error updating active user:', error)
+            }
+
+            return {
+              id: userConfig.name,
+              name: userConfig.name,
+            }
           }
         }
 
+        console.log('No matching password found')
         return null
       },
     }),
