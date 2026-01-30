@@ -60,27 +60,46 @@ export default function TodayPage() {
 
   async function handleStatusChange(
     item: TodayDoseItem,
-    status: 'completed' | 'skipped'
+    status: 'completed' | 'skipped' | 'pending'
   ) {
-    if (!currentUserId) return
+    if (!currentUserId || !data) return
 
-    try {
-      await fetch('/api/doses', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: currentUserId,
-          protocolId: item.protocolId,
-          scheduledDate: selectedDate.toISOString(),
-          status,
-        }),
-      })
+    // Optimistic update - update UI immediately
+    setData({
+      ...data,
+      items: data.items.map((i) =>
+        i.protocolId === item.protocolId ? { ...i, status } : i
+      ),
+      summary: {
+        ...data.summary,
+        completed: data.items.filter((i) =>
+          i.protocolId === item.protocolId ? status === 'completed' : i.status === 'completed'
+        ).length,
+        pending: data.items.filter((i) =>
+          i.protocolId === item.protocolId ? status === 'pending' : i.status === 'pending'
+        ).length,
+        skipped: data.items.filter((i) =>
+          i.protocolId === item.protocolId ? status === 'skipped' : i.status === 'skipped'
+        ).length,
+      },
+    })
 
-      // Refresh data
-      fetchToday()
-    } catch (error) {
+    // Send to server in background
+    const dateStr = format(selectedDate, 'yyyy-MM-dd') + 'T12:00:00.000Z'
+    fetch('/api/doses', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: currentUserId,
+        protocolId: item.protocolId,
+        scheduledDate: dateStr,
+        status,
+      }),
+    }).catch((error) => {
       console.error('Error updating dose:', error)
-    }
+      // Revert on error
+      fetchToday()
+    })
   }
 
   async function handleMarkAllDone() {
@@ -239,18 +258,30 @@ export default function TodayPage() {
                         >
                           <X className="w-5 h-5" />
                         </Button>
-                        <Button
-                          size="sm"
+                        <button
+                          type="button"
                           onClick={() => handleStatusChange(item, 'completed')}
-                          className="bg-green-600 hover:bg-green-700"
+                          className="w-10 h-10 rounded-full border-2 border-slate-300 bg-white hover:border-green-500 hover:bg-green-50 flex items-center justify-center transition-colors active:scale-95"
                         >
-                          <Check className="w-5 h-5" />
-                        </Button>
+                          <Check className="w-5 h-5 text-slate-400" />
+                        </button>
                       </>
                     ) : item.status === 'completed' ? (
-                      <Badge variant="success">Done</Badge>
+                      <button
+                        type="button"
+                        onClick={() => handleStatusChange(item, 'pending')}
+                        className="w-10 h-10 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-colors active:scale-95"
+                      >
+                        <Check className="w-5 h-5 text-white" />
+                      </button>
                     ) : (
-                      <Badge variant="default">Skipped</Badge>
+                      <button
+                        type="button"
+                        onClick={() => handleStatusChange(item, 'pending')}
+                        className="px-3 py-1 rounded bg-slate-200 hover:bg-slate-300 text-slate-600 text-sm transition-colors active:scale-95"
+                      >
+                        Skipped
+                      </button>
                     )}
                   </div>
                 </div>
