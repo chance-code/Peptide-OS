@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { signOut } from 'next-auth/react'
-import { User, ChevronRight, Plus, Trash2, Edit2, Check, LogOut } from 'lucide-react'
+import { User, Plus, Trash2, Edit2, LogOut, ArrowRightLeft } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -181,54 +181,67 @@ export default function SettingsPage() {
             <div className="p-4 text-center text-slate-500">Loading...</div>
           ) : (
             <div className="divide-y divide-slate-100">
-              {users.map((user) => (
-                <div
-                  key={user.id}
-                  className="flex items-center gap-3 p-4 hover:bg-slate-50 transition-colors"
-                >
-                  <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center">
-                    <User className="w-5 h-5 text-slate-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-slate-900">{user.name}</span>
-                      {user.id === currentUser?.id && (
-                        <Badge variant="success">Active</Badge>
+              {users.map((user) => {
+                const isActive = user.id === currentUser?.id
+                return (
+                  <div
+                    key={user.id}
+                    className={`flex items-center gap-3 p-4 transition-colors ${
+                      isActive
+                        ? 'bg-green-50 border-l-4 border-green-500'
+                        : 'hover:bg-slate-50'
+                    }`}
+                  >
+                    <div
+                      className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                        isActive ? 'bg-green-500' : 'bg-slate-100'
+                      }`}
+                    >
+                      <User className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-600'}`} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-slate-900">{user.name}</span>
+                        {isActive && (
+                          <Badge variant="success">Active</Badge>
+                        )}
+                      </div>
+                      {user.notes && (
+                        <div className="text-sm text-slate-500 truncate">{user.notes}</div>
                       )}
                     </div>
-                    {user.notes && (
-                      <div className="text-sm text-slate-500 truncate">{user.notes}</div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    {user.id !== currentUser?.id && (
+                    <div className="flex items-center gap-1">
+                      {!isActive && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => handleSwitchProfile(user)}
+                          className="text-xs"
+                        >
+                          <ArrowRightLeft className="w-3 h-3 mr-1" />
+                          Switch
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleSwitchProfile(user)}
+                        onClick={() => startEditing(user)}
                       >
-                        <Check className="w-4 h-4" />
+                        <Edit2 className="w-4 h-4" />
                       </Button>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => startEditing(user)}
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </Button>
-                    {users.length > 1 && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setShowDeleteModal(user)}
-                      >
-                        <Trash2 className="w-4 h-4 text-red-500" />
-                      </Button>
-                    )}
+                      {users.length > 1 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowDeleteModal(user)}
+                        >
+                          <Trash2 className="w-4 h-4 text-red-500" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </CardContent>

@@ -58,6 +58,34 @@ export default function ProtocolsPage() {
     }
   }
 
+  function formatDays(protocol: ProtocolWithPeptide): string | null {
+    if (protocol.frequency === 'daily') {
+      return 'Every day'
+    }
+
+    if (protocol.frequency === 'custom' && protocol.customDays) {
+      try {
+        const days = JSON.parse(protocol.customDays) as string[]
+        const dayLabels: Record<string, string> = {
+          mon: 'Mon',
+          tue: 'Tue',
+          wed: 'Wed',
+          thu: 'Thu',
+          fri: 'Fri',
+          sat: 'Sat',
+          sun: 'Sun',
+        }
+        const orderedDays = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
+        const sortedDays = days.sort((a, b) => orderedDays.indexOf(a) - orderedDays.indexOf(b))
+        return sortedDays.map((d) => dayLabels[d] || d).join(', ')
+      } catch {
+        return null
+      }
+    }
+
+    return null
+  }
+
   function getProgressStats(protocol: ProtocolWithPeptide) {
     const today = new Date()
     const start = new Date(protocol.startDate)
@@ -129,6 +157,11 @@ export default function ProtocolsPage() {
                           {protocol.doseAmount} {protocol.doseUnit} • {protocol.frequency}
                           {protocol.timing && ` • ${protocol.timing}`}
                         </div>
+                        {formatDays(protocol) && (
+                          <div className="text-xs text-slate-400 mt-0.5">
+                            {formatDays(protocol)}
+                          </div>
+                        )}
                       </div>
                       <div className="flex items-center gap-2">
                         <Badge
