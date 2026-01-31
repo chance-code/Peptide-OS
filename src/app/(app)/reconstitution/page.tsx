@@ -180,127 +180,55 @@ export default function ReconstitutionPage() {
       {isLoading ? (
         <div className="text-center py-8 text-slate-500">Loading...</div>
       ) : cheatSheet.length > 0 ? (
-        <div className="space-y-4">
-          {/* Section 1: Reconstitution Table */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold text-slate-700">
-                1. Reconstitution Table
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50">
-                      <th className="text-left py-2 px-3 font-medium text-slate-600">Peptide</th>
-                      <th className="text-left py-2 px-3 font-medium text-slate-600">Vial</th>
-                      <th className="text-left py-2 px-3 font-medium text-slate-600">BAC Water</th>
-                      <th className="text-left py-2 px-3 font-medium text-slate-600">Concentration</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {cheatSheet.map((peptide, i) => (
-                      <tr key={peptide.name} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                        <td className="py-2 px-3 font-medium text-slate-900">{peptide.name}</td>
-                        <td className="py-2 px-3 text-slate-700">{peptide.vialAmount}</td>
-                        <td className="py-2 px-3 text-slate-700">{peptide.bacWater}</td>
-                        <td className="py-2 px-3 text-slate-700">{peptide.concentration}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
+        <div className="space-y-3">
+          {/* Pen calibration note */}
+          <div className="text-xs text-slate-500 text-center py-1">
+            20-unit pen • 1 unit = 0.01 mL
+          </div>
 
-          {/* Section 2: Injection Volume Cheat Sheet */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold text-slate-700">
-                2. Injection Volume Cheat Sheet
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50">
-                      <th className="text-left py-2 px-3 font-medium text-slate-600">Peptide</th>
-                      <th className="text-left py-2 px-3 font-medium text-slate-600">Dose</th>
-                      <th className="text-left py-2 px-3 font-medium text-slate-600">Reconstitution</th>
-                      <th className="text-left py-2 px-3 font-medium text-slate-600">Injection Vol.</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {cheatSheet.map((peptide, i) => (
-                      <tr key={peptide.name} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                        <td className="py-2 px-3 font-medium text-slate-900">{peptide.name}</td>
-                        <td className="py-2 px-3 text-slate-700">{peptide.dose}</td>
-                        <td className="py-2 px-3 text-slate-600 text-xs">{peptide.vialAmount} → {peptide.bacWater}</td>
-                        <td className="py-2 px-3 font-semibold text-blue-600">{peptide.injectionVolume}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
+          {cheatSheet.map((peptide) => {
+            const styles = colorStyles[peptide.color] || colorStyles.blue
+            return (
+              <Card key={peptide.name} className={`${styles.bg} ${styles.border}`}>
+                <CardContent className="p-4">
+                  {/* Header */}
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className={`font-semibold text-lg ${styles.text}`}>{peptide.name}</h3>
+                    <Badge className={`${styles.badge} text-base px-3 py-1`}>{peptide.penUnits}</Badge>
+                  </div>
 
-          {/* Section 3: Pen Units Cheat Sheet */}
-          <Card>
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-semibold text-slate-700">
-                  3. Pen Units Cheat Sheet
-                </CardTitle>
-              </div>
-              <p className="text-xs text-slate-500 mt-1">20-unit pen • 1 unit = 0.01 mL</p>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50">
-                      <th className="text-left py-2 px-3 font-medium text-slate-600">Peptide</th>
-                      <th className="text-left py-2 px-3 font-medium text-slate-600">Injection Vol.</th>
-                      <th className="text-left py-2 px-3 font-medium text-slate-600">Pen Units</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {cheatSheet.map((peptide, i) => (
-                      <tr key={peptide.name} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                        <td className="py-2 px-3 font-medium text-slate-900">{peptide.name}</td>
-                        <td className="py-2 px-3 text-slate-700">{peptide.injectionVolume}</td>
-                        <td className="py-2 px-3 font-bold text-green-600 text-lg">{peptide.penUnits}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
+                  {/* Info Grid */}
+                  <div className="grid grid-cols-2 gap-3 text-sm mb-3">
+                    <div className="bg-white/60 rounded-lg p-2">
+                      <div className="text-slate-500 text-xs uppercase tracking-wide">Reconstitution</div>
+                      <div className={`font-medium ${styles.text}`}>
+                        {peptide.vialAmount} + {peptide.bacWater}
+                      </div>
+                      <div className="text-slate-600 text-xs">
+                        = {peptide.concentration}
+                      </div>
+                    </div>
+                    <div className="bg-white/60 rounded-lg p-2">
+                      <div className="text-slate-500 text-xs uppercase tracking-wide">Your Dose</div>
+                      <div className={`font-medium ${styles.text}`}>
+                        {peptide.dose}
+                      </div>
+                      <div className="text-slate-600 text-xs">
+                        = {peptide.injectionVolume}
+                      </div>
+                    </div>
+                  </div>
 
-          {/* Visual Syringe Reference */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold text-slate-700">
-                Visual Reference
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {cheatSheet.map((peptide) => (
-                <div key={peptide.name} className="border-b border-slate-100 pb-4 last:border-0 last:pb-0">
-                  <div className="font-medium text-slate-900 mb-1">{peptide.name}</div>
+                  {/* Syringe Visual */}
                   <SyringeVisual
                     units={peptide.penUnitsNum}
                     dose={peptide.dose}
                     concentration={peptide.concentration}
                   />
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
+            )
+          })}
         </div>
       ) : (
         <Card className="bg-slate-50 border-slate-200">

@@ -38,7 +38,7 @@ export const PEPTIDE_REFERENCE: PeptideReference[] = [
       { amount: 10, unit: 'mg' },
     ],
     recommendedDiluentMl: 2,
-    typicalDose: { min: 250, max: 500, unit: 'mcg' },
+    typicalDose: { min: 500, max: 500, unit: 'mcg' }, // Standard dose: 500mcg 1-2x daily
     description: 'Healing peptide for gut, tendons, and tissue repair',
   },
   {
@@ -50,7 +50,7 @@ export const PEPTIDE_REFERENCE: PeptideReference[] = [
       { amount: 10, unit: 'mg' },
     ],
     recommendedDiluentMl: 2,
-    typicalDose: { min: 2, max: 5, unit: 'mg' },
+    typicalDose: { min: 2.5, max: 2.5, unit: 'mg' }, // Standard dose: 2.5mg 2x/week
     description: 'Promotes healing, flexibility, and tissue repair',
   },
 
@@ -64,7 +64,7 @@ export const PEPTIDE_REFERENCE: PeptideReference[] = [
       { amount: 10, unit: 'mg' },
     ],
     recommendedDiluentMl: 2,
-    typicalDose: { min: 200, max: 400, unit: 'mcg' },
+    typicalDose: { min: 300, max: 300, unit: 'mcg' }, // Standard dose: 300mcg before bed
     description: 'Growth hormone secretagogue for recovery and anti-aging',
   },
   {
@@ -76,7 +76,7 @@ export const PEPTIDE_REFERENCE: PeptideReference[] = [
       { amount: 5, unit: 'mg' },
     ],
     recommendedDiluentMl: 2,
-    typicalDose: { min: 100, max: 300, unit: 'mcg' },
+    typicalDose: { min: 100, max: 100, unit: 'mcg' }, // Standard dose: 100mcg with GHRP
     description: 'Growth hormone releasing hormone for sustained GH release',
   },
   {
@@ -88,7 +88,7 @@ export const PEPTIDE_REFERENCE: PeptideReference[] = [
       { amount: 15, unit: 'mg' },
     ],
     recommendedDiluentMl: 3,
-    typicalDose: { min: 200, max: 500, unit: 'mcg' },
+    typicalDose: { min: 300, max: 300, unit: 'mcg' }, // Standard dose: 300mcg before bed
     description: 'Growth hormone releasing peptide',
   },
   {
@@ -99,7 +99,7 @@ export const PEPTIDE_REFERENCE: PeptideReference[] = [
       { amount: 2, unit: 'mg' },
     ],
     recommendedDiluentMl: 2,
-    typicalDose: { min: 1, max: 2, unit: 'mg' },
+    typicalDose: { min: 2, max: 2, unit: 'mg' }, // FDA dose: 2mg daily
     description: 'FDA-approved GHRH for visceral fat reduction',
   },
   {
@@ -111,7 +111,7 @@ export const PEPTIDE_REFERENCE: PeptideReference[] = [
       { amount: 10, unit: 'mg' },
     ],
     recommendedDiluentMl: 2,
-    typicalDose: { min: 100, max: 300, unit: 'mcg' },
+    typicalDose: { min: 100, max: 100, unit: 'mcg' }, // Standard dose: 100mcg 2-3x daily
     description: 'Growth hormone releasing peptide (increases appetite)',
   },
   {
@@ -123,7 +123,7 @@ export const PEPTIDE_REFERENCE: PeptideReference[] = [
       { amount: 10, unit: 'mg' },
     ],
     recommendedDiluentMl: 2,
-    typicalDose: { min: 100, max: 300, unit: 'mcg' },
+    typicalDose: { min: 100, max: 100, unit: 'mcg' }, // Standard dose: 100mcg 2-3x daily
     description: 'Growth hormone releasing peptide',
   },
   {
@@ -134,7 +134,7 @@ export const PEPTIDE_REFERENCE: PeptideReference[] = [
       { amount: 25, unit: 'mg' }, // Often oral
     ],
     recommendedDiluentMl: 1,
-    typicalDose: { min: 10, max: 25, unit: 'mg' },
+    typicalDose: { min: 25, max: 25, unit: 'mg' }, // Standard dose: 25mg daily
     description: 'Oral growth hormone secretagogue',
   },
 
@@ -150,7 +150,7 @@ export const PEPTIDE_REFERENCE: PeptideReference[] = [
       { amount: 30, unit: 'mg' },
     ],
     recommendedDiluentMl: 1,
-    typicalDose: { min: 2.5, max: 15, unit: 'mg' },
+    typicalDose: { min: 2.5, max: 2.5, unit: 'mg' }, // Start dose: 2.5mg weekly (titrate up)
     description: 'GLP-1/GIP dual agonist for weight loss and blood sugar',
   },
   {
@@ -163,7 +163,7 @@ export const PEPTIDE_REFERENCE: PeptideReference[] = [
       { amount: 10, unit: 'mg' },
     ],
     recommendedDiluentMl: 2,
-    typicalDose: { min: 0.25, max: 2.4, unit: 'mg' },
+    typicalDose: { min: 0.25, max: 0.25, unit: 'mg' }, // Start dose: 0.25mg weekly (titrate up)
     description: 'GLP-1 agonist for weight loss and blood sugar control',
   },
   {
@@ -175,7 +175,7 @@ export const PEPTIDE_REFERENCE: PeptideReference[] = [
       { amount: 12, unit: 'mg' },
     ],
     recommendedDiluentMl: 2,
-    typicalDose: { min: 1, max: 12, unit: 'mg' },
+    typicalDose: { min: 1, max: 1, unit: 'mg' }, // Start dose: 1mg weekly (titrate up)
     description: 'Triple agonist (GLP-1/GIP/Glucagon) for weight loss',
   },
   {
@@ -186,7 +186,7 @@ export const PEPTIDE_REFERENCE: PeptideReference[] = [
       { amount: 5, unit: 'mg' },
     ],
     recommendedDiluentMl: 2,
-    typicalDose: { min: 250, max: 500, unit: 'mcg' },
+    typicalDose: { min: 300, max: 300, unit: 'mcg' }, // Standard dose: 300mcg daily
     description: 'Fat-burning fragment of HGH',
   },
 
@@ -200,7 +200,7 @@ export const PEPTIDE_REFERENCE: PeptideReference[] = [
       { amount: 100, unit: 'mg' },
     ],
     recommendedDiluentMl: 2,
-    typicalDose: { min: 1, max: 2, unit: 'mg' },
+    typicalDose: { min: 1, max: 1, unit: 'mg' }, // Standard dose: 1mg daily
     description: 'Copper peptide for skin, hair, and tissue remodeling',
   },
   {
@@ -211,7 +211,7 @@ export const PEPTIDE_REFERENCE: PeptideReference[] = [
       { amount: 10, unit: 'mg' },
     ],
     recommendedDiluentMl: 2,
-    typicalDose: { min: 250, max: 500, unit: 'mcg' },
+    typicalDose: { min: 250, max: 250, unit: 'mcg' }, // Loading dose: 250mcg daily
     description: 'Tanning peptide',
   },
   {
@@ -222,7 +222,7 @@ export const PEPTIDE_REFERENCE: PeptideReference[] = [
       { amount: 10, unit: 'mg' },
     ],
     recommendedDiluentMl: 2,
-    typicalDose: { min: 500, max: 2000, unit: 'mcg' },
+    typicalDose: { min: 1000, max: 1000, unit: 'mcg' }, // Standard dose: 1mg as needed
     description: 'Sexual function peptide',
   },
 
@@ -236,7 +236,7 @@ export const PEPTIDE_REFERENCE: PeptideReference[] = [
       { amount: 50, unit: 'mg' },
     ],
     recommendedDiluentMl: 2,
-    typicalDose: { min: 5, max: 10, unit: 'mg' },
+    typicalDose: { min: 5, max: 5, unit: 'mg' }, // Standard dose: 5mg daily for 10-20 days
     description: 'Telomerase activator for anti-aging',
   },
   {
@@ -247,7 +247,7 @@ export const PEPTIDE_REFERENCE: PeptideReference[] = [
       { amount: 5, unit: 'mg' },
     ],
     recommendedDiluentMl: 1,
-    typicalDose: { min: 1, max: 3, unit: 'mg' },
+    typicalDose: { min: 1.6, max: 1.6, unit: 'mg' }, // Standard dose: 1.6mg 2x/week
     description: 'Immune modulating peptide',
   },
   {
@@ -258,7 +258,7 @@ export const PEPTIDE_REFERENCE: PeptideReference[] = [
       { amount: 5, unit: 'mg' },
     ],
     recommendedDiluentMl: 2,
-    typicalDose: { min: 50, max: 100, unit: 'mcg' },
+    typicalDose: { min: 100, max: 100, unit: 'mcg' }, // Standard dose: 100mcg daily
     description: 'Antimicrobial and immune peptide',
   },
   {
@@ -269,7 +269,7 @@ export const PEPTIDE_REFERENCE: PeptideReference[] = [
       { amount: 5, unit: 'mg' },
     ],
     recommendedDiluentMl: 2,
-    typicalDose: { min: 250, max: 500, unit: 'mcg' },
+    typicalDose: { min: 300, max: 300, unit: 'mcg' }, // Standard dose: 300mcg 1-2x daily
     description: 'Anxiolytic and cognitive peptide',
   },
   {
@@ -280,7 +280,7 @@ export const PEPTIDE_REFERENCE: PeptideReference[] = [
       { amount: 5, unit: 'mg' },
     ],
     recommendedDiluentMl: 2,
-    typicalDose: { min: 200, max: 600, unit: 'mcg' },
+    typicalDose: { min: 500, max: 500, unit: 'mcg' }, // Standard dose: 500mcg 1-2x daily
     description: 'Cognitive enhancement peptide',
   },
   {
@@ -291,7 +291,7 @@ export const PEPTIDE_REFERENCE: PeptideReference[] = [
       { amount: 10, unit: 'mg' }, // Often combined
     ],
     recommendedDiluentMl: 2,
-    typicalDose: { min: 500, max: 1000, unit: 'mcg' },
+    typicalDose: { min: 750, max: 750, unit: 'mcg' }, // Standard dose: 750mcg daily
     description: 'Combined healing stack',
   },
   {
@@ -303,7 +303,7 @@ export const PEPTIDE_REFERENCE: PeptideReference[] = [
       { amount: 500, unit: 'mg' },
     ],
     recommendedDiluentMl: 2,
-    typicalDose: { min: 50, max: 250, unit: 'mg' },
+    typicalDose: { min: 100, max: 100, unit: 'mg' }, // Standard dose: 100mg 2-3x/week
     description: 'Cellular energy and longevity molecule',
   },
   {
@@ -315,7 +315,7 @@ export const PEPTIDE_REFERENCE: PeptideReference[] = [
       { amount: 600, unit: 'mg' },
     ],
     recommendedDiluentMl: 2,
-    typicalDose: { min: 100, max: 600, unit: 'mg' },
+    typicalDose: { min: 200, max: 200, unit: 'mg' }, // Standard dose: 200mg 2-3x/week
     description: 'Master antioxidant',
   },
 ]

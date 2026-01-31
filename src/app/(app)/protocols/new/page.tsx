@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
-import { Lightbulb } from 'lucide-react'
+import { Lightbulb, History } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -11,7 +11,11 @@ import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { getReconstitutionDefaults, getRecommendedDiluent } from '@/lib/peptide-reference'
 import { SyringeVisual } from '@/components/syringe-visual'
-import type { Peptide, DayOfWeek } from '@/types'
+import type { Peptide, DayOfWeek, Protocol } from '@/types'
+
+interface ProtocolWithPeptide extends Protocol {
+  peptide: Peptide
+}
 
 const DOSE_UNITS = [
   { value: 'mcg', label: 'mcg' },
@@ -40,6 +44,7 @@ export default function NewProtocolPage() {
   const { currentUserId } = useAppStore()
 
   const [peptides, setPeptides] = useState<Peptide[]>([])
+  const [existingProtocols, setExistingProtocols] = useState<ProtocolWithPeptide[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [showNewPeptide, setShowNewPeptide] = useState(false)
 
@@ -62,35 +67,91 @@ export default function NewProtocolPage() {
   const [diluentVolume, setDiluentVolume] = useState('')
   const [showReconstitution, setShowReconstitution] = useState(false)
   const [recommendation, setRecommendation] = useState<{
+    source: 'previous' | 'reference'
     vialUnit: string
     doseAmount: number
     doseUnit: string
-    doseMin: number
-    doseMax: number
-    typicalVialSizes: { amount: number; unit: string }[]
+    doseMin?: number
+    doseMax?: number
+    typicalVialSizes?: { amount: number; unit: string }[]
     peptideName: string
+    // Previous protocol details
+    vialAmount?: number
+    diluentVolume?: number
   } | null>(null)
 
   useEffect(() => {
     fetchPeptides()
-  }, [])
+    if (currentUserId) {
+      fetchExistingProtocols()
+    }
+  }, [currentUserId])
 
   // Check for recommendations when peptide is selected
   useEffect(() => {
     if (peptideId) {
       const selectedPeptide = peptides.find(p => p.id === peptideId)
       if (selectedPeptide) {
-        checkForRecommendation(selectedPeptide.name)
+        checkForRecommendation(selectedPeptide)
       }
     } else {
       setRecommendation(null)
     }
-  }, [peptideId, peptides])
+  }, [peptideId, peptides, existingProtocols])
 
-  function checkForRecommendation(peptideName: string) {
-    const defaults = getReconstitutionDefaults(peptideName)
+  async function fetchExistingProtocols() {
+    try {
+      const res = await fetch(`/api/protocols?userId=${currentUserId}`)
+      if (res.ok) {
+        const data = await res.json()
+        setExistingProtocols(data)
+      }
+    } catch (error) {
+      console.error('Error fetching protocols:', error)
+    }
+  }
+
+  function checkForRecommendation(peptide: Peptide) {
+    // First check if user has a previous protocol for this peptide
+    const previousProtocol = existingProtocols.find(p => p.peptideId === peptide.id)
+
+    if (previousProtocol) {
+      // Use user's previous settings
+      setRecommendation({
+        source: 'previous',
+        peptideName: peptide.name,
+        doseAmount: previousProtocol.doseAmount,
+        doseUnit: previousProtocol.doseUnit,
+        vialUnit: previousProtocol.vialUnit || 'mg',
+        vialAmount: previousProtocol.vialAmount || undefined,
+        diluentVolume: previousProtocol.diluentVolume || undefined,
+      })
+      // Auto-fill from previous protocol
+      if (!doseAmount) {
+        setDoseAmount(previousProtocol.doseAmount.toString())
+        setDoseUnit(previousProtocol.doseUnit)
+      }
+      if (previousProtocol.vialAmount) {
+        setVialAmount(previousProtocol.vialAmount.toString())
+        setVialUnit(previousProtocol.vialUnit || 'mg')
+      }
+      if (previousProtocol.diluentVolume) {
+        setDiluentVolume(previousProtocol.diluentVolume.toString())
+      }
+      if (previousProtocol.vialAmount && previousProtocol.diluentVolume) {
+        setShowReconstitution(true)
+      }
+      return
+    }
+
+    // Fall back to reference database
+    const defaults = getReconstitutionDefaults(peptide.name)
     if (defaults) {
-      setRecommendation({ ...defaults, peptideName })
+      setRecommendation({
+        source: 'reference',
+        ...defaults,
+        peptideName: peptide.name
+      })
       // Auto-fill dose and expand reconstitution section
       if (!doseAmount) {
         setDoseAmount(defaults.doseAmount.toString())
@@ -143,9 +204,8 @@ export default function NewProtocolPage() {
         setPeptides([...peptides, peptide])
         setPeptideId(peptide.id)
         setShowNewPeptide(false)
-        // Check for recommendations for the new peptide
-        checkForRecommendation(newPeptideName.trim())
         setNewPeptideName('')
+        // Note: checkForRecommendation will be called by the useEffect
       }
     } catch (error) {
       console.error('Error creating peptide:', error)
@@ -260,7 +320,27 @@ export default function NewProtocolPage() {
         </Card>
 
         {/* Recommendation Banner */}
-        {recommendation && (
+        {recommendation && recommendation.source === 'previous' && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <History className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <div className="font-medium text-green-900 text-sm">
+                  Using your previous {recommendation.peptideName} settings
+                </div>
+                <div className="text-green-700 text-sm mt-1">
+                  Your dose: {recommendation.doseAmount} {recommendation.doseUnit}
+                  {recommendation.vialAmount && recommendation.diluentVolume && (
+                    <span className="text-green-600 ml-2">
+                      ({recommendation.vialAmount}{recommendation.vialUnit} + {recommendation.diluentVolume}mL)
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        {recommendation && recommendation.source === 'reference' && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <div className="flex items-start gap-3">
               <Lightbulb className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
@@ -269,11 +349,13 @@ export default function NewProtocolPage() {
                   {recommendation.peptideName} - Enter your vial size below
                 </div>
                 <div className="text-blue-700 text-sm mt-1">
-                  Typical dose: {recommendation.doseMin}-{recommendation.doseMax} {recommendation.doseUnit} (auto-filled)
+                  Recommended dose: {recommendation.doseAmount} {recommendation.doseUnit}
                 </div>
-                <div className="text-blue-600 text-xs mt-1">
-                  Common vial sizes: {recommendation.typicalVialSizes.map(v => `${v.amount}${v.unit}`).join(', ')}
-                </div>
+                {recommendation.typicalVialSizes && (
+                  <div className="text-blue-600 text-xs mt-1">
+                    Common vial sizes: {recommendation.typicalVialSizes.map(v => `${v.amount}${v.unit}`).join(', ')}
+                  </div>
+                )}
               </div>
             </div>
           </div>
