@@ -20,6 +20,7 @@ import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { useAppStore } from '@/store'
+import { SyringeVisual } from '@/components/syringe-visual'
 import type { ReconstitutionResult, Protocol, Peptide } from '@/types'
 
 const DOSE_UNITS = [
@@ -93,6 +94,7 @@ export default function ReconstitutionPage() {
       dose: `${protocol.doseAmount} ${protocol.doseUnit}`,
       injectionVolume: `${volumeMl.toFixed(3)} mL`,
       penUnits: `${penUnits} units`,
+      penUnitsNum: penUnits, // numeric for syringe visual
       color: COLORS[index % COLORS.length],
     }
   })
@@ -205,10 +207,17 @@ export default function ReconstitutionPage() {
                         {peptide.dose}
                       </div>
                       <div className="text-slate-600 text-xs mt-0.5">
-                        = {peptide.injectionVolume} ({peptide.penUnits})
+                        = {peptide.injectionVolume}
                       </div>
                     </div>
                   </div>
+
+                  {/* Syringe Visual */}
+                  <SyringeVisual
+                    units={peptide.penUnitsNum}
+                    dose={peptide.dose}
+                    concentration={peptide.concentration}
+                  />
                 </CardContent>
               </Card>
             )
