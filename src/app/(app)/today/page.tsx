@@ -15,7 +15,9 @@ import { useAppStore } from '@/store'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { BottomSheet } from '@/components/ui/bottom-sheet'
 import { DoseCardSkeleton, SummarySkeleton } from '@/components/ui/skeleton'
+import { SyringeVisual } from '@/components/syringe-visual'
 import { AlertsBanner } from '@/components/alerts-banner'
 import { cn } from '@/lib/utils'
 import type { TodayDoseItem } from '@/types'
@@ -80,6 +82,7 @@ export default function TodayPage() {
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [isLoading, setIsLoading] = useState(true)
   const [justCompleted, setJustCompleted] = useState<Set<string>>(new Set())
+  const [selectedDose, setSelectedDose] = useState<TodayDoseItem | null>(null)
 
   const fetchToday = useCallback(async () => {
     if (!currentUserId) return
@@ -286,7 +289,11 @@ export default function TodayPage() {
             >
               <CardContent className="p-4">
                 <div className="flex items-start gap-3">
-                  <div className="flex-1 min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDose(item)}
+                    className="flex-1 min-w-0 text-left"
+                  >
                     <div className="flex items-center gap-2 mb-1">
                       <span className="font-medium text-slate-900">
                         {item.peptideName}
@@ -317,7 +324,7 @@ export default function TodayPage() {
                         </>
                       )}
                     </div>
-                  </div>
+                  </button>
 
                   <div className="flex items-center gap-2">
                     {item.status === 'pending' ? (
@@ -372,6 +379,123 @@ export default function TodayPage() {
         </Card>
       )}
       </div>
+
+      {/* Dose Detail Bottom Sheet */}
+      <BottomSheet
+        isOpen={!!selectedDose}
+        onClose={() => setSelectedDose(null)}
+        title={selectedDose?.peptideName || ''}
+      >
+        {selectedDose && (
+          <div className="space-y-4">
+            {/* Pen Units - Primary Info */}
+            {selectedDose.penUnits ? (
+              <div className="text-center py-4 bg-blue-50 rounded-xl">
+                <div className="text-4xl font-bold text-blue-800">
+                  {selectedDose.penUnits} units
+                </div>
+                <div className="text-blue-600 mt-1">
+                  Draw to this line
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-4 bg-slate-50 rounded-xl">
+                <div className="text-slate-500">
+                  Add reconstitution info to your protocol to see pen units
+                </div>
+              </div>
+            )}
+
+            {/* Syringe Visual */}
+            {selectedDose.penUnits && selectedDose.concentration && (
+              <SyringeVisual
+                units={selectedDose.penUnits}
+                dose={`${selectedDose.doseAmount}${selectedDose.doseUnit}`}
+                concentration={selectedDose.concentration}
+              />
+            )}
+
+            {/* Dose Details */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-slate-50 rounded-xl p-4">
+                <div className="text-xs text-slate-500 uppercase tracking-wide mb-1">Dose</div>
+                <div className="font-semibold text-slate-900">
+                  {selectedDose.doseAmount} {selectedDose.doseUnit}
+                </div>
+              </div>
+              {selectedDose.concentration && (
+                <div className="bg-slate-50 rounded-xl p-4">
+                  <div className="text-xs text-slate-500 uppercase tracking-wide mb-1">Concentration</div>
+                  <div className="font-semibold text-slate-900">
+                    {selectedDose.concentration}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {selectedDose.timing && (
+              <div className="bg-slate-50 rounded-xl p-4">
+                <div className="text-xs text-slate-500 uppercase tracking-wide mb-1">Timing</div>
+                <div className="font-semibold text-slate-900 flex items-center gap-2">
+                  <Clock className="w-4 h-4" />
+                  {selectedDose.timing}
+                </div>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex gap-3 pt-2">
+              {selectedDose.status === 'pending' ? (
+                <>
+                  <Button
+                    variant="secondary"
+                    className="flex-1"
+                    onClick={() => {
+                      handleStatusChange(selectedDose, 'skipped')
+                      setSelectedDose(null)
+                    }}
+                  >
+                    <X className="w-4 h-4 mr-2" />
+                    Skip
+                  </Button>
+                  <Button
+                    className="flex-1 bg-green-600 hover:bg-green-700"
+                    onClick={() => {
+                      handleStatusChange(selectedDose, 'completed')
+                      setSelectedDose(null)
+                    }}
+                  >
+                    <Check className="w-4 h-4 mr-2" />
+                    Mark Done
+                  </Button>
+                </>
+              ) : selectedDose.status === 'completed' ? (
+                <Button
+                  variant="secondary"
+                  className="flex-1"
+                  onClick={() => {
+                    handleStatusChange(selectedDose, 'pending')
+                    setSelectedDose(null)
+                  }}
+                >
+                  Undo
+                </Button>
+              ) : (
+                <Button
+                  variant="secondary"
+                  className="flex-1"
+                  onClick={() => {
+                    handleStatusChange(selectedDose, 'pending')
+                    setSelectedDose(null)
+                  }}
+                >
+                  Unskip
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+      </BottomSheet>
     </div>
   )
 }

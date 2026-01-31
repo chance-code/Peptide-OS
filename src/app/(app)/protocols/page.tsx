@@ -100,6 +100,22 @@ export default function ProtocolsPage() {
     return { daysCompleted, daysRemaining, totalDays, totalWeeks, progress }
   }
 
+  function getPenUnits(protocol: ProtocolWithPeptide): number | null {
+    if (!protocol.vialAmount || !protocol.diluentVolume) return null
+
+    const concentration = protocol.vialAmount / protocol.diluentVolume
+    let doseInVialUnits = protocol.doseAmount
+
+    if (protocol.doseUnit === 'mcg' && protocol.vialUnit === 'mg') {
+      doseInVialUnits = protocol.doseAmount / 1000
+    } else if (protocol.doseUnit === 'mg' && protocol.vialUnit === 'mcg') {
+      doseInVialUnits = protocol.doseAmount * 1000
+    }
+
+    const volumeMl = doseInVialUnits / concentration
+    return Math.round(volumeMl * 100)
+  }
+
   const filteredProtocols = protocols.filter((p) => {
     if (filter === 'all') return true
     return p.status === filter
@@ -143,6 +159,7 @@ export default function ProtocolsPage() {
         <div className="space-y-3">
           {filteredProtocols.map((protocol) => {
             const stats = getProgressStats(protocol)
+            const penUnits = getPenUnits(protocol)
 
             return (
               <Link key={protocol.id} href={`/protocols/${protocol.id}`}>
@@ -150,10 +167,17 @@ export default function ProtocolsPage() {
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between mb-2">
                       <div>
-                        <div className="font-medium text-slate-900">
-                          {protocol.peptide.name}
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-slate-900">
+                            {protocol.peptide.name}
+                          </span>
+                          {penUnits && (
+                            <span className="bg-blue-100 text-blue-800 text-xs font-semibold px-2 py-0.5 rounded-full">
+                              {penUnits} units
+                            </span>
+                          )}
                         </div>
-                        <div className="text-sm text-slate-500">
+                        <div className="text-sm text-slate-500 mt-0.5">
                           {protocol.doseAmount} {protocol.doseUnit} • {protocol.frequency}
                           {protocol.timing && ` • ${protocol.timing}`}
                         </div>
