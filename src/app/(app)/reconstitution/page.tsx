@@ -19,8 +19,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
+import { CheatSheetCardSkeleton } from '@/components/ui/skeleton'
 import { useAppStore } from '@/store'
 import { SyringeVisual } from '@/components/syringe-visual'
+import { cn } from '@/lib/utils'
 import type { ReconstitutionResult, Protocol, Peptide } from '@/types'
 
 const DOSE_UNITS = [
@@ -178,18 +180,32 @@ export default function ReconstitutionPage() {
 
       {/* Quick Reference Cheat Sheet */}
       {isLoading ? (
-        <div className="text-center py-8 text-slate-500">Loading...</div>
+        <div className="space-y-3">
+          {[1, 2].map((i) => (
+            <div key={i} className={`animate-card-in stagger-${i}`}>
+              <CheatSheetCardSkeleton />
+            </div>
+          ))}
+        </div>
       ) : cheatSheet.length > 0 ? (
         <div className="space-y-3">
           {/* Pen calibration note */}
-          <div className="text-xs text-slate-500 text-center py-1">
+          <div className="text-xs text-slate-500 text-center py-1 animate-card-in">
             20-unit pen • 1 unit = 0.01 mL
           </div>
 
-          {cheatSheet.map((peptide) => {
+          {cheatSheet.map((peptide, index) => {
             const styles = colorStyles[peptide.color] || colorStyles.blue
             return (
-              <Card key={peptide.name} className={`${styles.bg} ${styles.border}`}>
+              <Card
+                key={peptide.name}
+                className={cn(
+                  styles.bg,
+                  styles.border,
+                  'animate-card-in',
+                  `stagger-${Math.min(index + 1, 10)}`
+                )}
+              >
                 <CardContent className="p-4">
                   {/* Header */}
                   <div className="flex items-center justify-between mb-3">

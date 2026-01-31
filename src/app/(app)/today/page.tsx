@@ -15,6 +15,7 @@ import { useAppStore } from '@/store'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { DoseCardSkeleton, SummarySkeleton } from '@/components/ui/skeleton'
 import { AlertsBanner } from '@/components/alerts-banner'
 import { cn } from '@/lib/utils'
 import type { TodayDoseItem } from '@/types'
@@ -226,8 +227,10 @@ export default function TodayPage() {
       </div>
 
       {/* Summary */}
-      {data && data.summary.total > 0 && (
-        <div className="grid grid-cols-3 gap-3 mb-6">
+      {isLoading ? (
+        <SummarySkeleton />
+      ) : data && data.summary.total > 0 ? (
+        <div className="grid grid-cols-3 gap-3 mb-6 animate-card-in">
           <div className="bg-white rounded-lg p-3 text-center border border-slate-100">
             <div className="text-2xl font-bold text-slate-900">
               {data.summary.total}
@@ -247,7 +250,7 @@ export default function TodayPage() {
             <div className="text-xs text-slate-500">Pending</div>
           </div>
         </div>
-      )}
+      ) : null}
 
       {/* Mark All Done Button */}
       {isToday && pendingCount > 1 && (
@@ -262,14 +265,21 @@ export default function TodayPage() {
 
       {/* Checklist */}
       {isLoading ? (
-        <div className="text-center py-8 text-slate-500">Loading...</div>
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className={`animate-card-in stagger-${i}`}>
+              <DoseCardSkeleton />
+            </div>
+          ))}
+        </div>
       ) : data && data.items.length > 0 ? (
         <div className="space-y-3">
-          {data.items.map((item) => (
+          {data.items.map((item, index) => (
             <Card
               key={item.id}
               className={cn(
-                'transition-all',
+                'transition-all animate-card-in',
+                `stagger-${Math.min(index + 1, 10)}`,
                 item.status === 'completed' && 'opacity-60',
                 item.vialExpired && 'border-amber-300 bg-amber-50/50'
               )}
