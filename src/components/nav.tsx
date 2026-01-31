@@ -26,7 +26,7 @@ const navItems = [
   { href: '/calendar', label: 'Calendar', icon: CalendarDays },
   { href: '/protocols', label: 'Protocols', icon: FileText },
   { href: '/inventory', label: 'Inventory', icon: Package },
-  { href: '/reconstitution', label: 'Calc', icon: Calculator },
+  { href: '/reconstitution', label: 'Dosing', icon: Calculator },
   { href: '/chat', label: 'Chat', icon: MessageCircle },
 ]
 

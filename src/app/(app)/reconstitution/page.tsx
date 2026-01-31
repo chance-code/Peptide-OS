@@ -167,7 +167,7 @@ export default function ReconstitutionPage() {
     <div className="p-4 pb-20 space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold text-slate-900">
-          Reconstitution Guide
+          Dosing Guide
         </h2>
         {cheatSheet.length > 0 && (
           <Button variant="secondary" size="sm" onClick={handleCopy}>
