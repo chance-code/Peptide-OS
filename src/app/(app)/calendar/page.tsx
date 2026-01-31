@@ -34,7 +34,25 @@ interface DayData {
   protocols: {
     protocol: ProtocolWithPeptide
     status: 'pending' | 'completed' | 'skipped' | 'missed' | 'scheduled'
+    penUnits?: number | null
   }[]
+}
+
+// Calculate pen units from protocol reconstitution info
+function calculatePenUnits(protocol: ProtocolWithPeptide): number | null {
+  if (!protocol.vialAmount || !protocol.diluentVolume) return null
+
+  const concentration = protocol.vialAmount / protocol.diluentVolume
+  let doseInVialUnits = protocol.doseAmount
+
+  if (protocol.doseUnit === 'mcg' && protocol.vialUnit === 'mg') {
+    doseInVialUnits = protocol.doseAmount / 1000
+  } else if (protocol.doseUnit === 'mg' && protocol.vialUnit === 'mcg') {
+    doseInVialUnits = protocol.doseAmount * 1000
+  }
+
+  const volumeMl = doseInVialUnits / concentration
+  return Math.round(volumeMl * 100)
 }
 
 const DAY_INDEX_MAP: Record<number, DayOfWeek> = {
@@ -160,7 +178,7 @@ export default function CalendarPage() {
           status = 'pending'
         }
 
-        dayProtocols.push({ protocol, status })
+        dayProtocols.push({ protocol, status, penUnits: calculatePenUnits(protocol) })
       }
 
       days.push({
@@ -377,7 +395,7 @@ export default function CalendarPage() {
                   </Button>
                 )}
 
-                {selectedDayData.protocols.map(({ protocol, status }) => (
+                {selectedDayData.protocols.map(({ protocol, status, penUnits }) => (
                   <div
                     key={protocol.id}
                     className={cn(
@@ -386,8 +404,15 @@ export default function CalendarPage() {
                     )}
                   >
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium text-slate-900 text-lg">
-                        {protocol.peptide.name}
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-medium text-slate-900 text-lg">
+                          {protocol.peptide.name}
+                        </span>
+                        {penUnits && (
+                          <span className="bg-blue-100 text-blue-800 text-sm font-semibold px-2 py-0.5 rounded-full">
+                            {penUnits} units
+                          </span>
+                        )}
                       </div>
                       <div className="text-sm text-slate-500">
                         {protocol.doseAmount} {protocol.doseUnit}

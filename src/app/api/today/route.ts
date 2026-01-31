@@ -128,6 +128,26 @@ export async function GET(request: NextRequest) {
       const hasExpiredVial = expiredPeptideIds.has(protocol.peptideId)
       const hasValidInventory = validPeptideIds.has(protocol.peptideId)
 
+      // Calculate pen units if reconstitution info is available
+      let penUnits: number | null = null
+      let concentration: string | null = null
+
+      if (protocol.vialAmount && protocol.diluentVolume) {
+        const conc = protocol.vialAmount / protocol.diluentVolume
+        concentration = `${conc.toFixed(2)} ${protocol.vialUnit || 'mg'}/mL`
+
+        // Convert dose to vial units if different
+        let doseInVialUnits = protocol.doseAmount
+        if (protocol.doseUnit === 'mcg' && protocol.vialUnit === 'mg') {
+          doseInVialUnits = protocol.doseAmount / 1000
+        } else if (protocol.doseUnit === 'mg' && protocol.vialUnit === 'mcg') {
+          doseInVialUnits = protocol.doseAmount * 1000
+        }
+
+        const volumeMl = doseInVialUnits / conc
+        penUnits = Math.round(volumeMl * 100)
+      }
+
       todayItems.push({
         id: existingLog?.id || `temp-${protocol.id}`,
         protocolId: protocol.id,
@@ -139,6 +159,8 @@ export async function GET(request: NextRequest) {
         status: existingLog?.status as TodayDoseItem['status'] || 'pending',
         notes: existingLog?.notes,
         vialExpired: !hasValidInventory && hasExpiredVial,
+        penUnits,
+        concentration,
       })
     }
 

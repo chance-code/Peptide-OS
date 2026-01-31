@@ -38,6 +38,9 @@ export interface TodayDoseItem {
   status: DoseLogStatus
   notes?: string | null
   vialExpired?: boolean
+  // Pen units to draw (calculated from reconstitution info)
+  penUnits?: number | null
+  concentration?: string | null
 }
 
 // Adherence stats
