@@ -348,28 +348,63 @@ export function findPeptideReference(name: string): PeptideReference | undefined
 
 /**
  * Get default reconstitution values for a peptide
+ * Note: vialAmount is NOT included - user should enter their own vial size
  */
 export function getReconstitutionDefaults(peptideName: string): {
-  vialAmount: number
   vialUnit: string
-  diluentVolume: number
   doseAmount: number
   doseUnit: string
+  doseMin: number
+  doseMax: number
+  typicalVialSizes: { amount: number; unit: string }[]
 } | null {
   const ref = findPeptideReference(peptideName)
   if (!ref) return null
 
-  // Use the most common vial size (usually the first one listed)
-  const vialSize = ref.typicalVialSizes[0]
-
   return {
-    vialAmount: vialSize.amount,
-    vialUnit: vialSize.unit,
-    diluentVolume: ref.recommendedDiluentMl,
-    // Use middle of dose range
+    vialUnit: ref.typicalVialSizes[0].unit,
+    // Use middle of dose range as default
     doseAmount: Math.round((ref.typicalDose.min + ref.typicalDose.max) / 2),
     doseUnit: ref.typicalDose.unit,
+    doseMin: ref.typicalDose.min,
+    doseMax: ref.typicalDose.max,
+    typicalVialSizes: ref.typicalVialSizes,
   }
+}
+
+/**
+ * Get recommended BAC water amount based on vial size
+ * Aims for a concentration that results in reasonable injection volumes
+ */
+export function getRecommendedDiluent(peptideName: string, vialAmount: number, vialUnit: string): number | null {
+  const ref = findPeptideReference(peptideName)
+  if (!ref) return null
+
+  // Calculate diluent to achieve a good concentration
+  // Goal: typical dose should be ~5-20 units (0.05-0.2mL) for easy measurement
+  const typicalDose = (ref.typicalDose.min + ref.typicalDose.max) / 2
+
+  // Convert dose to vial units if needed
+  let doseInVialUnits = typicalDose
+  if (ref.typicalDose.unit === 'mcg' && vialUnit === 'mg') {
+    doseInVialUnits = typicalDose / 1000
+  } else if (ref.typicalDose.unit === 'mg' && vialUnit === 'mcg') {
+    doseInVialUnits = typicalDose * 1000
+  }
+
+  // Target: ~10 units per dose (0.1mL)
+  // concentration = vialAmount / diluent
+  // volumePerDose = doseInVialUnits / concentration
+  // 0.1 = doseInVialUnits / (vialAmount / diluent)
+  // diluent = vialAmount * 0.1 / doseInVialUnits
+  const targetVolumeMl = 0.1
+  let recommendedDiluent = (vialAmount * targetVolumeMl) / doseInVialUnits
+
+  // Round to reasonable values (0.5, 1, 1.5, 2, 2.5, 3, etc.)
+  recommendedDiluent = Math.round(recommendedDiluent * 2) / 2
+
+  // Clamp to reasonable range
+  return Math.max(0.5, Math.min(5, recommendedDiluent))
 }
 
 /**

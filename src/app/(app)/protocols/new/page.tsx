@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
-import { findPeptideReference, getReconstitutionDefaults } from '@/lib/peptide-reference'
+import { getReconstitutionDefaults, getRecommendedDiluent } from '@/lib/peptide-reference'
 import type { Peptide, DayOfWeek } from '@/types'
 
 const DOSE_UNITS = [
@@ -61,11 +61,12 @@ export default function NewProtocolPage() {
   const [diluentVolume, setDiluentVolume] = useState('')
   const [showReconstitution, setShowReconstitution] = useState(false)
   const [recommendation, setRecommendation] = useState<{
-    vialAmount: number
     vialUnit: string
-    diluentVolume: number
     doseAmount: number
     doseUnit: string
+    doseMin: number
+    doseMax: number
+    typicalVialSizes: { amount: number; unit: string }[]
     peptideName: string
   } | null>(null)
 
@@ -98,20 +99,23 @@ export default function NewProtocolPage() {
     if (!recommendation) return
     setDoseAmount(recommendation.doseAmount.toString())
     setDoseUnit(recommendation.doseUnit)
-    setVialAmount(recommendation.vialAmount.toString())
     setVialUnit(recommendation.vialUnit)
-    setDiluentVolume(recommendation.diluentVolume.toString())
     setShowReconstitution(true) // Auto-expand the section
     setRecommendation(null) // Clear after applying
   }
 
-  // Auto-expand reconstitution section when a known peptide is selected
+  // Auto-suggest BAC water when vial amount changes
   useEffect(() => {
-    if (recommendation) {
-      // A known peptide was selected - the recommendation banner is showing
-      // User will click "Apply Recommendations" to fill in values
+    if (vialAmount && peptideId) {
+      const selectedPeptide = peptides.find(p => p.id === peptideId)
+      if (selectedPeptide) {
+        const recommendedDiluent = getRecommendedDiluent(selectedPeptide.name, parseFloat(vialAmount), vialUnit)
+        if (recommendedDiluent && !diluentVolume) {
+          setDiluentVolume(recommendedDiluent.toString())
+        }
+      }
     }
-  }, [recommendation])
+  }, [vialAmount, vialUnit, peptideId, peptides])
 
   async function fetchPeptides() {
     try {
@@ -263,11 +267,13 @@ export default function NewProtocolPage() {
               <Lightbulb className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
                 <div className="font-medium text-blue-900 text-sm">
-                  Recommended settings for {recommendation.peptideName}
+                  Info for {recommendation.peptideName}
                 </div>
                 <div className="text-blue-700 text-sm mt-1">
-                  {recommendation.vialAmount}{recommendation.vialUnit} vial + {recommendation.diluentVolume}mL BAC water •
-                  Typical dose: {recommendation.doseAmount}{recommendation.doseUnit}
+                  Typical dose: {recommendation.doseMin}-{recommendation.doseMax} {recommendation.doseUnit}
+                </div>
+                <div className="text-blue-600 text-xs mt-1">
+                  Common vial sizes: {recommendation.typicalVialSizes.map(v => `${v.amount}${v.unit}`).join(', ')}
                 </div>
                 <Button
                   type="button"
@@ -275,7 +281,7 @@ export default function NewProtocolPage() {
                   className="mt-2"
                   onClick={applyRecommendation}
                 >
-                  Apply Recommendations
+                  Use Typical Dose
                 </Button>
               </div>
             </div>

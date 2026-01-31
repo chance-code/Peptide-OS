@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
-import { getReconstitutionDefaults } from '@/lib/peptide-reference'
+import { getReconstitutionDefaults, getRecommendedDiluent } from '@/lib/peptide-reference'
 import type { Peptide, Protocol } from '@/types'
 
 interface ProtocolWithReconstitution extends Protocol {
@@ -32,9 +32,8 @@ export default function NewInventoryPage() {
   const [showNewPeptide, setShowNewPeptide] = useState(false)
   const [recommendation, setRecommendation] = useState<{
     source: 'protocol' | 'reference'
-    vialAmount: number
     vialUnit: string
-    diluentVolume: number
+    typicalVialSizes?: { amount: number; unit: string }[]
     peptideName: string
   } | null>(null)
 
@@ -79,37 +78,45 @@ export default function NewInventoryPage() {
     if (userProtocol) {
       setRecommendation({
         source: 'protocol',
-        vialAmount: userProtocol.vialAmount!,
         vialUnit: userProtocol.vialUnit || 'mg',
-        diluentVolume: userProtocol.diluentVolume!,
         peptideName: peptide.name,
       })
+      // Auto-fill from protocol since user already set this up
+      setTotalAmount(userProtocol.vialAmount!.toString())
+      setTotalUnit(userProtocol.vialUnit || 'mg')
+      setDiluentVolume(userProtocol.diluentVolume!.toString())
       return
     }
 
-    // Otherwise check reference database
+    // Otherwise check reference database for info
     const defaults = getReconstitutionDefaults(peptide.name)
     if (defaults) {
       setRecommendation({
         source: 'reference',
-        vialAmount: defaults.vialAmount,
         vialUnit: defaults.vialUnit,
-        diluentVolume: defaults.diluentVolume,
+        typicalVialSizes: defaults.typicalVialSizes,
         peptideName: peptide.name,
       })
+      // Don't auto-fill vial amount - user enters their own
+      setTotalUnit(defaults.vialUnit)
       return
     }
 
     setRecommendation(null)
   }
 
-  function applyRecommendation() {
-    if (!recommendation) return
-    setTotalAmount(recommendation.vialAmount.toString())
-    setTotalUnit(recommendation.vialUnit)
-    setDiluentVolume(recommendation.diluentVolume.toString())
-    setRecommendation(null)
-  }
+  // Auto-suggest BAC water when vial amount changes
+  useEffect(() => {
+    if (totalAmount && peptideId && !diluentVolume) {
+      const selectedPeptide = peptides.find(p => p.id === peptideId)
+      if (selectedPeptide) {
+        const recommendedDiluent = getRecommendedDiluent(selectedPeptide.name, parseFloat(totalAmount), totalUnit)
+        if (recommendedDiluent) {
+          setDiluentVolume(recommendedDiluent.toString())
+        }
+      }
+    }
+  }, [totalAmount, totalUnit, peptideId, peptides])
 
   async function fetchProtocols() {
     try {
@@ -276,20 +283,14 @@ export default function NewInventoryPage() {
               <div className="flex-1">
                 <div className="font-medium text-blue-900 text-sm">
                   {recommendation.source === 'protocol'
-                    ? `From your ${recommendation.peptideName} protocol`
-                    : `Typical settings for ${recommendation.peptideName}`}
+                    ? `Using settings from your ${recommendation.peptideName} protocol`
+                    : `Info for ${recommendation.peptideName}`}
                 </div>
-                <div className="text-blue-700 text-sm mt-1">
-                  {recommendation.vialAmount}{recommendation.vialUnit} vial + {recommendation.diluentVolume}mL BAC water
-                </div>
-                <Button
-                  type="button"
-                  size="sm"
-                  className="mt-2"
-                  onClick={applyRecommendation}
-                >
-                  Apply
-                </Button>
+                {recommendation.source === 'reference' && recommendation.typicalVialSizes && (
+                  <div className="text-blue-600 text-xs mt-1">
+                    Common vial sizes: {recommendation.typicalVialSizes.map(v => `${v.amount}${v.unit}`).join(', ')}
+                  </div>
+                )}
               </div>
             </div>
           </div>
