@@ -15,7 +15,7 @@ import {
   isToday,
   getDay,
 } from 'date-fns'
-import { ChevronLeft, ChevronRight, Circle, CheckCircle, XCircle } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Check, X, CheckCheck } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -180,6 +180,62 @@ export default function CalendarPage() {
     ? calendarDays.find((d) => isSameDay(d.date, selectedDay))
     : null
 
+  async function handleStatusChange(
+    protocolId: string,
+    date: Date,
+    status: 'completed' | 'skipped' | 'pending'
+  ) {
+    if (!currentUserId) return
+
+    // Optimistic update
+    setDoseLogs(prev => {
+      const existingIndex = prev.findIndex(
+        l => l.protocolId === protocolId && isSameDay(new Date(l.scheduledDate), date)
+      )
+
+      if (existingIndex >= 0) {
+        const updated = [...prev]
+        updated[existingIndex] = { ...updated[existingIndex], status }
+        return updated
+      } else {
+        // Create a minimal dose log for optimistic update
+        const newLog: DoseLog = {
+          id: `temp-${Date.now()}`,
+          protocolId,
+          userId: currentUserId,
+          scheduledDate: date,
+          status,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          notes: null,
+          completedAt: status === 'completed' ? new Date() : null,
+          actualDose: null,
+          actualUnit: null,
+          scheduleId: null,
+        }
+        return [...prev, newLog]
+      }
+    })
+
+    // Send to server
+    const dateStr = format(date, 'yyyy-MM-dd') + 'T12:00:00.000Z'
+    try {
+      await fetch('/api/doses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: currentUserId,
+          protocolId,
+          scheduledDate: dateStr,
+          status,
+        }),
+      })
+    } catch (error) {
+      console.error('Error updating dose:', error)
+      fetchData() // Revert on error
+    }
+  }
+
   return (
     <div className="p-4 pb-20">
       {/* Header */}
@@ -305,42 +361,77 @@ export default function CalendarPage() {
 
             {selectedDayData.protocols.length > 0 ? (
               <div className="space-y-2">
+                {/* Mark All Done button */}
+                {selectedDayData.protocols.filter(p =>
+                  p.status === 'pending' || p.status === 'missed' || p.status === 'scheduled'
+                ).length > 1 && (
+                  <Button
+                    onClick={() => {
+                      selectedDayData.protocols.forEach(({ protocol, status }) => {
+                        if (status === 'pending' || status === 'missed' || status === 'scheduled') {
+                          handleStatusChange(protocol.id, selectedDayData.date, 'completed')
+                        }
+                      })
+                    }}
+                    className="w-full mb-2 bg-green-600 hover:bg-green-700"
+                  >
+                    <CheckCheck className="w-4 h-4 mr-2" />
+                    Mark All Done ({selectedDayData.protocols.filter(p =>
+                      p.status === 'pending' || p.status === 'missed' || p.status === 'scheduled'
+                    ).length})
+                  </Button>
+                )}
+
                 {selectedDayData.protocols.map(({ protocol, status }) => (
                   <div
                     key={protocol.id}
-                    className="flex items-center justify-between p-2 rounded-lg bg-slate-50"
+                    className={cn(
+                      'flex items-center justify-between p-3 rounded-lg',
+                      status === 'completed' ? 'bg-green-50' : 'bg-slate-50'
+                    )}
                   >
-                    <div className="flex items-center gap-2">
-                      {status === 'completed' ? (
-                        <CheckCircle className="w-4 h-4 text-green-600" />
-                      ) : status === 'missed' ? (
-                        <XCircle className="w-4 h-4 text-red-500" />
-                      ) : (
-                        <Circle className="w-4 h-4 text-slate-300" />
-                      )}
-                      <div>
-                        <div className="font-medium text-slate-900">
-                          {protocol.peptide.name}
-                        </div>
-                        <div className="text-xs text-slate-500">
-                          {protocol.doseAmount} {protocol.doseUnit}
-                          {protocol.timing && ` • ${protocol.timing}`}
-                        </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-slate-900">
+                        {protocol.peptide.name}
+                      </div>
+                      <div className="text-sm text-slate-500">
+                        {protocol.doseAmount} {protocol.doseUnit}
+                        {protocol.timing && ` • ${protocol.timing}`}
                       </div>
                     </div>
-                    <Badge
-                      variant={
-                        status === 'completed'
-                          ? 'success'
-                          : status === 'missed'
-                          ? 'danger'
-                          : status === 'skipped'
-                          ? 'default'
-                          : 'warning'
-                      }
-                    >
-                      {status}
-                    </Badge>
+
+                    <div className="flex items-center gap-2">
+                      {status === 'pending' || status === 'missed' || status === 'scheduled' ? (
+                        <>
+                          <button
+                            onClick={() => handleStatusChange(protocol.id, selectedDayData.date, 'skipped')}
+                            className="p-2 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors"
+                          >
+                            <X className="w-5 h-5" />
+                          </button>
+                          <button
+                            onClick={() => handleStatusChange(protocol.id, selectedDayData.date, 'completed')}
+                            className="w-10 h-10 rounded-full border-2 border-slate-300 bg-white hover:border-green-500 hover:bg-green-50 flex items-center justify-center transition-colors"
+                          >
+                            <Check className="w-5 h-5 text-slate-400" />
+                          </button>
+                        </>
+                      ) : status === 'completed' ? (
+                        <button
+                          onClick={() => handleStatusChange(protocol.id, selectedDayData.date, 'pending')}
+                          className="w-10 h-10 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-colors"
+                        >
+                          <Check className="w-5 h-5 text-white" />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleStatusChange(protocol.id, selectedDayData.date, 'pending')}
+                          className="px-3 py-1 rounded bg-slate-200 hover:bg-slate-300 text-slate-600 text-sm transition-colors"
+                        >
+                          Skipped
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
