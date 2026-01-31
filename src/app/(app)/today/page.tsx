@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { format } from 'date-fns'
 import {
   Check,
@@ -18,6 +18,66 @@ import { Badge } from '@/components/ui/badge'
 import { AlertsBanner } from '@/components/alerts-banner'
 import { cn } from '@/lib/utils'
 import type { TodayDoseItem } from '@/types'
+
+// Animated checkmark button component
+function AnimatedCheckButton({
+  isCompleted,
+  onComplete,
+  onUndo
+}: {
+  isCompleted: boolean
+  onComplete: () => void
+  onUndo: () => void
+}) {
+  const [isAnimating, setIsAnimating] = useState(false)
+  const wasCompleted = useRef(isCompleted)
+
+  useEffect(() => {
+    // Trigger animation when transitioning to completed
+    if (isCompleted && !wasCompleted.current) {
+      setIsAnimating(true)
+      const timer = setTimeout(() => setIsAnimating(false), 400)
+      return () => clearTimeout(timer)
+    }
+    wasCompleted.current = isCompleted
+  }, [isCompleted])
+
+  if (isCompleted) {
+    return (
+      <button
+        type="button"
+        onClick={onUndo}
+        className={cn(
+          'w-10 h-10 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-all',
+          isAnimating && 'animate-check-pop'
+        )}
+        style={{
+          animation: isAnimating ? 'checkPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)' : undefined
+        }}
+      >
+        <Check
+          className={cn(
+            'w-5 h-5 text-white transition-transform',
+            isAnimating && 'animate-check-draw'
+          )}
+          style={{
+            animation: isAnimating ? 'checkDraw 0.3s ease-out 0.1s both' : undefined
+          }}
+        />
+      </button>
+    )
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onComplete}
+      className="w-10 h-10 rounded-full border-2 border-slate-300 bg-white hover:border-green-500 hover:bg-green-50 flex items-center justify-center transition-colors active:scale-95"
+    >
+      <Check className="w-5 h-5 text-slate-400" />
+    </button>
+  )
+}
 
 interface TodayResponse {
   date: string
@@ -258,22 +318,18 @@ export default function TodayPage() {
                         >
                           <X className="w-5 h-5" />
                         </Button>
-                        <button
-                          type="button"
-                          onClick={() => handleStatusChange(item, 'completed')}
-                          className="w-10 h-10 rounded-full border-2 border-slate-300 bg-white hover:border-green-500 hover:bg-green-50 flex items-center justify-center transition-colors active:scale-95"
-                        >
-                          <Check className="w-5 h-5 text-slate-400" />
-                        </button>
+                        <AnimatedCheckButton
+                          isCompleted={false}
+                          onComplete={() => handleStatusChange(item, 'completed')}
+                          onUndo={() => handleStatusChange(item, 'pending')}
+                        />
                       </>
                     ) : item.status === 'completed' ? (
-                      <button
-                        type="button"
-                        onClick={() => handleStatusChange(item, 'pending')}
-                        className="w-10 h-10 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-colors active:scale-95"
-                      >
-                        <Check className="w-5 h-5 text-white" />
-                      </button>
+                      <AnimatedCheckButton
+                        isCompleted={true}
+                        onComplete={() => handleStatusChange(item, 'completed')}
+                        onUndo={() => handleStatusChange(item, 'pending')}
+                      />
                     ) : (
                       <button
                         type="button"
