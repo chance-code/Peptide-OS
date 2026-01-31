@@ -90,18 +90,16 @@ export default function NewProtocolPage() {
     const defaults = getReconstitutionDefaults(peptideName)
     if (defaults) {
       setRecommendation({ ...defaults, peptideName })
+      // Auto-fill dose and expand reconstitution section
+      if (!doseAmount) {
+        setDoseAmount(defaults.doseAmount.toString())
+        setDoseUnit(defaults.doseUnit)
+      }
+      setVialUnit(defaults.vialUnit)
+      setShowReconstitution(true)
     } else {
       setRecommendation(null)
     }
-  }
-
-  function applyRecommendation() {
-    if (!recommendation) return
-    setDoseAmount(recommendation.doseAmount.toString())
-    setDoseUnit(recommendation.doseUnit)
-    setVialUnit(recommendation.vialUnit)
-    setShowReconstitution(true) // Auto-expand the section
-    setRecommendation(null) // Clear after applying
   }
 
   // Auto-suggest BAC water when vial amount changes
@@ -110,7 +108,7 @@ export default function NewProtocolPage() {
       const selectedPeptide = peptides.find(p => p.id === peptideId)
       if (selectedPeptide) {
         const recommendedDiluent = getRecommendedDiluent(selectedPeptide.name, parseFloat(vialAmount), vialUnit)
-        if (recommendedDiluent && !diluentVolume) {
+        if (recommendedDiluent) {
           setDiluentVolume(recommendedDiluent.toString())
         }
       }
@@ -267,22 +265,14 @@ export default function NewProtocolPage() {
               <Lightbulb className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
                 <div className="font-medium text-blue-900 text-sm">
-                  Info for {recommendation.peptideName}
+                  {recommendation.peptideName} - Enter your vial size below
                 </div>
                 <div className="text-blue-700 text-sm mt-1">
-                  Typical dose: {recommendation.doseMin}-{recommendation.doseMax} {recommendation.doseUnit}
+                  Typical dose: {recommendation.doseMin}-{recommendation.doseMax} {recommendation.doseUnit} (auto-filled)
                 </div>
                 <div className="text-blue-600 text-xs mt-1">
                   Common vial sizes: {recommendation.typicalVialSizes.map(v => `${v.amount}${v.unit}`).join(', ')}
                 </div>
-                <Button
-                  type="button"
-                  size="sm"
-                  className="mt-2"
-                  onClick={applyRecommendation}
-                >
-                  Use Typical Dose
-                </Button>
               </div>
             </div>
           </div>
@@ -341,15 +331,17 @@ export default function NewProtocolPage() {
           </CardHeader>
           {showReconstitution && (
             <CardContent className="space-y-3">
+              <p className="text-sm text-slate-500">Enter your vial size - BAC water will be suggested automatically</p>
               <div className="flex gap-3">
                 <div className="flex-1">
                   <Input
-                    label="Vial Amount"
+                    label="Your Vial Size"
                     type="number"
                     step="any"
                     value={vialAmount}
                     onChange={(e) => setVialAmount(e.target.value)}
-                    placeholder="e.g., 10"
+                    placeholder="e.g., 5, 10"
+                    autoFocus
                   />
                 </div>
                 <div className="w-24">
@@ -362,21 +354,22 @@ export default function NewProtocolPage() {
                 </div>
               </div>
               <Input
-                label="BAC Water (mL)"
+                label="BAC Water (mL) - auto-suggested"
                 type="number"
                 step="any"
                 value={diluentVolume}
                 onChange={(e) => setDiluentVolume(e.target.value)}
-                placeholder="e.g., 2"
+                placeholder="auto-filled when you enter vial size"
               />
               {vialAmount && diluentVolume && doseAmount && (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <div className="text-green-800 font-medium mb-2">Your Reconstitution Summary</div>
                   <div className="text-sm text-green-700">
                     <strong>Concentration:</strong>{' '}
                     {(parseFloat(vialAmount) / parseFloat(diluentVolume)).toFixed(2)} {vialUnit}/mL
                   </div>
                   <div className="text-sm text-green-700 mt-1">
-                    <strong>Per dose:</strong>{' '}
+                    <strong>Per {doseAmount}{doseUnit} dose:</strong>{' '}
                     {(() => {
                       const concentration = parseFloat(vialAmount) / parseFloat(diluentVolume)
                       let doseInVialUnits = parseFloat(doseAmount)
@@ -390,6 +383,9 @@ export default function NewProtocolPage() {
                       const units = Math.round(volumeMl * 100)
                       return `${units} units (${volumeMl.toFixed(3)} mL)`
                     })()}
+                  </div>
+                  <div className="text-xs text-green-600 mt-2">
+                    Doses per vial: ~{Math.floor(parseFloat(vialAmount) / (parseFloat(doseAmount) * (doseUnit === 'mcg' && vialUnit === 'mg' ? 0.001 : doseUnit === 'mg' && vialUnit === 'mcg' ? 1000 : 1)))}
                   </div>
                 </div>
               )}
