@@ -51,6 +51,9 @@ export async function PUT(
       timing,
       status,
       notes,
+      vialAmount,
+      vialUnit,
+      diluentVolume,
     } = body
 
     // Get current state for history
@@ -106,6 +109,20 @@ export async function PUT(
     if (notes !== undefined && notes !== currentProtocol.notes) {
       updateData.notes = notes
       changes.notes = { from: currentProtocol.notes, to: notes }
+    }
+
+    // Reconstitution fields
+    if (vialAmount !== undefined) {
+      updateData.vialAmount = vialAmount
+      changes.vialAmount = { from: currentProtocol.vialAmount, to: vialAmount }
+    }
+    if (vialUnit !== undefined) {
+      updateData.vialUnit = vialUnit
+      changes.vialUnit = { from: currentProtocol.vialUnit, to: vialUnit }
+    }
+    if (diluentVolume !== undefined) {
+      updateData.diluentVolume = diluentVolume
+      changes.diluentVolume = { from: currentProtocol.diluentVolume, to: diluentVolume }
     }
 
     // Handle status changes

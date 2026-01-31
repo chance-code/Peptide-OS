@@ -30,16 +30,41 @@ export default function TermsPage() {
 
         <section className="mb-6">
           <h2 className="text-lg font-semibold text-slate-900 mb-2">3. Medical Disclaimer</h2>
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+            <p className="text-amber-800 font-semibold mb-2">
+              IMPORTANT - PLEASE READ CAREFULLY
+            </p>
+            <p className="text-amber-700 text-sm">
+              Peptide OS is NOT a medical device, NOT FDA-approved, and does NOT provide
+              medical advice, diagnosis, treatment recommendations, or prescriptions.
+            </p>
+          </div>
           <p className="text-slate-600 mb-4">
-            <strong>IMPORTANT:</strong> Peptide OS is not a medical device and does not provide
-            medical advice, diagnosis, or treatment. The app is a tracking and organization
-            tool only. Information provided by the AI assistant is for informational purposes
-            only and should not be considered medical advice.
+            This app is a personal tracking and organization tool ONLY. It is designed to help
+            users log and track information they choose to enter. The app does not:
+          </p>
+          <ul className="list-disc list-inside text-slate-600 space-y-1 mb-4">
+            <li>Recommend, prescribe, or endorse any peptides, supplements, or treatments</li>
+            <li>Provide medical advice or guidance on dosing, timing, or protocols</li>
+            <li>Diagnose any medical condition</li>
+            <li>Replace consultation with qualified healthcare professionals</li>
+            <li>Guarantee the accuracy of any calculations or information displayed</li>
+          </ul>
+          <p className="text-slate-600 mb-4">
+            The reconstitution calculator and reference information are mathematical tools only.
+            Any dosing information, peptide data, or protocol suggestions displayed in the app
+            are user-entered or for general educational reference only. Users are solely
+            responsible for verifying all information with qualified healthcare providers.
           </p>
           <p className="text-slate-600 mb-4">
-            Always consult with a qualified healthcare provider before starting, stopping,
-            or modifying any supplement regimen. Never disregard professional medical advice
-            based on information from this app.
+            Information provided by the AI chat assistant is for general informational purposes
+            only and may contain errors. AI responses should never be relied upon for medical
+            decisions.
+          </p>
+          <p className="text-slate-600 mb-4 font-medium">
+            ALWAYS consult with a qualified healthcare provider before starting, stopping,
+            or modifying any supplement, peptide, or medication regimen. Never disregard
+            professional medical advice or delay seeking it based on information from this app.
           </p>
         </section>
 
@@ -75,17 +100,60 @@ export default function TermsPage() {
         </section>
 
         <section className="mb-6">
-          <h2 className="text-lg font-semibold text-slate-900 mb-2">7. Limitation of Liability</h2>
+          <h2 className="text-lg font-semibold text-slate-900 mb-2">7. Assumption of Risk</h2>
           <p className="text-slate-600 mb-4">
-            To the maximum extent permitted by law, Peptide OS and its creators shall not
-            be liable for any indirect, incidental, special, consequential, or punitive
-            damages arising from your use of the app. This includes, but is not limited to,
-            any health-related outcomes from following information displayed in the app.
+            You acknowledge and agree that the use of peptides, supplements, and similar
+            substances carries inherent risks. BY USING THIS APP, YOU EXPRESSLY ASSUME ALL
+            RISKS associated with your use of any substances you choose to track, including
+            but not limited to adverse health effects, interactions with medications, and
+            legal implications in your jurisdiction.
+          </p>
+          <p className="text-slate-600 mb-4">
+            You are solely responsible for researching and understanding the legal status,
+            safety, proper handling, and appropriate use of any substances you track in
+            this app. The inclusion of any peptide or substance in the app's reference
+            database does not constitute an endorsement or recommendation.
           </p>
         </section>
 
         <section className="mb-6">
-          <h2 className="text-lg font-semibold text-slate-900 mb-2">8. Data and Privacy</h2>
+          <h2 className="text-lg font-semibold text-slate-900 mb-2">8. Limitation of Liability</h2>
+          <p className="text-slate-600 mb-4">
+            TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, PEPTIDE OS, ITS CREATORS,
+            AFFILIATES, AND SERVICE PROVIDERS SHALL NOT BE LIABLE FOR ANY DIRECT, INDIRECT,
+            INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES ARISING FROM:
+          </p>
+          <ul className="list-disc list-inside text-slate-600 space-y-1 mb-4">
+            <li>Your use of or inability to use the app</li>
+            <li>Any health-related outcomes, injuries, or adverse effects</li>
+            <li>Errors, inaccuracies, or omissions in any content or calculations</li>
+            <li>Reliance on information displayed in the app or provided by the AI assistant</li>
+            <li>Unauthorized access to or alteration of your data</li>
+            <li>Any third-party conduct or content</li>
+          </ul>
+          <p className="text-slate-600 mb-4">
+            IN NO EVENT SHALL OUR TOTAL LIABILITY EXCEED THE AMOUNT YOU PAID FOR THE APP
+            IN THE TWELVE (12) MONTHS PRECEDING THE CLAIM, OR $100, WHICHEVER IS LESS.
+          </p>
+          <p className="text-slate-600 mb-4">
+            Some jurisdictions do not allow the exclusion of certain warranties or limitation
+            of liability, so some of the above limitations may not apply to you.
+          </p>
+        </section>
+
+        <section className="mb-6">
+          <h2 className="text-lg font-semibold text-slate-900 mb-2">9. Indemnification</h2>
+          <p className="text-slate-600 mb-4">
+            You agree to indemnify, defend, and hold harmless Peptide OS, its creators,
+            affiliates, officers, directors, employees, and agents from any claims, damages,
+            losses, liabilities, costs, and expenses (including reasonable attorneys' fees)
+            arising from your use of the app, your violation of these terms, or your
+            violation of any rights of another party.
+          </p>
+        </section>
+
+        <section className="mb-6">
+          <h2 className="text-lg font-semibold text-slate-900 mb-2">10. Data and Privacy</h2>
           <p className="text-slate-600 mb-4">
             Your use of the app is also governed by our Privacy Policy. By using the app,
             you consent to the collection and use of data as described in the Privacy Policy.
@@ -93,7 +161,7 @@ export default function TermsPage() {
         </section>
 
         <section className="mb-6">
-          <h2 className="text-lg font-semibold text-slate-900 mb-2">9. Service Availability</h2>
+          <h2 className="text-lg font-semibold text-slate-900 mb-2">11. Service Availability</h2>
           <p className="text-slate-600 mb-4">
             We strive to keep the app available at all times but do not guarantee uninterrupted
             access. We may modify, suspend, or discontinue features at any time without notice.
@@ -101,7 +169,17 @@ export default function TermsPage() {
         </section>
 
         <section className="mb-6">
-          <h2 className="text-lg font-semibold text-slate-900 mb-2">10. Changes to Terms</h2>
+          <h2 className="text-lg font-semibold text-slate-900 mb-2">12. Governing Law</h2>
+          <p className="text-slate-600 mb-4">
+            These terms shall be governed by and construed in accordance with the laws of
+            the State of California, without regard to its conflict of law provisions.
+            Any disputes arising under these terms shall be subject to the exclusive
+            jurisdiction of the courts located in California.
+          </p>
+        </section>
+
+        <section className="mb-6">
+          <h2 className="text-lg font-semibold text-slate-900 mb-2">13. Changes to Terms</h2>
           <p className="text-slate-600 mb-4">
             We may update these terms from time to time. Continued use of the app after
             changes constitutes acceptance of the new terms.
@@ -109,7 +187,7 @@ export default function TermsPage() {
         </section>
 
         <section className="mb-6">
-          <h2 className="text-lg font-semibold text-slate-900 mb-2">11. Contact</h2>
+          <h2 className="text-lg font-semibold text-slate-900 mb-2">14. Contact</h2>
           <p className="text-slate-600 mb-4">
             For questions about these terms, contact us at: support@peptideos.app
           </p>

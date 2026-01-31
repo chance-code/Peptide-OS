@@ -66,6 +66,11 @@ model Protocol {
   doseUnit    String    // 'mcg', 'mg', 'IU'
   timing      String?   // e.g., 'morning', 'evening', 'before bed'
 
+  // Reconstitution info (for cheat sheet)
+  vialAmount    Float?    // Total peptide in vial (e.g., 10 for 10mg)
+  vialUnit      String?   // 'mg', 'mcg', 'IU'
+  diluentVolume Float?    // mL of BAC water added
+
   // Status
   status      String    @default("active") // 'active', 'paused', 'completed'
   pausedAt    DateTime?

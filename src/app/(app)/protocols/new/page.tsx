@@ -3,11 +3,13 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
+import { Lightbulb } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
+import { findPeptideReference, getReconstitutionDefaults } from '@/lib/peptide-reference'
 import type { Peptide, DayOfWeek } from '@/types'
 
 const DOSE_UNITS = [
@@ -53,9 +55,63 @@ export default function NewProtocolPage() {
   const [timing, setTiming] = useState('')
   const [notes, setNotes] = useState('')
 
+  // Reconstitution state
+  const [vialAmount, setVialAmount] = useState('')
+  const [vialUnit, setVialUnit] = useState('mg')
+  const [diluentVolume, setDiluentVolume] = useState('')
+  const [showReconstitution, setShowReconstitution] = useState(false)
+  const [recommendation, setRecommendation] = useState<{
+    vialAmount: number
+    vialUnit: string
+    diluentVolume: number
+    doseAmount: number
+    doseUnit: string
+    peptideName: string
+  } | null>(null)
+
   useEffect(() => {
     fetchPeptides()
   }, [])
+
+  // Check for recommendations when peptide is selected
+  useEffect(() => {
+    if (peptideId) {
+      const selectedPeptide = peptides.find(p => p.id === peptideId)
+      if (selectedPeptide) {
+        checkForRecommendation(selectedPeptide.name)
+      }
+    } else {
+      setRecommendation(null)
+    }
+  }, [peptideId, peptides])
+
+  function checkForRecommendation(peptideName: string) {
+    const defaults = getReconstitutionDefaults(peptideName)
+    if (defaults) {
+      setRecommendation({ ...defaults, peptideName })
+    } else {
+      setRecommendation(null)
+    }
+  }
+
+  function applyRecommendation() {
+    if (!recommendation) return
+    setDoseAmount(recommendation.doseAmount.toString())
+    setDoseUnit(recommendation.doseUnit)
+    setVialAmount(recommendation.vialAmount.toString())
+    setVialUnit(recommendation.vialUnit)
+    setDiluentVolume(recommendation.diluentVolume.toString())
+    setShowReconstitution(true) // Auto-expand the section
+    setRecommendation(null) // Clear after applying
+  }
+
+  // Auto-expand reconstitution section when a known peptide is selected
+  useEffect(() => {
+    if (recommendation) {
+      // A known peptide was selected - the recommendation banner is showing
+      // User will click "Apply Recommendations" to fill in values
+    }
+  }, [recommendation])
 
   async function fetchPeptides() {
     try {
@@ -84,6 +140,8 @@ export default function NewProtocolPage() {
         setPeptides([...peptides, peptide])
         setPeptideId(peptide.id)
         setShowNewPeptide(false)
+        // Check for recommendations for the new peptide
+        checkForRecommendation(newPeptideName.trim())
         setNewPeptideName('')
       }
     } catch (error) {
@@ -113,6 +171,10 @@ export default function NewProtocolPage() {
           doseUnit,
           timing: timing || null,
           notes: notes || null,
+          // Reconstitution info
+          vialAmount: vialAmount ? parseFloat(vialAmount) : null,
+          vialUnit: vialAmount ? vialUnit : null,
+          diluentVolume: diluentVolume ? parseFloat(diluentVolume) : null,
         }),
       })
 
@@ -194,6 +256,32 @@ export default function NewProtocolPage() {
           </CardContent>
         </Card>
 
+        {/* Recommendation Banner */}
+        {recommendation && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <Lightbulb className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <div className="font-medium text-blue-900 text-sm">
+                  Recommended settings for {recommendation.peptideName}
+                </div>
+                <div className="text-blue-700 text-sm mt-1">
+                  {recommendation.vialAmount}{recommendation.vialUnit} vial + {recommendation.diluentVolume}mL BAC water •
+                  Typical dose: {recommendation.doseAmount}{recommendation.doseUnit}
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="mt-2"
+                  onClick={applyRecommendation}
+                >
+                  Apply Recommendations
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Dosing */}
         <Card>
           <CardHeader>
@@ -227,6 +315,80 @@ export default function NewProtocolPage() {
               placeholder="e.g., morning, before bed"
             />
           </CardContent>
+        </Card>
+
+        {/* Reconstitution */}
+        <Card>
+          <CardHeader>
+            <button
+              type="button"
+              onClick={() => setShowReconstitution(!showReconstitution)}
+              className="flex items-center justify-between w-full"
+            >
+              <CardTitle className="text-base">
+                Reconstitution Info {!showReconstitution && '(optional)'}
+              </CardTitle>
+              <span className="text-slate-400 text-sm">
+                {showReconstitution ? '−' : '+'}
+              </span>
+            </button>
+          </CardHeader>
+          {showReconstitution && (
+            <CardContent className="space-y-3">
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <Input
+                    label="Vial Amount"
+                    type="number"
+                    step="any"
+                    value={vialAmount}
+                    onChange={(e) => setVialAmount(e.target.value)}
+                    placeholder="e.g., 10"
+                  />
+                </div>
+                <div className="w-24">
+                  <Select
+                    label="Unit"
+                    value={vialUnit}
+                    onChange={(e) => setVialUnit(e.target.value)}
+                    options={DOSE_UNITS}
+                  />
+                </div>
+              </div>
+              <Input
+                label="BAC Water (mL)"
+                type="number"
+                step="any"
+                value={diluentVolume}
+                onChange={(e) => setDiluentVolume(e.target.value)}
+                placeholder="e.g., 2"
+              />
+              {vialAmount && diluentVolume && doseAmount && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                  <div className="text-sm text-green-700">
+                    <strong>Concentration:</strong>{' '}
+                    {(parseFloat(vialAmount) / parseFloat(diluentVolume)).toFixed(2)} {vialUnit}/mL
+                  </div>
+                  <div className="text-sm text-green-700 mt-1">
+                    <strong>Per dose:</strong>{' '}
+                    {(() => {
+                      const concentration = parseFloat(vialAmount) / parseFloat(diluentVolume)
+                      let doseInVialUnits = parseFloat(doseAmount)
+                      // Convert dose to vial units if different
+                      if (doseUnit === 'mcg' && vialUnit === 'mg') {
+                        doseInVialUnits = doseInVialUnits / 1000
+                      } else if (doseUnit === 'mg' && vialUnit === 'mcg') {
+                        doseInVialUnits = doseInVialUnits * 1000
+                      }
+                      const volumeMl = doseInVialUnits / concentration
+                      const units = Math.round(volumeMl * 100)
+                      return `${units} units (${volumeMl.toFixed(3)} mL)`
+                    })()}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          )}
         </Card>
 
         {/* Schedule */}

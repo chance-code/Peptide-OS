@@ -3,12 +3,18 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { format, addDays } from 'date-fns'
+import { Lightbulb } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
-import type { Peptide } from '@/types'
+import { getReconstitutionDefaults } from '@/lib/peptide-reference'
+import type { Peptide, Protocol } from '@/types'
+
+interface ProtocolWithReconstitution extends Protocol {
+  peptide: Peptide
+}
 
 const AMOUNT_UNITS = [
   { value: 'mg', label: 'mg' },
@@ -21,8 +27,16 @@ export default function NewInventoryPage() {
   const { currentUserId } = useAppStore()
 
   const [peptides, setPeptides] = useState<Peptide[]>([])
+  const [protocols, setProtocols] = useState<ProtocolWithReconstitution[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [showNewPeptide, setShowNewPeptide] = useState(false)
+  const [recommendation, setRecommendation] = useState<{
+    source: 'protocol' | 'reference'
+    vialAmount: number
+    vialUnit: string
+    diluentVolume: number
+    peptideName: string
+  } | null>(null)
 
   // Form state
   const [peptideId, setPeptideId] = useState('')
@@ -39,7 +53,75 @@ export default function NewInventoryPage() {
 
   useEffect(() => {
     fetchPeptides()
-  }, [])
+    if (currentUserId) {
+      fetchProtocols()
+    }
+  }, [currentUserId])
+
+  // Check for recommendations when peptide is selected
+  useEffect(() => {
+    if (peptideId) {
+      const selectedPeptide = peptides.find(p => p.id === peptideId)
+      if (selectedPeptide) {
+        checkForRecommendation(selectedPeptide)
+      }
+    } else {
+      setRecommendation(null)
+    }
+  }, [peptideId, peptides, protocols])
+
+  function checkForRecommendation(peptide: Peptide) {
+    // First check if user has a protocol with reconstitution info for this peptide
+    const userProtocol = protocols.find(
+      p => p.peptideId === peptide.id && p.vialAmount && p.diluentVolume
+    )
+
+    if (userProtocol) {
+      setRecommendation({
+        source: 'protocol',
+        vialAmount: userProtocol.vialAmount!,
+        vialUnit: userProtocol.vialUnit || 'mg',
+        diluentVolume: userProtocol.diluentVolume!,
+        peptideName: peptide.name,
+      })
+      return
+    }
+
+    // Otherwise check reference database
+    const defaults = getReconstitutionDefaults(peptide.name)
+    if (defaults) {
+      setRecommendation({
+        source: 'reference',
+        vialAmount: defaults.vialAmount,
+        vialUnit: defaults.vialUnit,
+        diluentVolume: defaults.diluentVolume,
+        peptideName: peptide.name,
+      })
+      return
+    }
+
+    setRecommendation(null)
+  }
+
+  function applyRecommendation() {
+    if (!recommendation) return
+    setTotalAmount(recommendation.vialAmount.toString())
+    setTotalUnit(recommendation.vialUnit)
+    setDiluentVolume(recommendation.diluentVolume.toString())
+    setRecommendation(null)
+  }
+
+  async function fetchProtocols() {
+    try {
+      const res = await fetch(`/api/protocols?userId=${currentUserId}`)
+      if (res.ok) {
+        const data = await res.json()
+        setProtocols(data)
+      }
+    } catch (error) {
+      console.error('Error fetching protocols:', error)
+    }
+  }
 
   // Auto-update expiration when reconstitution date changes
   useEffect(() => {
@@ -185,6 +267,33 @@ export default function NewInventoryPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Recommendation Banner */}
+        {recommendation && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <Lightbulb className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <div className="font-medium text-blue-900 text-sm">
+                  {recommendation.source === 'protocol'
+                    ? `From your ${recommendation.peptideName} protocol`
+                    : `Typical settings for ${recommendation.peptideName}`}
+                </div>
+                <div className="text-blue-700 text-sm mt-1">
+                  {recommendation.vialAmount}{recommendation.vialUnit} vial + {recommendation.diluentVolume}mL BAC water
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="mt-2"
+                  onClick={applyRecommendation}
+                >
+                  Apply
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Vial Details */}
         <Card>

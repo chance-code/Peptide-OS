@@ -14,6 +14,7 @@ import {
   Clock,
   Calendar,
   X,
+  Beaker,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -74,6 +75,10 @@ export default function ProtocolDetailPage({
   const [editEndDate, setEditEndDate] = useState('')
   const [editIndefinite, setEditIndefinite] = useState(false)
   const [editNotes, setEditNotes] = useState('')
+  const [editVialAmount, setEditVialAmount] = useState('')
+  const [editVialUnit, setEditVialUnit] = useState('mg')
+  const [editDiluentVolume, setEditDiluentVolume] = useState('')
+  const [showReconstitution, setShowReconstitution] = useState(false)
 
   const fetchProtocol = useCallback(async () => {
     try {
@@ -117,6 +122,12 @@ export default function ProtocolDetailPage({
       setEditCustomDays([])
     }
 
+    // Reconstitution fields
+    setEditVialAmount(protocol.vialAmount?.toString() || '')
+    setEditVialUnit(protocol.vialUnit || 'mg')
+    setEditDiluentVolume(protocol.diluentVolume?.toString() || '')
+    setShowReconstitution(!!(protocol.vialAmount || protocol.diluentVolume))
+
     setIsEditing(true)
   }
 
@@ -138,6 +149,9 @@ export default function ProtocolDetailPage({
           startDate: editStartDate,
           endDate: editIndefinite ? null : editEndDate || null,
           notes: editNotes || null,
+          vialAmount: editVialAmount ? parseFloat(editVialAmount) : null,
+          vialUnit: editVialAmount ? editVialUnit : null,
+          diluentVolume: editDiluentVolume ? parseFloat(editDiluentVolume) : null,
         }),
       })
 
@@ -333,6 +347,79 @@ export default function ProtocolDetailPage({
                 placeholder="e.g., morning, before bed"
               />
             </CardContent>
+          </Card>
+
+          {/* Reconstitution */}
+          <Card>
+            <CardHeader>
+              <button
+                type="button"
+                onClick={() => setShowReconstitution(!showReconstitution)}
+                className="flex items-center justify-between w-full"
+              >
+                <CardTitle className="text-base">
+                  Reconstitution Info {!showReconstitution && '(optional)'}
+                </CardTitle>
+                <span className="text-slate-400 text-sm">
+                  {showReconstitution ? '−' : '+'}
+                </span>
+              </button>
+            </CardHeader>
+            {showReconstitution && (
+              <CardContent className="space-y-3">
+                <div className="flex gap-3">
+                  <div className="flex-1">
+                    <Input
+                      label="Vial Amount"
+                      type="number"
+                      step="any"
+                      value={editVialAmount}
+                      onChange={(e) => setEditVialAmount(e.target.value)}
+                      placeholder="e.g., 10"
+                    />
+                  </div>
+                  <div className="w-24">
+                    <Select
+                      label="Unit"
+                      value={editVialUnit}
+                      onChange={(e) => setEditVialUnit(e.target.value)}
+                      options={DOSE_UNITS}
+                    />
+                  </div>
+                </div>
+                <Input
+                  label="BAC Water (mL)"
+                  type="number"
+                  step="any"
+                  value={editDiluentVolume}
+                  onChange={(e) => setEditDiluentVolume(e.target.value)}
+                  placeholder="e.g., 2"
+                />
+                {editVialAmount && editDiluentVolume && editDoseAmount && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                    <div className="text-sm text-green-700">
+                      <strong>Concentration:</strong>{' '}
+                      {(parseFloat(editVialAmount) / parseFloat(editDiluentVolume)).toFixed(2)} {editVialUnit}/mL
+                    </div>
+                    <div className="text-sm text-green-700 mt-1">
+                      <strong>Per dose:</strong>{' '}
+                      {(() => {
+                        const concentration = parseFloat(editVialAmount) / parseFloat(editDiluentVolume)
+                        let doseInVialUnits = parseFloat(editDoseAmount)
+                        if (editDoseUnit === 'mcg' && editVialUnit === 'mg') {
+                          doseInVialUnits = doseInVialUnits / 1000
+                        } else if (editDoseUnit === 'mg' && editVialUnit === 'mcg') {
+                          doseInVialUnits = doseInVialUnits * 1000
+                        }
+                        const volumeMl = doseInVialUnits / concentration
+                        const units = Math.round(volumeMl * 100)
+                        return `${units} units (${volumeMl.toFixed(3)} mL)`
+                      })()}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            )}
           </Card>
 
           {/* Schedule */}
@@ -571,6 +658,20 @@ export default function ProtocolDetailPage({
               <div>
                 <div className="text-sm text-slate-500">Timing</div>
                 <div className="font-medium">{protocol.timing}</div>
+              </div>
+            </div>
+          )}
+          {protocol.vialAmount && protocol.diluentVolume && (
+            <div className="flex items-center gap-3">
+              <Beaker className="w-4 h-4 text-slate-400" />
+              <div>
+                <div className="text-sm text-slate-500">Reconstitution</div>
+                <div className="font-medium">
+                  {protocol.vialAmount}{protocol.vialUnit} + {protocol.diluentVolume}mL BAC water
+                </div>
+                <div className="text-xs text-slate-500">
+                  = {(protocol.vialAmount / protocol.diluentVolume).toFixed(2)} {protocol.vialUnit}/mL
+                </div>
               </div>
             </div>
           )}

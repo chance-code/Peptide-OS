@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Calculator,
   Copy,
@@ -19,7 +19,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import type { ReconstitutionResult } from '@/types'
+import { useAppStore } from '@/store'
+import type { ReconstitutionResult, Protocol, Peptide } from '@/types'
 
 const DOSE_UNITS = [
   { value: 'mcg', label: 'mcg' },
@@ -27,51 +28,17 @@ const DOSE_UNITS = [
   { value: 'IU', label: 'IU' },
 ]
 
-// Your specific peptide reconstitution data from the guide
-const PEPTIDE_CHEAT_SHEET = [
-  {
-    name: 'BPC-157',
-    vialAmount: '10 mg',
-    bacWater: '2 mL',
-    concentration: '5 mg/mL',
-    dose: '500 mcg',
-    injectionVolume: '0.10 mL',
-    penUnits: '10 units',
-    color: 'blue',
-  },
-  {
-    name: 'Ipamorelin',
-    vialAmount: '10 mg',
-    bacWater: '2 mL',
-    concentration: '5 mg/mL',
-    dose: '400 mcg',
-    injectionVolume: '0.08 mL',
-    penUnits: '8 units',
-    color: 'purple',
-  },
-  {
-    name: 'Tirzepatide',
-    vialAmount: '10 mg',
-    bacWater: '1 mL',
-    concentration: '10 mg/mL',
-    dose: '1.25 mg',
-    injectionVolume: '0.125 mL',
-    penUnits: '13 units',
-    color: 'green',
-  },
-  {
-    name: 'GHK-Cu',
-    vialAmount: '50 mg',
-    bacWater: '3.4 mL',
-    concentration: '~14.7 mg/mL',
-    dose: '1.0 mg',
-    injectionVolume: '~0.067 mL',
-    penUnits: '7 units',
-    color: 'amber',
-  },
-]
+interface ProtocolWithPeptide extends Protocol {
+  peptide: Peptide
+}
+
+// Color palette for peptides
+const COLORS = ['blue', 'purple', 'green', 'amber', 'rose', 'cyan', 'orange', 'teal']
 
 export default function ReconstitutionPage() {
+  const { currentUserId } = useAppStore()
+  const [protocols, setProtocols] = useState<ProtocolWithPeptide[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [showInstructions, setShowInstructions] = useState(false)
   const [showCalculator, setShowCalculator] = useState(false)
   const [vialAmount, setVialAmount] = useState('')
@@ -81,6 +48,54 @@ export default function ReconstitutionPage() {
   const [targetUnit, setTargetUnit] = useState('mcg')
   const [result, setResult] = useState<ReconstitutionResult | null>(null)
   const [copied, setCopied] = useState(false)
+
+  useEffect(() => {
+    if (currentUserId) {
+      fetchProtocols()
+    }
+  }, [currentUserId])
+
+  async function fetchProtocols() {
+    try {
+      const res = await fetch(`/api/protocols?userId=${currentUserId}&status=active`)
+      if (res.ok) {
+        const data = await res.json()
+        // Filter to only protocols with reconstitution info
+        setProtocols(data.filter((p: ProtocolWithPeptide) => p.vialAmount && p.diluentVolume))
+      }
+    } catch (error) {
+      console.error('Error fetching protocols:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Generate cheat sheet from user's protocols
+  const cheatSheet = protocols.map((protocol, index) => {
+    const concentration = protocol.vialAmount! / protocol.diluentVolume!
+    let doseInVialUnits = protocol.doseAmount
+
+    // Convert dose to vial units if different
+    if (protocol.doseUnit === 'mcg' && protocol.vialUnit === 'mg') {
+      doseInVialUnits = protocol.doseAmount / 1000
+    } else if (protocol.doseUnit === 'mg' && protocol.vialUnit === 'mcg') {
+      doseInVialUnits = protocol.doseAmount * 1000
+    }
+
+    const volumeMl = doseInVialUnits / concentration
+    const penUnits = Math.round(volumeMl * 100)
+
+    return {
+      name: protocol.peptide.name,
+      vialAmount: `${protocol.vialAmount} ${protocol.vialUnit}`,
+      bacWater: `${protocol.diluentVolume} mL`,
+      concentration: `${concentration.toFixed(2)} ${protocol.vialUnit}/mL`,
+      dose: `${protocol.doseAmount} ${protocol.doseUnit}`,
+      injectionVolume: `${volumeMl.toFixed(3)} mL`,
+      penUnits: `${penUnits} units`,
+      color: COLORS[index % COLORS.length],
+    }
+  })
 
   async function handleCalculate() {
     if (!vialAmount || !diluentVolume) return
@@ -111,7 +126,7 @@ export default function ReconstitutionPage() {
     let text = "PEPTIDE RECONSTITUTION CHEAT SHEET\n"
     text += "================================\n\n"
 
-    for (const p of PEPTIDE_CHEAT_SHEET) {
+    for (const p of cheatSheet) {
       text += `${p.name}\n`
       text += `  Vial: ${p.vialAmount} + ${p.bacWater} BAC water\n`
       text += `  Concentration: ${p.concentration}\n`
@@ -140,6 +155,10 @@ export default function ReconstitutionPage() {
     purple: { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-900', badge: 'bg-purple-100 text-purple-800' },
     green: { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-900', badge: 'bg-green-100 text-green-800' },
     amber: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-900', badge: 'bg-amber-100 text-amber-800' },
+    rose: { bg: 'bg-rose-50', border: 'border-rose-200', text: 'text-rose-900', badge: 'bg-rose-100 text-rose-800' },
+    cyan: { bg: 'bg-cyan-50', border: 'border-cyan-200', text: 'text-cyan-900', badge: 'bg-cyan-100 text-cyan-800' },
+    orange: { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-900', badge: 'bg-orange-100 text-orange-800' },
+    teal: { bg: 'bg-teal-50', border: 'border-teal-200', text: 'text-teal-900', badge: 'bg-teal-100 text-teal-800' },
   }
 
   return (
@@ -148,48 +167,64 @@ export default function ReconstitutionPage() {
         <h2 className="text-xl font-semibold text-slate-900">
           Reconstitution Guide
         </h2>
-        <Button variant="secondary" size="sm" onClick={handleCopy}>
-          {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-        </Button>
+        {cheatSheet.length > 0 && (
+          <Button variant="secondary" size="sm" onClick={handleCopy}>
+            {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+          </Button>
+        )}
       </div>
 
       {/* Quick Reference Cheat Sheet */}
-      <div className="space-y-3">
-        {PEPTIDE_CHEAT_SHEET.map((peptide) => {
-          const styles = colorStyles[peptide.color]
-          return (
-            <Card key={peptide.name} className={`${styles.bg} ${styles.border}`}>
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between mb-3">
-                  <h3 className={`font-semibold text-lg ${styles.text}`}>{peptide.name}</h3>
-                  <Badge className={styles.badge}>{peptide.penUnits}</Badge>
-                </div>
+      {isLoading ? (
+        <div className="text-center py-8 text-slate-500">Loading...</div>
+      ) : cheatSheet.length > 0 ? (
+        <div className="space-y-3">
+          {cheatSheet.map((peptide) => {
+            const styles = colorStyles[peptide.color] || colorStyles.blue
+            return (
+              <Card key={peptide.name} className={`${styles.bg} ${styles.border}`}>
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between mb-3">
+                    <h3 className={`font-semibold text-lg ${styles.text}`}>{peptide.name}</h3>
+                    <Badge className={styles.badge}>{peptide.penUnits}</Badge>
+                  </div>
 
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <div className="text-slate-500 text-xs uppercase tracking-wide mb-1">Reconstitution</div>
-                    <div className={`font-medium ${styles.text}`}>
-                      {peptide.vialAmount} + {peptide.bacWater}
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <div className="text-slate-500 text-xs uppercase tracking-wide mb-1">Reconstitution</div>
+                      <div className={`font-medium ${styles.text}`}>
+                        {peptide.vialAmount} + {peptide.bacWater}
+                      </div>
+                      <div className="text-slate-600 text-xs mt-0.5">
+                        = {peptide.concentration}
+                      </div>
                     </div>
-                    <div className="text-slate-600 text-xs mt-0.5">
-                      = {peptide.concentration}
+                    <div>
+                      <div className="text-slate-500 text-xs uppercase tracking-wide mb-1">Your Dose</div>
+                      <div className={`font-medium ${styles.text}`}>
+                        {peptide.dose}
+                      </div>
+                      <div className="text-slate-600 text-xs mt-0.5">
+                        = {peptide.injectionVolume} ({peptide.penUnits})
+                      </div>
                     </div>
                   </div>
-                  <div>
-                    <div className="text-slate-500 text-xs uppercase tracking-wide mb-1">Your Dose</div>
-                    <div className={`font-medium ${styles.text}`}>
-                      {peptide.dose}
-                    </div>
-                    <div className="text-slate-600 text-xs mt-0.5">
-                      = {peptide.injectionVolume} ({peptide.penUnits})
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )
-        })}
-      </div>
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
+      ) : (
+        <Card className="bg-slate-50 border-slate-200">
+          <CardContent className="p-6 text-center">
+            <Beaker className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+            <p className="text-slate-600 mb-2">No reconstitution info yet</p>
+            <p className="text-sm text-slate-500">
+              Add reconstitution details to your protocols to see your personal cheat sheet here.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Storage Quick Reference */}
       <Card className="bg-slate-50 border-slate-200">
@@ -209,6 +244,13 @@ export default function ReconstitutionPage() {
       {/* Pen Calibration Note */}
       <div className="text-center text-sm text-slate-500 py-2">
         Pen calibration: 1 unit = 0.01 mL
+      </div>
+
+      {/* Disclaimer */}
+      <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-700">
+        <strong>Disclaimer:</strong> This calculator is a mathematical tool only. Always verify
+        calculations and consult a healthcare provider before use. Information shown is user-entered
+        and not medical advice.
       </div>
 
       {/* Step-by-Step Instructions */}

@@ -53,6 +53,9 @@ export async function POST(request: NextRequest) {
       doseUnit,
       timing,
       notes,
+      vialAmount,
+      vialUnit,
+      diluentVolume,
     } = body
 
     if (!userId || !peptideId || !startDate || !frequency || !doseAmount || !doseUnit) {
@@ -72,6 +75,9 @@ export async function POST(request: NextRequest) {
         timing,
         notes,
         status: 'active',
+        vialAmount: vialAmount || null,
+        vialUnit: vialUnit || null,
+        diluentVolume: diluentVolume || null,
       },
       include: {
         peptide: true,
