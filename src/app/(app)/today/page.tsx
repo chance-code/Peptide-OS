@@ -22,46 +22,29 @@ import type { TodayDoseItem } from '@/types'
 // Animated checkmark button component
 function AnimatedCheckButton({
   isCompleted,
+  justCompleted,
   onComplete,
   onUndo
 }: {
   isCompleted: boolean
+  justCompleted: boolean
   onComplete: () => void
   onUndo: () => void
 }) {
-  const [isAnimating, setIsAnimating] = useState(false)
-  const wasCompleted = useRef(isCompleted)
-
-  useEffect(() => {
-    // Trigger animation when transitioning to completed
-    if (isCompleted && !wasCompleted.current) {
-      setIsAnimating(true)
-      const timer = setTimeout(() => setIsAnimating(false), 400)
-      return () => clearTimeout(timer)
-    }
-    wasCompleted.current = isCompleted
-  }, [isCompleted])
-
   if (isCompleted) {
     return (
       <button
         type="button"
         onClick={onUndo}
-        className={cn(
-          'w-10 h-10 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-all',
-          isAnimating && 'animate-check-pop'
-        )}
+        className="w-10 h-10 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center"
         style={{
-          animation: isAnimating ? 'checkPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)' : undefined
+          animation: justCompleted ? 'checkPop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)' : undefined
         }}
       >
         <Check
-          className={cn(
-            'w-5 h-5 text-white transition-transform',
-            isAnimating && 'animate-check-draw'
-          )}
+          className="w-5 h-5 text-white"
           style={{
-            animation: isAnimating ? 'checkDraw 0.3s ease-out 0.1s both' : undefined
+            animation: justCompleted ? 'checkDraw 0.4s ease-out 0.1s both' : undefined
           }}
         />
       </button>
@@ -95,6 +78,7 @@ export default function TodayPage() {
   const [data, setData] = useState<TodayResponse | null>(null)
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [isLoading, setIsLoading] = useState(true)
+  const [justCompleted, setJustCompleted] = useState<Set<string>>(new Set())
 
   const fetchToday = useCallback(async () => {
     if (!currentUserId) return
@@ -123,6 +107,19 @@ export default function TodayPage() {
     status: 'completed' | 'skipped' | 'pending'
   ) {
     if (!currentUserId || !data) return
+
+    // Track animation for newly completed items
+    if (status === 'completed') {
+      setJustCompleted(prev => new Set(prev).add(item.protocolId))
+      // Clear after animation
+      setTimeout(() => {
+        setJustCompleted(prev => {
+          const next = new Set(prev)
+          next.delete(item.protocolId)
+          return next
+        })
+      }, 600)
+    }
 
     // Optimistic update - update UI immediately
     setData({
@@ -320,6 +317,7 @@ export default function TodayPage() {
                         </Button>
                         <AnimatedCheckButton
                           isCompleted={false}
+                          justCompleted={false}
                           onComplete={() => handleStatusChange(item, 'completed')}
                           onUndo={() => handleStatusChange(item, 'pending')}
                         />
@@ -327,6 +325,7 @@ export default function TodayPage() {
                     ) : item.status === 'completed' ? (
                       <AnimatedCheckButton
                         isCompleted={true}
+                        justCompleted={justCompleted.has(item.protocolId)}
                         onComplete={() => handleStatusChange(item, 'completed')}
                         onUndo={() => handleStatusChange(item, 'pending')}
                       />
