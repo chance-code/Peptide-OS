@@ -1,15 +1,23 @@
 'use client'
 
 interface SyringeVisualProps {
-  units: number // 0-100
+  units: number // The units to draw
   dose: string // e.g., "500mcg"
   concentration: string // e.g., "5 mg/mL"
+  maxUnits?: number // Syringe capacity (default 20 for pen)
 }
 
-export function SyringeVisual({ units, dose, concentration }: SyringeVisualProps) {
-  // Clamp units to 0-100
-  const fillUnits = Math.min(100, Math.max(0, units))
-  const fillPercent = fillUnits / 100
+export function SyringeVisual({ units, dose, concentration, maxUnits = 20 }: SyringeVisualProps) {
+  // Clamp units to 0-maxUnits
+  const fillUnits = Math.min(maxUnits, Math.max(0, units))
+  const fillPercent = fillUnits / maxUnits
+
+  // Generate tick marks based on max units
+  const ticks = []
+  const tickInterval = maxUnits <= 20 ? 2 : maxUnits <= 50 ? 5 : 10
+  for (let i = 0; i <= maxUnits; i += tickInterval) {
+    ticks.push(i)
+  }
 
   return (
     <div className="mt-3">
@@ -20,47 +28,47 @@ export function SyringeVisual({ units, dose, concentration }: SyringeVisualProps
         {/* Syringe Body */}
         <div className="flex items-center gap-2">
           {/* Plunger */}
-          <div className="w-3 h-8 bg-slate-300 rounded-l-sm" />
+          <div className="w-3 h-10 bg-slate-300 rounded-l-sm" />
 
           {/* Barrel */}
           <div className="flex-1 relative">
             {/* Barrel outline */}
-            <div className="h-8 bg-white border-2 border-slate-300 rounded-r relative overflow-hidden">
+            <div className="h-10 bg-white border-2 border-slate-300 rounded-r relative overflow-hidden">
               {/* Fill level */}
               <div
-                className="absolute left-0 top-0 bottom-0 bg-blue-200 transition-all duration-300"
+                className="absolute left-0 top-0 bottom-0 bg-blue-300 transition-all duration-300"
                 style={{ width: `${fillPercent * 100}%` }}
               />
 
               {/* Tick marks */}
-              <div className="absolute inset-0 flex justify-between px-1">
-                {[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map((tick) => (
+              <div className="absolute inset-0 flex justify-between px-0.5">
+                {ticks.map((tick) => (
                   <div
                     key={tick}
-                    className={`w-px ${tick % 50 === 0 ? 'h-full bg-slate-400' : tick % 10 === 0 ? 'h-3/4 bg-slate-300' : 'h-1/2 bg-slate-200'}`}
+                    className={`w-px ${tick === 0 || tick === maxUnits || tick === maxUnits / 2 ? 'h-full bg-slate-400' : 'h-1/2 bg-slate-300'}`}
                   />
                 ))}
               </div>
 
               {/* Fill line indicator */}
-              {fillUnits > 0 && fillUnits < 100 && (
+              {fillUnits > 0 && fillUnits < maxUnits && (
                 <div
-                  className="absolute top-0 bottom-0 w-0.5 bg-blue-600"
-                  style={{ left: `${fillPercent * 100}%` }}
+                  className="absolute top-0 bottom-0 w-1 bg-blue-600 rounded"
+                  style={{ left: `calc(${fillPercent * 100}% - 2px)` }}
                 />
               )}
             </div>
 
             {/* Unit labels */}
-            <div className="flex justify-between text-xs text-slate-500 mt-1 px-1">
+            <div className="flex justify-between text-xs text-slate-500 mt-1">
               <span>0</span>
-              <span>50</span>
-              <span>100</span>
+              <span>{maxUnits / 2}</span>
+              <span>{maxUnits}</span>
             </div>
           </div>
 
           {/* Needle */}
-          <div className="w-8 h-1 bg-slate-400 rounded-r-full" />
+          <div className="w-6 h-0.5 bg-slate-400 rounded-r-full" />
         </div>
 
         {/* Annotation */}
@@ -70,11 +78,11 @@ export function SyringeVisual({ units, dose, concentration }: SyringeVisualProps
             {dose} = {units} units
           </div>
         </div>
-      </div>
 
-      {/* Explanation */}
-      <div className="mt-2 text-xs text-slate-500 text-center">
-        At {concentration} concentration
+        {/* mL conversion */}
+        <div className="mt-2 text-xs text-slate-500 text-center">
+          {units} units = {(units * 0.01).toFixed(2)} mL
+        </div>
       </div>
     </div>
   )

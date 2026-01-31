@@ -255,7 +255,7 @@ export default function ReconstitutionPage() {
                   3. Pen Units Cheat Sheet
                 </CardTitle>
               </div>
-              <p className="text-xs text-slate-500 mt-1">1 unit = 0.01 mL</p>
+              <p className="text-xs text-slate-500 mt-1">20-unit pen • 1 unit = 0.01 mL</p>
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
