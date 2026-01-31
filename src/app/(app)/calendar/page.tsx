@@ -19,7 +19,7 @@ import { ChevronLeft, ChevronRight, Check, X, CheckCheck } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { BottomSheet } from '@/components/ui/bottom-sheet'
 import { cn } from '@/lib/utils'
 import type { Protocol, Peptide, DoseLog, DayOfWeek } from '@/types'
 
@@ -346,21 +346,16 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      {/* Selected Day Details */}
-      {selectedDayData && (
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-slate-900">
-                {format(selectedDayData.date, 'EEEE, MMMM d')}
-              </h3>
-              <Button variant="ghost" size="sm" onClick={() => setSelectedDay(null)}>
-                Close
-              </Button>
-            </div>
-
+      {/* Selected Day Bottom Sheet */}
+      <BottomSheet
+        isOpen={!!selectedDay}
+        onClose={() => setSelectedDay(null)}
+        title={selectedDayData ? format(selectedDayData.date, 'EEEE, MMMM d') : ''}
+      >
+        {selectedDayData && (
+          <>
             {selectedDayData.protocols.length > 0 ? (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {/* Mark All Done button */}
                 {selectedDayData.protocols.filter(p =>
                   p.status === 'pending' || p.status === 'missed' || p.status === 'scheduled'
@@ -373,7 +368,7 @@ export default function CalendarPage() {
                         }
                       })
                     }}
-                    className="w-full mb-2 bg-green-600 hover:bg-green-700"
+                    className="w-full bg-green-600 hover:bg-green-700"
                   >
                     <CheckCheck className="w-4 h-4 mr-2" />
                     Mark All Done ({selectedDayData.protocols.filter(p =>
@@ -386,12 +381,12 @@ export default function CalendarPage() {
                   <div
                     key={protocol.id}
                     className={cn(
-                      'flex items-center justify-between p-3 rounded-lg',
+                      'flex items-center justify-between p-4 rounded-xl',
                       status === 'completed' ? 'bg-green-50' : 'bg-slate-50'
                     )}
                   >
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium text-slate-900">
+                      <div className="font-medium text-slate-900 text-lg">
                         {protocol.peptide.name}
                       </div>
                       <div className="text-sm text-slate-500">
@@ -411,22 +406,22 @@ export default function CalendarPage() {
                           </button>
                           <button
                             onClick={() => handleStatusChange(protocol.id, selectedDayData.date, 'completed')}
-                            className="w-10 h-10 rounded-full border-2 border-slate-300 bg-white hover:border-green-500 hover:bg-green-50 flex items-center justify-center transition-colors"
+                            className="w-12 h-12 rounded-full border-2 border-slate-300 bg-white hover:border-green-500 hover:bg-green-50 flex items-center justify-center transition-colors"
                           >
-                            <Check className="w-5 h-5 text-slate-400" />
+                            <Check className="w-6 h-6 text-slate-400" />
                           </button>
                         </>
                       ) : status === 'completed' ? (
                         <button
                           onClick={() => handleStatusChange(protocol.id, selectedDayData.date, 'pending')}
-                          className="w-10 h-10 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-colors"
+                          className="w-12 h-12 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-colors"
                         >
-                          <Check className="w-5 h-5 text-white" />
+                          <Check className="w-6 h-6 text-white" />
                         </button>
                       ) : (
                         <button
                           onClick={() => handleStatusChange(protocol.id, selectedDayData.date, 'pending')}
-                          className="px-3 py-1 rounded bg-slate-200 hover:bg-slate-300 text-slate-600 text-sm transition-colors"
+                          className="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-600 text-sm transition-colors"
                         >
                           Skipped
                         </button>
@@ -436,11 +431,13 @@ export default function CalendarPage() {
                 ))}
               </div>
             ) : (
-              <p className="text-slate-500 text-sm">No protocols scheduled for this day</p>
+              <div className="text-center py-8">
+                <p className="text-slate-500">No doses scheduled for this day</p>
+              </div>
             )}
-          </CardContent>
-        </Card>
-      )}
+          </>
+        )}
+      </BottomSheet>
 
       {/* Loading state */}
       {isLoading && (
