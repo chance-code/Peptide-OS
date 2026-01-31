@@ -1,0 +1,42 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background gradient -->
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f172a"/>
+      <stop offset="100%" style="stop-color:#1e293b"/>
+    </linearGradient>
+    <linearGradient id="accentGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#34d399"/>
+      <stop offset="100%" style="stop-color:#06b6d4"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1024" height="1024" rx="224" fill="url(#bgGradient)"/>
+
+  <!-- Stylized molecule / peptide chain -->
+  <!-- Main circles (amino acids) -->
+  <circle cx="320" cy="400" r="80" fill="url(#accentGradient)"/>
+  <circle cx="512" cy="320" r="80" fill="url(#accentGradient)"/>
+  <circle cx="704" cy="400" r="80" fill="url(#accentGradient)"/>
+  <circle cx="400" cy="600" r="80" fill="url(#accentGradient)"/>
+  <circle cx="624" cy="600" r="80" fill="url(#accentGradient)"/>
+  <circle cx="512" cy="780" r="80" fill="url(#accentGradient)"/>
+
+  <!-- Connecting bonds -->
+  <line x1="380" y1="360" x2="450" y2="340" stroke="url(#accentGradient)" stroke-width="24" stroke-linecap="round"/>
+  <line x1="574" y1="340" x2="644" y2="360" stroke="url(#accentGradient)" stroke-width="24" stroke-linecap="round"/>
+  <line x1="340" y1="470" x2="380" y2="540" stroke="url(#accentGradient)" stroke-width="24" stroke-linecap="round"/>
+  <line x1="684" y1="470" x2="644" y2="540" stroke="url(#accentGradient)" stroke-width="24" stroke-linecap="round"/>
+  <line x1="460" y1="640" x2="500" y2="720" stroke="url(#accentGradient)" stroke-width="24" stroke-linecap="round"/>
+  <line x1="564" y1="640" x2="524" y2="720" stroke="url(#accentGradient)" stroke-width="24" stroke-linecap="round"/>
+  <line x1="470" y1="580" x2="554" y2="580" stroke="url(#accentGradient)" stroke-width="24" stroke-linecap="round"/>
+
+  <!-- Inner circles (nuclei) -->
+  <circle cx="320" cy="400" r="32" fill="#0f172a"/>
+  <circle cx="512" cy="320" r="32" fill="#0f172a"/>
+  <circle cx="704" cy="400" r="32" fill="#0f172a"/>
+  <circle cx="400" cy="600" r="32" fill="#0f172a"/>
+  <circle cx="624" cy="600" r="32" fill="#0f172a"/>
+  <circle cx="512" cy="780" r="32" fill="#0f172a"/>
+</svg>

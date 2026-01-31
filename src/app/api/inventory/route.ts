@@ -13,21 +13,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'userId is required' }, { status: 400 })
     }
 
-    // Update expired status for vials
+    // Check expiration by date directly in query (no separate update needed)
     const today = new Date()
-    await prisma.inventoryVial.updateMany({
-      where: {
-        userId,
-        expirationDate: { lt: today },
-        isExpired: false,
-      },
-      data: { isExpired: true },
-    })
 
     const inventory = await prisma.inventoryVial.findMany({
       where: {
         userId,
-        ...(!includeExpired && { isExpired: false }),
+        ...(!includeExpired && {
+          OR: [
+            { expirationDate: null },
+            { expirationDate: { gte: today } },
+          ],
+        }),
         ...(!includeExhausted && { isExhausted: false }),
       },
       include: {
@@ -39,7 +36,11 @@ export async function GET(request: NextRequest) {
       ],
     })
 
-    return NextResponse.json(inventory)
+    return NextResponse.json(inventory, {
+      headers: {
+        'Cache-Control': 'private, max-age=60', // 1 min cache
+      },
+    })
   } catch (error) {
     console.error('Error fetching inventory:', error)
     return NextResponse.json({ error: 'Failed to fetch inventory' }, { status: 500 })

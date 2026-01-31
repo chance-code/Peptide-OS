@@ -143,7 +143,7 @@ export default function ReconstitutionPage() {
   }
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="p-4 pb-20 space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold text-slate-900">
           Reconstitution Guide

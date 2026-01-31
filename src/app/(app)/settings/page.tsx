@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { signOut } from 'next-auth/react'
-import { User, Plus, Trash2, Edit2, LogOut, ArrowRightLeft } from 'lucide-react'
+import { User, Plus, Trash2, Edit2, LogOut, ArrowRightLeft, Crown, Zap } from 'lucide-react'
 import { useAppStore } from '@/store'
+import { Paywall } from '@/components/paywall'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,7 +14,7 @@ import { NotificationSettings } from '@/components/notification-settings'
 import type { UserProfile } from '@/types'
 
 export default function SettingsPage() {
-  const { currentUser, setCurrentUser } = useAppStore()
+  const { currentUser, setCurrentUser, isPremium, setIsPremium, showPaywall, setShowPaywall } = useAppStore()
   const [users, setUsers] = useState<UserProfile[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [showNewProfile, setShowNewProfile] = useState(false)
@@ -136,7 +137,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="p-4">
+    <div className="p-4 pb-20">
       <h2 className="text-xl font-semibold text-slate-900 mb-4">Settings</h2>
 
       {/* Current Profile */}
@@ -167,6 +168,37 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Subscription Status */}
+      <Card className="mb-6">
+        <CardContent className="p-4">
+          {isPremium ? (
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
+                <Crown className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex-1">
+                <div className="font-medium text-slate-900">Premium Active</div>
+                <div className="text-sm text-slate-500">All features unlocked</div>
+              </div>
+              <Badge className="bg-gradient-to-r from-amber-400 to-orange-500 text-white">PRO</Badge>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center">
+                <Zap className="w-5 h-5 text-slate-400" />
+              </div>
+              <div className="flex-1">
+                <div className="font-medium text-slate-900">Free Plan</div>
+                <div className="text-sm text-slate-500">Upgrade for all features</div>
+              </div>
+              <Button size="sm" onClick={() => setShowPaywall(true)}>
+                Upgrade
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* All Profiles */}
       <Card className="mb-6">
@@ -384,6 +416,13 @@ export default function SettingsPage() {
           </Button>
         </div>
       </Modal>
+
+      {/* Paywall */}
+      <Paywall
+        isOpen={showPaywall}
+        onClose={() => setShowPaywall(false)}
+        onPurchaseSuccess={() => setIsPremium(true)}
+      />
     </div>
   )
 }

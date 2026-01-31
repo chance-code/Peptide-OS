@@ -69,7 +69,7 @@ export default function HistoryPage() {
   const sortedDates = Object.keys(logsByDate).sort((a, b) => b.localeCompare(a))
 
   return (
-    <div className="p-4">
+    <div className="p-4 pb-20">
       <h2 className="text-xl font-semibold text-slate-900 mb-4">History</h2>
 
       {/* Date Range Selector */}

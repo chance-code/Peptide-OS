@@ -27,7 +27,11 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
     })
 
-    return NextResponse.json(protocols)
+    return NextResponse.json(protocols, {
+      headers: {
+        'Cache-Control': 'private, max-age=60', // 1 min cache
+      },
+    })
   } catch (error) {
     console.error('Error fetching protocols:', error)
     return NextResponse.json({ error: 'Failed to fetch protocols' }, { status: 500 })

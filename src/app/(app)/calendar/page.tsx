@@ -181,7 +181,7 @@ export default function CalendarPage() {
     : null
 
   return (
-    <div className="p-4">
+    <div className="p-4 pb-20">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <Button variant="ghost" size="sm" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>

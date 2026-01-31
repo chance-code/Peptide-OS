@@ -58,9 +58,10 @@ export default function InventoryPage() {
 
   const activeVials = vials.filter((v) => !v.isExpired && !v.isExhausted)
   const expiredVials = vials.filter((v) => v.isExpired)
+  const expiringVials = activeVials.filter((v) => getExpirationStatus(v) === 'expiring-soon')
 
   return (
-    <div className="p-4">
+    <div className="p-4 pb-20">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-semibold text-slate-900">Inventory</h2>
@@ -71,6 +72,43 @@ export default function InventoryPage() {
           </Button>
         </Link>
       </div>
+
+      {/* Expiration Alerts */}
+      {!isLoading && (expiringVials.length > 0 || expiredVials.length > 0) && (
+        <div className="space-y-2 mb-4">
+          {expiredVials.length > 0 && (
+            <div className="flex items-start gap-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <div className="font-medium text-red-800">
+                  {expiredVials.length} expired vial{expiredVials.length > 1 ? 's' : ''}
+                </div>
+                <div className="text-sm text-red-600">
+                  {expiredVials.map(v => v.peptide.name).join(', ')}
+                </div>
+              </div>
+            </div>
+          )}
+          {expiringVials.length > 0 && (
+            <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <Clock className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <div className="font-medium text-amber-800">
+                  {expiringVials.length} vial{expiringVials.length > 1 ? 's' : ''} expiring soon
+                </div>
+                <div className="text-sm text-amber-600">
+                  {expiringVials.map(v => {
+                    const days = v.expirationDate
+                      ? differenceInDays(new Date(v.expirationDate), new Date())
+                      : 0
+                    return `${v.peptide.name} (${days}d)`
+                  }).join(', ')}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Summary */}
       {!isLoading && (

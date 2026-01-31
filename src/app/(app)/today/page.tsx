@@ -141,7 +141,7 @@ export default function TodayPage() {
       {/* Alerts Banner */}
       <AlertsBanner />
 
-      <div className="p-4">
+      <div className="p-4 pb-20">
       {/* Date Navigation */}
       <div className="flex items-center justify-between mb-6">
         <Button

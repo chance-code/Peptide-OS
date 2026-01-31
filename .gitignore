@@ -45,3 +45,10 @@ next-env.d.ts
 # database
 *.db
 *.db-journal
+
+# Capacitor / iOS
+ios/App/App/public
+ios/App/Pods
+ios/App/App.xcworkspace/xcuserdata
+ios/App/DerivedData
+*.xcuserstate

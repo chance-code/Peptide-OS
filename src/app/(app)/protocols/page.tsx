@@ -106,7 +106,7 @@ export default function ProtocolsPage() {
   })
 
   return (
-    <div className="p-4">
+    <div className="p-4 pb-20">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-semibold text-slate-900">Protocols</h2>

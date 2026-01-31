@@ -91,18 +91,29 @@ export async function GET(request: NextRequest) {
 
     const logsByProtocol = new Map(existingLogs.map((log) => [log.protocolId, log]))
 
-    // Check for expired vials
-    const expiredVials = await prisma.inventoryVial.findMany({
-      where: {
-        userId,
-        isExpired: true,
-      },
+    // Batch load all inventory status in one query (fixes N+1)
+    const today = new Date()
+    const allInventory = await prisma.inventoryVial.findMany({
+      where: { userId },
       select: {
         peptideId: true,
+        expirationDate: true,
+        isExhausted: true,
       },
     })
 
-    const expiredPeptideIds = new Set(expiredVials.map((v) => v.peptideId))
+    // Build lookup maps
+    const expiredPeptideIds = new Set<string>()
+    const validPeptideIds = new Set<string>()
+    for (const vial of allInventory) {
+      const isExpired = vial.expirationDate && vial.expirationDate < today
+      if (isExpired) {
+        expiredPeptideIds.add(vial.peptideId)
+      }
+      if (!isExpired && !vial.isExhausted) {
+        validPeptideIds.add(vial.peptideId)
+      }
+    }
 
     // Build today's checklist
     const todayItems: TodayDoseItem[] = []
@@ -115,16 +126,7 @@ export async function GET(request: NextRequest) {
 
       const existingLog = logsByProtocol.get(protocol.id)
       const hasExpiredVial = expiredPeptideIds.has(protocol.peptideId)
-
-      // Check if there's any valid (non-expired) inventory for this peptide
-      const validInventory = await prisma.inventoryVial.findFirst({
-        where: {
-          userId,
-          peptideId: protocol.peptideId,
-          isExpired: false,
-          isExhausted: false,
-        },
-      })
+      const hasValidInventory = validPeptideIds.has(protocol.peptideId)
 
       todayItems.push({
         id: existingLog?.id || `temp-${protocol.id}`,
@@ -136,7 +138,7 @@ export async function GET(request: NextRequest) {
         timing: protocol.timing,
         status: existingLog?.status as TodayDoseItem['status'] || 'pending',
         notes: existingLog?.notes,
-        vialExpired: !validInventory && hasExpiredVial,
+        vialExpired: !hasValidInventory && hasExpiredVial,
       })
     }
 

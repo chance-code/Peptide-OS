@@ -33,20 +33,21 @@ export default function NewInventoryPage() {
   const [diluentVolume, setDiluentVolume] = useState('')
   const [dateReceived, setDateReceived] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [dateReconstituted, setDateReconstituted] = useState('')
-  const [expirationDate, setExpirationDate] = useState('')
+  // Default expiration to 28 days from today
+  const [expirationDate, setExpirationDate] = useState(format(addDays(new Date(), 28), 'yyyy-MM-dd'))
   const [notes, setNotes] = useState('')
 
   useEffect(() => {
     fetchPeptides()
   }, [])
 
-  // Auto-calculate expiration (28 days from reconstitution by default)
+  // Auto-update expiration when reconstitution date changes
   useEffect(() => {
-    if (dateReconstituted && !expirationDate) {
+    if (dateReconstituted) {
       const reconDate = new Date(dateReconstituted)
       setExpirationDate(format(addDays(reconDate, 28), 'yyyy-MM-dd'))
     }
-  }, [dateReconstituted, expirationDate])
+  }, [dateReconstituted])
 
   async function fetchPeptides() {
     try {
@@ -124,7 +125,7 @@ export default function NewInventoryPage() {
       : null
 
   return (
-    <div className="p-4">
+    <div className="p-4 pb-20">
       <h2 className="text-xl font-semibold text-slate-900 mb-4">Add Vial</h2>
 
       <form onSubmit={handleSubmit} className="space-y-4">

@@ -7,7 +7,11 @@ export async function GET() {
     const users = await prisma.userProfile.findMany({
       orderBy: { name: 'asc' },
     })
-    return NextResponse.json(users)
+    return NextResponse.json(users, {
+      headers: {
+        'Cache-Control': 'private, max-age=300', // 5 min cache
+      },
+    })
   } catch (error) {
     console.error('Error fetching users:', error)
     return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 })
