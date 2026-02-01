@@ -272,17 +272,46 @@ export default function NewInventoryPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
 
-    if (!currentUserId || !peptideId || !totalAmount) return
+    if (!currentUserId || !totalAmount) return
+
+    // Check if we need a peptide - either existing or new
+    if (!peptideId && !newPeptideName.trim()) return
 
     setIsLoading(true)
 
     try {
+      let finalPeptideId = peptideId
+
+      // If no peptideId but we have a new peptide name, create it first
+      if (!finalPeptideId && newPeptideName.trim()) {
+        const createRes = await fetch('/api/peptides', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: newPeptideName.trim() }),
+        })
+
+        if (!createRes.ok) {
+          throw new Error('Failed to create peptide')
+        }
+
+        const newPeptide = await createRes.json()
+        finalPeptideId = newPeptide.id
+        setPeptides([...peptides, newPeptide])
+        setPeptideId(newPeptide.id)
+        setShowNewPeptide(false)
+        setNewPeptideName('')
+      }
+
+      if (!finalPeptideId) {
+        throw new Error('No peptide selected')
+      }
+
       const res = await fetch('/api/inventory', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: currentUserId,
-          peptideId,
+          peptideId: finalPeptideId,
           identifier: identifier || null,
           totalAmount: parseFloat(totalAmount),
           totalUnit,
@@ -296,6 +325,9 @@ export default function NewInventoryPage() {
 
       if (res.ok) {
         router.push('/inventory')
+      } else {
+        const error = await res.json()
+        console.error('Failed to create inventory:', error)
       }
     } catch (error) {
       console.error('Error creating vial:', error)
@@ -602,7 +634,7 @@ export default function NewInventoryPage() {
           <Button
             type="submit"
             className="flex-1"
-            disabled={isLoading || !peptideId || !totalAmount}
+            disabled={isLoading || (!peptideId && !newPeptideName.trim()) || !totalAmount}
           >
             {isLoading ? 'Adding...' : 'Add Vial'}
           </Button>
