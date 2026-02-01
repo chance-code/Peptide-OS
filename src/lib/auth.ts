@@ -16,6 +16,12 @@ const users: UserConfig[] = [
   { name: 'Angela Olson', hashEnvVar: 'AUTH_PASSWORD_HASH_ANGELA' },
 ]
 
+// Map OAuth emails to existing profile names
+const emailToProfileName: Record<string, string> = {
+  'chanceolson@gmail.com': 'Chance Olson',
+  'angelaolson8@gmail.com': 'Angela Olson',
+}
+
 export const authOptions: NextAuthOptions = {
   providers: [
     // Google OAuth
@@ -96,9 +102,15 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user, account }) {
       // On initial sign in, add user info to token
       if (user) {
-        token.name = user.name
         token.email = user.email
         token.provider = account?.provider || 'credentials'
+
+        // Map OAuth emails to existing profile names
+        if (user.email && emailToProfileName[user.email.toLowerCase()]) {
+          token.name = emailToProfileName[user.email.toLowerCase()]
+        } else {
+          token.name = user.name
+        }
       }
       return token
     },
