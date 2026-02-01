@@ -63,7 +63,7 @@ export default function NewInventoryPage() {
   const [totalUnit, setTotalUnit] = useState('mg')
   const [diluentVolume, setDiluentVolume] = useState('')
   const [dateReceived, setDateReceived] = useState(format(new Date(), 'yyyy-MM-dd'))
-  const [dateReconstituted, setDateReconstituted] = useState('')
+  const [dateReconstituted, setDateReconstituted] = useState(format(new Date(), 'yyyy-MM-dd'))
   // Default expiration to 28 days from today
   const [expirationDate, setExpirationDate] = useState(format(addDays(new Date(), 28), 'yyyy-MM-dd'))
   const [notes, setNotes] = useState('')
