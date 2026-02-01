@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { format, addDays } from 'date-fns'
-import { Lightbulb } from 'lucide-react'
+import { Lightbulb, Camera, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -11,6 +11,17 @@ import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { getReconstitutionDefaults, getRecommendedDiluent } from '@/lib/peptide-reference'
 import type { Peptide, Protocol } from '@/types'
+
+interface ScanResult {
+  peptideName: string | null
+  amount: number | null
+  unit: string | null
+  manufacturer: string | null
+  lotNumber: string | null
+  expirationDate: string | null
+  confidence: 'high' | 'medium' | 'low'
+  rawText: string | null
+}
 
 interface ProtocolWithReconstitution extends Protocol {
   peptide: Peptide
@@ -25,11 +36,18 @@ const AMOUNT_UNITS = [
 export default function NewInventoryPage() {
   const router = useRouter()
   const { currentUserId } = useAppStore()
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [peptides, setPeptides] = useState<Peptide[]>([])
   const [protocols, setProtocols] = useState<ProtocolWithReconstitution[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [showNewPeptide, setShowNewPeptide] = useState(false)
+
+  // Scan state
+  const [isScanning, setIsScanning] = useState(false)
+  const [scanResult, setScanResult] = useState<ScanResult | null>(null)
+  const [scanError, setScanError] = useState<string | null>(null)
+
   const [recommendation, setRecommendation] = useState<{
     source: 'protocol' | 'reference'
     vialUnit: string
@@ -56,6 +74,85 @@ export default function NewInventoryPage() {
       fetchProtocols()
     }
   }, [currentUserId])
+
+  // Handle image capture and scanning
+  async function handleImageCapture(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setScanError(null)
+    setScanResult(null)
+    setIsScanning(true)
+
+    try {
+      // Convert to base64
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as string)
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+
+      // Send to API
+      const res = await fetch('/api/inventory/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64 }),
+      })
+
+      if (!res.ok) {
+        throw new Error('Failed to analyze image')
+      }
+
+      const result: ScanResult = await res.json()
+      setScanResult(result)
+
+      // Auto-populate form fields
+      if (result.peptideName) {
+        // Try to find matching peptide
+        const matchingPeptide = peptides.find(
+          p => p.name.toLowerCase().replace(/[-\s]/g, '') ===
+               result.peptideName!.toLowerCase().replace(/[-\s]/g, '')
+        )
+        if (matchingPeptide) {
+          setPeptideId(matchingPeptide.id)
+        } else {
+          // Create new peptide
+          setShowNewPeptide(true)
+          setNewPeptideName(result.peptideName)
+        }
+      }
+
+      if (result.amount) {
+        setTotalAmount(result.amount.toString())
+      }
+
+      if (result.unit) {
+        setTotalUnit(result.unit)
+      }
+
+      if (result.expirationDate) {
+        setExpirationDate(result.expirationDate)
+      }
+
+      if (result.lotNumber) {
+        setIdentifier(result.lotNumber)
+      }
+
+      if (result.manufacturer) {
+        setNotes(prev => prev ? `${prev}\nManufacturer: ${result.manufacturer}` : `Manufacturer: ${result.manufacturer}`)
+      }
+    } catch (error) {
+      console.error('Scan error:', error)
+      setScanError('Failed to analyze image. Please try again or enter details manually.')
+    } finally {
+      setIsScanning(false)
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    }
+  }
 
   // Check for recommendations when peptide is selected
   useEffect(() => {
@@ -216,6 +313,96 @@ export default function NewInventoryPage() {
   return (
     <div className="p-4 pb-48">
       <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-4">Add Vial</h2>
+
+      {/* Scan Vial Button */}
+      <div className="mb-6">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          onChange={handleImageCapture}
+          className="hidden"
+          id="vial-camera"
+        />
+        <label
+          htmlFor="vial-camera"
+          className={`
+            flex items-center justify-center gap-3 w-full p-4 rounded-2xl border-2 border-dashed
+            transition-all cursor-pointer
+            ${isScanning
+              ? 'border-[var(--accent)] bg-[var(--accent-muted)]'
+              : 'border-[var(--border)] hover:border-[var(--accent)] hover:bg-[var(--muted)]'
+            }
+          `}
+        >
+          {isScanning ? (
+            <>
+              <Loader2 className="w-6 h-6 text-[var(--accent)] animate-spin" />
+              <span className="text-[var(--accent)] font-medium">Analyzing vial...</span>
+            </>
+          ) : (
+            <>
+              <Camera className="w-6 h-6 text-[var(--muted-foreground)]" />
+              <span className="text-[var(--foreground)] font-medium">Scan Vial Label</span>
+            </>
+          )}
+        </label>
+        <p className="text-xs text-[var(--muted-foreground)] text-center mt-2">
+          Take a photo of the vial label to auto-fill details
+        </p>
+      </div>
+
+      {/* Scan Result Banner */}
+      {scanResult && (
+        <div className={`
+          mb-4 p-4 rounded-xl border
+          ${scanResult.confidence === 'high'
+            ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+            : scanResult.confidence === 'medium'
+              ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
+              : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+          }
+        `}>
+          <div className="flex items-start gap-3">
+            {scanResult.confidence === 'high' ? (
+              <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+            ) : (
+              <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+            )}
+            <div className="flex-1 min-w-0">
+              <div className="font-medium text-sm text-[var(--foreground)]">
+                {scanResult.confidence === 'high'
+                  ? 'Vial detected!'
+                  : scanResult.confidence === 'medium'
+                    ? 'Partial match - please verify'
+                    : 'Could not read label clearly'}
+              </div>
+              {scanResult.peptideName && (
+                <div className="text-sm text-[var(--muted-foreground)] mt-1">
+                  {scanResult.peptideName}
+                  {scanResult.amount && ` • ${scanResult.amount}${scanResult.unit || 'mg'}`}
+                </div>
+              )}
+              {scanResult.confidence === 'low' && scanResult.rawText && (
+                <div className="text-xs text-[var(--muted-foreground)] mt-1 truncate">
+                  Text found: {scanResult.rawText}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Scan Error */}
+      {scanError && (
+        <div className="mb-4 p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+          <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
+            <AlertCircle className="w-5 h-5" />
+            <span className="text-sm">{scanError}</span>
+          </div>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Peptide Selection */}
