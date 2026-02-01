@@ -89,7 +89,7 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     async signIn({ user, account }) {
-      // For OAuth providers, handle user creation/linking
+      // For OAuth providers, ensure user exists in database
       if (account?.provider === 'google' || account?.provider === 'apple') {
         try {
           const email = user.email
@@ -100,24 +100,8 @@ export const authOptions: NextAuthOptions = {
             return false
           }
 
-          // Check if account already exists for this provider
-          const existingAccount = await prisma.account.findUnique({
-            where: {
-              provider_providerAccountId: {
-                provider: account.provider,
-                providerAccountId: account.providerAccountId,
-              },
-            },
-            include: { user: true },
-          })
-
-          if (existingAccount) {
-            // Account exists, allow sign in
-            return true
-          }
-
           // Check if user exists by email
-          let userProfile = await prisma.userProfile.findUnique({
+          let userProfile = await prisma.userProfile.findFirst({
             where: { email },
           })
 
@@ -138,29 +122,10 @@ export const authOptions: NextAuthOptions = {
               userProfile = await prisma.userProfile.create({
                 data: { name, email },
               })
-            } else {
-              // Name exists but with different email - create new user with email
-              userProfile = await prisma.userProfile.create({
-                data: { name, email },
-              })
             }
+            // If name exists with different email, that's fine -
+            // the app layout will handle finding/creating the right user
           }
-
-          // Create the account link
-          await prisma.account.create({
-            data: {
-              userId: userProfile.id,
-              type: account.type,
-              provider: account.provider,
-              providerAccountId: account.providerAccountId,
-              refresh_token: account.refresh_token,
-              access_token: account.access_token,
-              expires_at: account.expires_at,
-              token_type: account.token_type,
-              scope: account.scope,
-              id_token: account.id_token,
-            },
-          })
 
           return true
         } catch (error) {
