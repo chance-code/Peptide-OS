@@ -21,7 +21,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       try {
         // Get the logged-in user's info from the session
         const sessionUserName = session?.user?.name
-        const sessionUserEmail = session?.user?.email
+        const sessionUserEmail = session?.user?.email // Used as fallback for name
 
         // Fetch all users
         const usersRes = await fetch('/api/users')
@@ -33,25 +33,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         const users = await usersRes.json()
         let userToUse = null
 
-        // For OAuth users, try to find by email first
-        if (sessionUserEmail) {
-          userToUse = users.find((u: { email?: string }) => u.email === sessionUserEmail)
-        }
-
-        // Then try to find by name
-        if (!userToUse && sessionUserName) {
+        // Try to find user by name
+        if (sessionUserName) {
           userToUse = users.find((u: { name: string }) => u.name === sessionUserName)
         }
 
         // If session user doesn't exist in database, create them
         if (!userToUse && (sessionUserName || sessionUserEmail)) {
+          const userName = sessionUserName || sessionUserEmail?.split('@')[0] || 'User'
           const createRes = await fetch('/api/users', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              name: sessionUserName || sessionUserEmail?.split('@')[0] || 'User',
-              email: sessionUserEmail,
-            }),
+            body: JSON.stringify({ name: userName }),
           })
           if (createRes.ok) {
             userToUse = await createRes.json()
