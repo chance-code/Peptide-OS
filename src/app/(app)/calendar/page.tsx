@@ -414,9 +414,9 @@ export default function CalendarPage() {
                   style={getBgStyle()}
                 >
                   <span className={cn(
-                    'text-sm font-medium',
-                    dayData.isToday && 'font-bold',
-                    allCompleted && !isFuture && 'text-[var(--success)]'
+                    'text-sm',
+                    dayData.isToday ? 'font-bold' : 'font-semibold',
+                    allCompleted && !isFuture && 'text-green-700 dark:text-green-300'
                   )}>
                     {format(dayData.date, 'd')}
                   </span>
