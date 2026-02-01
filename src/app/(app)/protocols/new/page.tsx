@@ -275,7 +275,7 @@ export default function NewProtocolPage() {
   }
 
   return (
-    <div className="p-4 pb-20">
+    <div className="p-4 pb-48">
       <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-4">New Protocol</h2>
 
       <form onSubmit={handleSubmit} className="space-y-4">

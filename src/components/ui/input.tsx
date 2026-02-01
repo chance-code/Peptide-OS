@@ -1,6 +1,6 @@
 'use client'
 
-import { forwardRef } from 'react'
+import { forwardRef, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
@@ -9,8 +9,21 @@ export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> 
 }
 
 const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ className, label, error, id, ...props }, ref) => {
+  ({ className, label, error, id, onFocus, ...props }, ref) => {
     const inputId = id || label?.toLowerCase().replace(/\s+/g, '-')
+
+    // Handle iOS keyboard - scroll input into view with a delay
+    const handleFocus = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
+      // Call original onFocus if provided
+      onFocus?.(e)
+
+      // On iOS, scroll the input into view after keyboard appears
+      if (typeof window !== 'undefined' && /iPhone|iPad|iPod/.test(navigator.userAgent)) {
+        setTimeout(() => {
+          e.target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        }, 300)
+      }
+    }, [onFocus])
 
     return (
       <div className="w-full">
@@ -25,6 +38,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
         <input
           ref={ref}
           id={inputId}
+          onFocus={handleFocus}
           className={cn(
             'w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500',
             'focus:outline-none focus:ring-2 focus:ring-slate-500 dark:focus:ring-slate-400 focus:border-transparent',
