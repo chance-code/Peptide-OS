@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { signOut } from 'next-auth/react'
-import { User, Plus, Trash2, Edit2, LogOut, ArrowRightLeft, Crown, Zap, Sun, Moon, Monitor } from 'lucide-react'
+import { User, Edit2, LogOut, Crown, Zap, Sun, Moon, Monitor } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { useTheme } from '@/components/theme-provider'
 import { Paywall } from '@/components/paywall'
@@ -13,81 +13,22 @@ import { Modal } from '@/components/ui/modal'
 import { Badge } from '@/components/ui/badge'
 import { NotificationSettings } from '@/components/notification-settings'
 import { cn } from '@/lib/utils'
-import type { UserProfile } from '@/types'
 
 export default function SettingsPage() {
   const { currentUser, setCurrentUser, isPremium, setIsPremium, showPaywall, setShowPaywall } = useAppStore()
   const { theme, setTheme } = useTheme()
-  const [users, setUsers] = useState<UserProfile[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [showNewProfile, setShowNewProfile] = useState(false)
-  const [editingUser, setEditingUser] = useState<UserProfile | null>(null)
-  const [showDeleteModal, setShowDeleteModal] = useState<UserProfile | null>(null)
+  const [editingUser, setEditingUser] = useState(false)
 
   // Form state
   const [newName, setNewName] = useState('')
   const [newNotes, setNewNotes] = useState('')
 
-  useEffect(() => {
-    fetchUsers()
-  }, [])
-
-  async function fetchUsers() {
-    try {
-      const res = await fetch('/api/users')
-      if (res.ok) {
-        const data = await res.json()
-        setUsers(data)
-      }
-    } catch (error) {
-      console.error('Error fetching users:', error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  async function handleSwitchProfile(user: UserProfile) {
-    try {
-      await fetch(`/api/users/${user.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isActive: true }),
-      })
-      setCurrentUser(user)
-      fetchUsers()
-    } catch (error) {
-      console.error('Error switching profile:', error)
-    }
-  }
-
-  async function handleCreateProfile(e: React.FormEvent) {
-    e.preventDefault()
-    if (!newName.trim()) return
-
-    try {
-      const res = await fetch('/api/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newName.trim(), notes: newNotes.trim() || null }),
-      })
-
-      if (res.ok) {
-        setShowNewProfile(false)
-        setNewName('')
-        setNewNotes('')
-        fetchUsers()
-      }
-    } catch (error) {
-      console.error('Error creating profile:', error)
-    }
-  }
-
   async function handleUpdateProfile(e: React.FormEvent) {
     e.preventDefault()
-    if (!editingUser || !newName.trim()) return
+    if (!currentUser || !newName.trim()) return
 
     try {
-      const res = await fetch(`/api/users/${editingUser.id}`, {
+      const res = await fetch(`/api/users/${currentUser.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newName.trim(), notes: newNotes.trim() || null }),
@@ -95,48 +36,21 @@ export default function SettingsPage() {
 
       if (res.ok) {
         const updated = await res.json()
-        if (currentUser?.id === editingUser.id) {
-          setCurrentUser(updated)
-        }
-        setEditingUser(null)
+        setCurrentUser(updated)
+        setEditingUser(false)
         setNewName('')
         setNewNotes('')
-        fetchUsers()
       }
     } catch (error) {
       console.error('Error updating profile:', error)
     }
   }
 
-  async function handleDeleteProfile() {
-    if (!showDeleteModal) return
-
-    try {
-      await fetch(`/api/users/${showDeleteModal.id}`, {
-        method: 'DELETE',
-      })
-
-      // If deleting current user, switch to another
-      if (currentUser?.id === showDeleteModal.id) {
-        const remaining = users.filter((u) => u.id !== showDeleteModal.id)
-        if (remaining.length > 0) {
-          handleSwitchProfile(remaining[0])
-        } else {
-          setCurrentUser(null)
-        }
-      }
-
-      setShowDeleteModal(null)
-      fetchUsers()
-    } catch (error) {
-      console.error('Error deleting profile:', error)
-    }
-  }
-
-  function startEditing(user: UserProfile) {
-    setEditingUser(user)
-    setNewName(user.name)
-    setNewNotes(user.notes || '')
+  function startEditing() {
+    if (!currentUser) return
+    setEditingUser(true)
+    setNewName(currentUser.name)
+    setNewNotes(currentUser.notes || '')
   }
 
   return (
@@ -147,12 +61,12 @@ export default function SettingsPage() {
       {currentUser && (
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle className="text-base">Current Profile</CardTitle>
+            <CardTitle className="text-base">Your Profile</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-slate-900 flex items-center justify-center">
-                <User className="w-6 h-6 text-white" />
+              <div className="w-12 h-12 rounded-full bg-slate-900 dark:bg-slate-100 flex items-center justify-center">
+                <User className="w-6 h-6 text-white dark:text-slate-900" />
               </div>
               <div className="flex-1">
                 <div className="font-medium text-slate-900 dark:text-white">{currentUser.name}</div>
@@ -163,7 +77,7 @@ export default function SettingsPage() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => startEditing(currentUser)}
+                onClick={startEditing}
               >
                 <Edit2 className="w-4 h-4" />
               </Button>
@@ -233,85 +147,6 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* All Profiles */}
-      <Card className="mb-6">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-base">All Profiles</CardTitle>
-          <Button size="sm" variant="ghost" onClick={() => setShowNewProfile(true)}>
-            <Plus className="w-4 h-4" />
-          </Button>
-        </CardHeader>
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="p-4 text-center text-slate-500">Loading...</div>
-          ) : (
-            <div className="divide-y divide-slate-100 dark:divide-slate-700">
-              {users.map((user) => {
-                const isActive = user.id === currentUser?.id
-                return (
-                  <div
-                    key={user.id}
-                    className={`flex items-center gap-3 p-4 transition-colors ${
-                      isActive
-                        ? 'bg-green-50 dark:bg-green-900/20 border-l-4 border-green-500'
-                        : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'
-                    }`}
-                  >
-                    <div
-                      className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                        isActive ? 'bg-green-500' : 'bg-slate-100'
-                      }`}
-                    >
-                      <User className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-600'}`} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-slate-900 dark:text-white">{user.name}</span>
-                        {isActive && (
-                          <Badge variant="success">Active</Badge>
-                        )}
-                      </div>
-                      {user.notes && (
-                        <div className="text-sm text-slate-500 truncate">{user.notes}</div>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {!isActive && (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => handleSwitchProfile(user)}
-                          className="text-xs"
-                        >
-                          <ArrowRightLeft className="w-3 h-3 mr-1" />
-                          Switch
-                        </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => startEditing(user)}
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </Button>
-                      {users.length > 1 && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setShowDeleteModal(user)}
-                        >
-                          <Trash2 className="w-4 h-4 text-red-500" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
       {/* Notification Settings */}
       <div className="mb-6">
         <NotificationSettings />
@@ -338,55 +173,11 @@ export default function SettingsPage() {
         Sign Out
       </Button>
 
-      {/* New Profile Modal */}
-      <Modal
-        isOpen={showNewProfile}
-        onClose={() => {
-          setShowNewProfile(false)
-          setNewName('')
-          setNewNotes('')
-        }}
-        title="New Profile"
-      >
-        <form onSubmit={handleCreateProfile} className="space-y-4">
-          <Input
-            label="Name"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            placeholder="Enter name"
-            autoFocus
-          />
-          <Input
-            label="Notes (optional)"
-            value={newNotes}
-            onChange={(e) => setNewNotes(e.target.value)}
-            placeholder="Any notes"
-          />
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              className="flex-1"
-              onClick={() => {
-                setShowNewProfile(false)
-                setNewName('')
-                setNewNotes('')
-              }}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" className="flex-1" disabled={!newName.trim()}>
-              Create
-            </Button>
-          </div>
-        </form>
-      </Modal>
-
       {/* Edit Profile Modal */}
       <Modal
-        isOpen={!!editingUser}
+        isOpen={editingUser}
         onClose={() => {
-          setEditingUser(null)
+          setEditingUser(false)
           setNewName('')
           setNewNotes('')
         }}
@@ -412,7 +203,7 @@ export default function SettingsPage() {
               variant="secondary"
               className="flex-1"
               onClick={() => {
-                setEditingUser(null)
+                setEditingUser(false)
                 setNewName('')
                 setNewNotes('')
               }}
@@ -424,30 +215,6 @@ export default function SettingsPage() {
             </Button>
           </div>
         </form>
-      </Modal>
-
-      {/* Delete Confirmation Modal */}
-      <Modal
-        isOpen={!!showDeleteModal}
-        onClose={() => setShowDeleteModal(null)}
-        title="Delete Profile"
-      >
-        <p className="text-slate-600 dark:text-slate-300 mb-4">
-          Are you sure you want to delete {showDeleteModal?.name}&apos;s profile? All their
-          protocols, inventory, and history will be permanently deleted.
-        </p>
-        <div className="flex gap-2">
-          <Button
-            variant="secondary"
-            className="flex-1"
-            onClick={() => setShowDeleteModal(null)}
-          >
-            Cancel
-          </Button>
-          <Button variant="danger" className="flex-1" onClick={handleDeleteProfile}>
-            Delete
-          </Button>
-        </div>
       </Modal>
 
       {/* Paywall */}
