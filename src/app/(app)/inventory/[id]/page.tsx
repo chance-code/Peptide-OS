@@ -137,11 +137,18 @@ export default function EditInventoryPage({
 
       if (res.ok) {
         router.push('/inventory')
+        router.refresh()
+      } else {
+        const error = await res.json().catch(() => ({ error: 'Unknown error' }))
+        console.error('Delete failed:', error)
+        alert('Failed to delete vial. Please try again.')
       }
     } catch (error) {
       console.error('Error deleting vial:', error)
+      alert('Failed to delete vial. Please try again.')
     } finally {
       setIsDeleting(false)
+      setShowDeleteConfirm(false)
     }
   }
 
