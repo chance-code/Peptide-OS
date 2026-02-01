@@ -16,12 +16,13 @@ import {
   isToday,
   getDay,
 } from 'date-fns'
-import { ChevronLeft, ChevronRight, Check, X, CheckCheck } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Check, X, CheckCheck, Flame } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { BottomSheet } from '@/components/ui/bottom-sheet'
 import { PullToRefresh } from '@/components/pull-to-refresh'
+import { ComplianceRing } from '@/components/compliance-ring'
 import { cn } from '@/lib/utils'
 import type { Protocol, Peptide, DoseLog, DayOfWeek } from '@/types'
 
@@ -194,6 +195,76 @@ export default function CalendarPage() {
     return days
   }, [currentMonth, protocols, doseLogs, monthStart, monthEnd])
 
+  // Calculate monthly compliance stats
+  const monthlyStats = useMemo(() => {
+    const today = new Date()
+    let totalDoses = 0
+    let completedDoses = 0
+    let currentStreak = 0
+    let checkingStreak = true
+
+    // Only count days in the current month up to today
+    const daysToCount = calendarDays.filter(
+      (d) => d.isCurrentMonth && d.date <= today && d.protocols.length > 0
+    )
+
+    // Count totals and check streak (going backwards from today)
+    const sortedDays = [...daysToCount].sort((a, b) => b.date.getTime() - a.date.getTime())
+
+    for (const day of sortedDays) {
+      const dayTotal = day.protocols.length
+      const dayCompleted = day.protocols.filter((p) => p.status === 'completed').length
+
+      totalDoses += dayTotal
+      completedDoses += dayCompleted
+
+      if (checkingStreak) {
+        if (dayCompleted === dayTotal && dayTotal > 0) {
+          currentStreak++
+        } else if (dayCompleted < dayTotal) {
+          checkingStreak = false
+        }
+      }
+    }
+
+    return {
+      totalDoses,
+      completedDoses,
+      percentage: totalDoses > 0 ? Math.round((completedDoses / totalDoses) * 100) : 0,
+      streak: currentStreak,
+    }
+  }, [calendarDays])
+
+  // Group calendar days by week with stats
+  const weeks = useMemo(() => {
+    const today = new Date()
+    const result: { days: DayData[]; stats: { completed: number; total: number; percentage: number } }[] = []
+
+    for (let i = 0; i < calendarDays.length; i += 7) {
+      const weekDays = calendarDays.slice(i, i + 7)
+      let weekTotal = 0
+      let weekCompleted = 0
+
+      for (const day of weekDays) {
+        if (day.isCurrentMonth && day.date <= today) {
+          weekTotal += day.protocols.length
+          weekCompleted += day.protocols.filter((p) => p.status === 'completed').length
+        }
+      }
+
+      result.push({
+        days: weekDays,
+        stats: {
+          completed: weekCompleted,
+          total: weekTotal,
+          percentage: weekTotal > 0 ? Math.round((weekCompleted / weekTotal) * 100) : 0,
+        },
+      })
+    }
+
+    return result
+  }, [calendarDays])
+
   const selectedDayData = selectedDay
     ? calendarDays.find((d) => isSameDay(d.date, selectedDay))
     : null
@@ -272,6 +343,37 @@ export default function CalendarPage() {
           </Button>
         </div>
 
+        {/* Monthly Summary Card */}
+        <Card className="mb-4">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <ComplianceRing
+                  completed={monthlyStats.completedDoses}
+                  total={monthlyStats.totalDoses}
+                  size="sm"
+                  showPercentage={true}
+                  showCheckOnComplete={true}
+                />
+                <div>
+                  <div className="text-lg font-semibold text-slate-900 dark:text-white">
+                    {monthlyStats.percentage}% Compliance
+                  </div>
+                  <div className="text-sm text-slate-500 dark:text-slate-400">
+                    {monthlyStats.completedDoses} of {monthlyStats.totalDoses} doses
+                  </div>
+                </div>
+              </div>
+              {monthlyStats.streak > 0 && (
+                <div className="flex items-center gap-1.5 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 px-3 py-1.5 rounded-full">
+                  <Flame className="w-4 h-4" />
+                  <span className="font-semibold">{monthlyStats.streak}</span>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Today button */}
         {!isSameMonth(currentMonth, new Date()) && (
           <div className="flex justify-center mb-4">
@@ -286,9 +388,9 @@ export default function CalendarPage() {
           <CardContent className="p-2">
             {/* Day headers */}
             <div className="grid grid-cols-7 mb-1">
-              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+              {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, i) => (
                 <div
-                  key={day}
+                  key={i}
                   className="text-center text-xs font-medium text-slate-500 dark:text-slate-400 py-2"
                 >
                   {day}
@@ -296,74 +398,99 @@ export default function CalendarPage() {
               ))}
             </div>
 
-            {/* Calendar days */}
-            <div className="grid grid-cols-7 gap-1">
-              {calendarDays.map((dayData, index) => {
-                const hasProtocols = dayData.protocols.length > 0
-                const allCompleted = hasProtocols && dayData.protocols.every((p) => p.status === 'completed')
-                const hasMissed = dayData.protocols.some((p) => p.status === 'missed')
-                const hasPending = dayData.protocols.some((p) => p.status === 'pending' || p.status === 'scheduled')
-
-                return (
-                  <button
-                    key={index}
-                    onClick={() => setSelectedDay(dayData.date)}
-                    className={cn(
-                      'relative aspect-square p-1 rounded-lg text-sm transition-colors',
-                      dayData.isCurrentMonth ? 'text-slate-900 dark:text-white' : 'text-slate-300 dark:text-slate-600',
-                      dayData.isToday && 'ring-2 ring-slate-900 dark:ring-white',
-                      selectedDay && isSameDay(dayData.date, selectedDay) && 'bg-slate-100 dark:bg-slate-700',
-                      !selectedDay && hasProtocols && 'hover:bg-slate-50 dark:hover:bg-slate-700'
-                    )}
-                  >
-                    <span
+            {/* Calendar weeks with stats */}
+            {weeks.map((week, weekIndex) => (
+              <div key={weekIndex}>
+                {/* Weekly compliance indicator */}
+                {week.stats.total > 0 && (
+                  <div className="flex items-center justify-end gap-1 mb-1 pr-1">
+                    <div
                       className={cn(
-                        'block text-center',
-                        dayData.isToday && 'font-bold'
+                        'text-[10px] font-medium px-1.5 py-0.5 rounded',
+                        week.stats.percentage === 100
+                          ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                          : week.stats.percentage >= 80
+                            ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+                            : week.stats.percentage >= 50
+                              ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'
+                              : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
                       )}
                     >
-                      {format(dayData.date, 'd')}
-                    </span>
+                      {week.stats.percentage}%
+                    </div>
+                  </div>
+                )}
 
-                    {/* Protocol indicators */}
-                    {hasProtocols && (
-                      <div className="absolute bottom-1 left-1/2 -translate-x-1/2 flex gap-0.5">
-                        {allCompleted ? (
-                          <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                        ) : hasMissed ? (
-                          <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                        ) : hasPending ? (
-                          <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                        ) : (
-                          <div className="w-1.5 h-1.5 rounded-full bg-slate-300" />
+                {/* Week days */}
+                <div className="grid grid-cols-7 gap-1 mb-1">
+                  {week.days.map((dayData, dayIndex) => {
+                    const hasProtocols = dayData.protocols.length > 0
+                    const completedCount = dayData.protocols.filter((p) => p.status === 'completed').length
+                    const isFuture = dayData.date > new Date() && !dayData.isToday
+
+                    return (
+                      <button
+                        key={dayIndex}
+                        onClick={() => setSelectedDay(dayData.date)}
+                        className={cn(
+                          'relative flex flex-col items-center justify-center py-1 rounded-lg text-sm transition-colors min-h-[52px]',
+                          dayData.isCurrentMonth
+                            ? isFuture
+                              ? 'text-slate-400 dark:text-slate-500'
+                              : 'text-slate-900 dark:text-white'
+                            : 'text-slate-300 dark:text-slate-600',
+                          dayData.isToday && 'ring-2 ring-slate-900 dark:ring-white',
+                          selectedDay && isSameDay(dayData.date, selectedDay) && 'bg-slate-100 dark:bg-slate-700',
+                          !selectedDay && hasProtocols && 'hover:bg-slate-50 dark:hover:bg-slate-700'
                         )}
-                        {dayData.protocols.length > 1 && (
-                          <span className="text-[8px] text-slate-400">
-                            +{dayData.protocols.length - 1}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
+                      >
+                        <span
+                          className={cn(
+                            'text-xs mb-0.5',
+                            dayData.isToday && 'font-bold'
+                          )}
+                        >
+                          {format(dayData.date, 'd')}
+                        </span>
+
+                        {/* Mini compliance ring or empty state */}
+                        {hasProtocols ? (
+                          <div className={cn(isFuture && 'opacity-40')}>
+                            <ComplianceRing
+                              completed={completedCount}
+                              total={dayData.protocols.length}
+                              size="xs"
+                              showPercentage={false}
+                              showCheckOnComplete={true}
+                            />
+                          </div>
+                        ) : dayData.isCurrentMonth ? (
+                          <div className="w-6 h-6" />
+                        ) : null}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
           </CardContent>
         </Card>
 
         {/* Legend */}
         <div className="flex items-center justify-center gap-4 text-xs text-slate-500 dark:text-slate-400 mb-4">
-          <div className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-full bg-green-500" />
-            <span>Completed</span>
+          <div className="flex items-center gap-1.5">
+            <div className="w-4 h-4 rounded-full border-2 border-[var(--success)] flex items-center justify-center">
+              <Check className="w-2.5 h-2.5 text-[var(--success)]" />
+            </div>
+            <span>Done</span>
           </div>
-          <div className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-full bg-amber-500" />
+          <div className="flex items-center gap-1.5">
+            <div className="w-4 h-4 rounded-full border-2 border-[var(--accent)]" />
+            <span>Partial</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-4 h-4 rounded-full border-2 border-[var(--muted)]" />
             <span>Pending</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-full bg-red-500" />
-            <span>Missed</span>
           </div>
         </div>
 

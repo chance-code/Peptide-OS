@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
 interface ComplianceRingProps {
   completed: number
   total: number
-  size?: 'sm' | 'md' | 'lg'
+  size?: 'xs' | 'sm' | 'md' | 'lg'
   showPercentage?: boolean
   showCheckOnComplete?: boolean
   className?: string
@@ -35,6 +35,7 @@ export function ComplianceRing({
   }, [percentage])
 
   const sizes = {
+    xs: { ring: 24, stroke: 2.5, text: 'text-[8px]', icon: 'w-2.5 h-2.5' },
     sm: { ring: 48, stroke: 4, text: 'text-sm', icon: 'w-4 h-4' },
     md: { ring: 80, stroke: 6, text: 'text-xl', icon: 'w-6 h-6' },
     lg: { ring: 120, stroke: 8, text: 'text-3xl', icon: 'w-10 h-10' },
@@ -82,16 +83,20 @@ export function ComplianceRing({
       {/* Center content */}
       <div className="absolute inset-0 flex items-center justify-center">
         {isComplete && showCheckOnComplete ? (
-          <div
-            className="flex items-center justify-center rounded-full bg-[var(--success)] text-white"
-            style={{
-              width: ring * 0.5,
-              height: ring * 0.5,
-              animation: 'checkPop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-            }}
-          >
-            <Check className={icon} />
-          </div>
+          size === 'xs' ? (
+            <Check className="w-3 h-3 text-[var(--success)]" strokeWidth={3} />
+          ) : (
+            <div
+              className="flex items-center justify-center rounded-full bg-[var(--success)] text-white"
+              style={{
+                width: ring * 0.5,
+                height: ring * 0.5,
+                animation: 'checkPop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+              }}
+            >
+              <Check className={icon} />
+            </div>
+          )
         ) : showPercentage ? (
           <span className={cn('font-bold tabular-nums text-[var(--foreground)]', text)}>
             {animatedProgress}%
