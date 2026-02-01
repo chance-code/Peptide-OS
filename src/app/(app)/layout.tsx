@@ -6,12 +6,17 @@ import { useAppStore } from '@/store'
 import { BottomNav, TopHeader } from '@/components/nav'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { data: session } = useSession()
+  const { data: session, status: sessionStatus } = useSession()
   const { currentUserId: storedUserId, setCurrentUser } = useAppStore()
   const [isLoading, setIsLoading] = useState(true)
   const [currentUserId, setLocalCurrentUserId] = useState<string | null>(null)
 
   useEffect(() => {
+    // Wait for session to finish loading before making decisions
+    if (sessionStatus === 'loading') {
+      return
+    }
+
     async function loadUser() {
       try {
         // Get the logged-in user's name from the session
@@ -66,9 +71,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
 
     loadUser()
-  }, [setCurrentUser, storedUserId, session?.user?.name])
+  }, [setCurrentUser, storedUserId, session?.user?.name, sessionStatus])
 
-  if (isLoading) {
+  if (isLoading || sessionStatus === 'loading') {
     return (
       <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
         <div className="text-[var(--muted-foreground)]">Loading...</div>
