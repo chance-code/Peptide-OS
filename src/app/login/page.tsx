@@ -1,13 +1,11 @@
 'use client'
 
 import { Suspense, useState } from 'react'
-import { signIn, getSession } from 'next-auth/react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { Lock, ChevronDown, ChevronUp } from 'lucide-react'
+import { signIn } from 'next-auth/react'
+import { useSearchParams } from 'next/navigation'
+import { Lock } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { useAppStore } from '@/store'
 
 function GoogleIcon({ className }: { className?: string }) {
   return (
@@ -41,15 +39,10 @@ function AppleIcon({ className }: { className?: string }) {
 }
 
 function LoginForm() {
-  const router = useRouter()
   const searchParams = useSearchParams()
   const callbackUrl = searchParams.get('callbackUrl') || '/today'
-  const { setCurrentUser } = useAppStore()
 
-  const [password, setPassword] = useState('')
   const [error, setError] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
-  const [showPasswordForm, setShowPasswordForm] = useState(false)
   const [oauthLoading, setOauthLoading] = useState<string | null>(null)
 
   async function handleOAuthSignIn(provider: 'google' | 'apple') {
@@ -64,160 +57,50 @@ function LoginForm() {
     }
   }
 
-  async function handlePasswordSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setError('')
-    setIsLoading(true)
-
-    try {
-      const result = await signIn('credentials', {
-        password,
-        redirect: false,
-        callbackUrl,
-      })
-
-      if (result?.error) {
-        setError('Incorrect password')
-        setIsLoading(false)
-      } else if (result?.ok) {
-        const session = await getSession()
-        const userName = session?.user?.name
-
-        if (userName) {
-          const usersRes = await fetch('/api/users')
-          const users = await usersRes.json()
-
-          let matchingUser = users.find((u: { name: string }) => u.name === userName)
-
-          if (!matchingUser) {
-            const createRes = await fetch('/api/users', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ name: userName }),
-            })
-            if (createRes.ok) {
-              matchingUser = await createRes.json()
-            }
-          }
-
-          if (matchingUser) {
-            setCurrentUser(matchingUser)
-          }
-        }
-
-        router.push(callbackUrl)
-        router.refresh()
-      }
-    } catch {
-      setError('Something went wrong')
-      setIsLoading(false)
-    }
-  }
-
-  // Check if OAuth providers are available
-  const hasGoogle = true // Will show button, fails gracefully if not configured
-  const hasApple = true
-
   return (
-    <div className="space-y-4">
-      {/* OAuth Buttons */}
-      <Card>
-        <CardContent className="pt-6 space-y-3">
-          {hasGoogle && (
-            <Button
-              type="button"
-              variant="secondary"
-              className="w-full h-12 text-base"
-              onClick={() => handleOAuthSignIn('google')}
-              disabled={oauthLoading !== null}
-            >
-              {oauthLoading === 'google' ? (
-                'Signing in...'
-              ) : (
-                <>
-                  <GoogleIcon className="w-5 h-5 mr-3" />
-                  Continue with Google
-                </>
-              )}
-            </Button>
+    <Card>
+      <CardContent className="pt-6 space-y-3">
+        <Button
+          type="button"
+          variant="secondary"
+          className="w-full h-12 text-base"
+          onClick={() => handleOAuthSignIn('google')}
+          disabled={oauthLoading !== null}
+        >
+          {oauthLoading === 'google' ? (
+            'Signing in...'
+          ) : (
+            <>
+              <GoogleIcon className="w-5 h-5 mr-3" />
+              Continue with Google
+            </>
           )}
+        </Button>
 
-          {hasApple && (
-            <Button
-              type="button"
-              variant="secondary"
-              className="w-full h-12 text-base bg-black text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
-              onClick={() => handleOAuthSignIn('apple')}
-              disabled={oauthLoading !== null}
-            >
-              {oauthLoading === 'apple' ? (
-                'Signing in...'
-              ) : (
-                <>
-                  <AppleIcon className="w-5 h-5 mr-3" />
-                  Continue with Apple
-                </>
-              )}
-            </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          className="w-full h-12 text-base bg-black text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
+          onClick={() => handleOAuthSignIn('apple')}
+          disabled={oauthLoading !== null}
+        >
+          {oauthLoading === 'apple' ? (
+            'Signing in...'
+          ) : (
+            <>
+              <AppleIcon className="w-5 h-5 mr-3" />
+              Continue with Apple
+            </>
           )}
-        </CardContent>
-      </Card>
+        </Button>
 
-      {/* Divider */}
-      <div className="relative">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-slate-200 dark:border-slate-700" />
-        </div>
-        <div className="relative flex justify-center text-sm">
-          <span className="px-2 bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-400">
-            or
-          </span>
-        </div>
-      </div>
-
-      {/* Password Option (Collapsible) */}
-      <Card>
-        <CardContent className="pt-4">
-          <button
-            type="button"
-            onClick={() => setShowPasswordForm(!showPasswordForm)}
-            className="w-full flex items-center justify-between py-2 text-slate-600 dark:text-slate-300"
-          >
-            <span className="flex items-center gap-2">
-              <Lock className="w-4 h-4" />
-              Sign in with password
-            </span>
-            {showPasswordForm ? (
-              <ChevronUp className="w-4 h-4" />
-            ) : (
-              <ChevronDown className="w-4 h-4" />
-            )}
-          </button>
-
-          {showPasswordForm && (
-            <form onSubmit={handlePasswordSubmit} className="mt-4 space-y-4">
-              <Input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Password"
-                autoComplete="current-password"
-              />
-
-              {error && (
-                <div className="text-red-600 dark:text-red-400 text-sm text-center">
-                  {error}
-                </div>
-              )}
-
-              <Button type="submit" className="w-full" disabled={isLoading || !password}>
-                {isLoading ? 'Signing in...' : 'Sign In'}
-              </Button>
-            </form>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+        {error && (
+          <div className="text-red-600 dark:text-red-400 text-sm text-center">
+            {error}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 
