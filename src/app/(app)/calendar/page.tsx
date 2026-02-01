@@ -16,13 +16,11 @@ import {
   isToday,
   getDay,
 } from 'date-fns'
-import { ChevronLeft, ChevronRight, Check, X, CheckCheck, Flame } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Check, X, CheckCheck, Flame, TrendingUp } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 import { BottomSheet } from '@/components/ui/bottom-sheet'
 import { PullToRefresh } from '@/components/pull-to-refresh'
-import { ComplianceRing } from '@/components/compliance-ring'
 import { cn } from '@/lib/utils'
 import type { Protocol, Peptide, DoseLog, DayOfWeek } from '@/types'
 
@@ -41,57 +39,87 @@ interface DayData {
   }[]
 }
 
-// Calculate pen units from protocol reconstitution info
 function calculatePenUnits(protocol: ProtocolWithPeptide): number | null {
   if (!protocol.vialAmount || !protocol.diluentVolume) return null
-
   const concentration = protocol.vialAmount / protocol.diluentVolume
   let doseInVialUnits = protocol.doseAmount
-
   if (protocol.doseUnit === 'mcg' && protocol.vialUnit === 'mg') {
     doseInVialUnits = protocol.doseAmount / 1000
   } else if (protocol.doseUnit === 'mg' && protocol.vialUnit === 'mcg') {
     doseInVialUnits = protocol.doseAmount * 1000
   }
-
   const volumeMl = doseInVialUnits / concentration
   return Math.round(volumeMl * 100)
 }
 
 const DAY_INDEX_MAP: Record<number, DayOfWeek> = {
-  0: 'sun',
-  1: 'mon',
-  2: 'tue',
-  3: 'wed',
-  4: 'thu',
-  5: 'fri',
-  6: 'sat',
+  0: 'sun', 1: 'mon', 2: 'tue', 3: 'wed', 4: 'thu', 5: 'fri', 6: 'sat',
 }
 
-function isDoseDay(
-  date: Date,
-  frequency: string,
-  startDate: Date,
-  customDays?: string | null
-): boolean {
+function isDoseDay(date: Date, frequency: string, startDate: Date, customDays?: string | null): boolean {
   const dayOfWeek = DAY_INDEX_MAP[getDay(date)]
-
   switch (frequency) {
-    case 'daily':
-      return true
-    case 'weekly':
-      return getDay(date) === getDay(startDate)
+    case 'daily': return true
+    case 'weekly': return getDay(date) === getDay(startDate)
     case 'custom':
       if (!customDays) return false
       try {
         const days = JSON.parse(customDays) as DayOfWeek[]
         return days.includes(dayOfWeek)
-      } catch {
-        return false
-      }
-    default:
-      return false
+      } catch { return false }
+    default: return false
   }
+}
+
+// Animated score ring component
+function ScoreRing({ score, size = 120 }: { score: number; size?: number }) {
+  const strokeWidth = size * 0.08
+  const radius = (size - strokeWidth) / 2
+  const circumference = radius * 2 * Math.PI
+  const offset = circumference - (score / 100) * circumference
+
+  const getColor = () => {
+    if (score >= 85) return 'var(--success)'
+    if (score >= 70) return 'var(--accent)'
+    if (score >= 50) return 'var(--warning)'
+    return 'var(--error)'
+  }
+
+  return (
+    <div className="relative" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="transform -rotate-90">
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="var(--muted)"
+          strokeWidth={strokeWidth}
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke={getColor()}
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          className="transition-all duration-1000 ease-out"
+          style={{ filter: `drop-shadow(0 0 8px ${getColor()})` }}
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-4xl font-bold tabular-nums text-[var(--foreground)]">
+          {score}
+        </span>
+        <span className="text-xs text-[var(--muted-foreground)] uppercase tracking-wider">
+          Score
+        </span>
+      </div>
+    </div>
+  )
 }
 
 export default function CalendarPage() {
@@ -103,7 +131,6 @@ export default function CalendarPage() {
   const monthStart = startOfMonth(currentMonth)
   const monthEnd = endOfMonth(currentMonth)
 
-  // Fetch protocols
   const { data: protocols = [] } = useQuery<ProtocolWithPeptide[]>({
     queryKey: ['protocols', currentUserId],
     queryFn: async () => {
@@ -112,10 +139,9 @@ export default function CalendarPage() {
       return res.json()
     },
     enabled: !!currentUserId,
-    staleTime: 1000 * 60, // 1 minute
+    staleTime: 1000 * 60,
   })
 
-  // Fetch dose logs for the month
   const { data: doseLogs = [], refetch: refetchLogs } = useQuery<DoseLog[]>({
     queryKey: ['doseLogs', currentUserId, format(monthStart, 'yyyy-MM'), format(monthEnd, 'yyyy-MM')],
     queryFn: async () => {
@@ -126,7 +152,7 @@ export default function CalendarPage() {
       return res.json()
     },
     enabled: !!currentUserId,
-    staleTime: 1000 * 30, // 30 seconds
+    staleTime: 1000 * 30,
   })
 
   const handleRefresh = useCallback(async () => {
@@ -136,11 +162,9 @@ export default function CalendarPage() {
     ])
   }, [queryClient, currentUserId, refetchLogs])
 
-  // Generate calendar days
   const calendarDays = useMemo(() => {
     const calendarStart = startOfWeek(monthStart)
     const calendarEnd = endOfWeek(monthEnd)
-
     const days: DayData[] = []
     let day = calendarStart
 
@@ -148,26 +172,16 @@ export default function CalendarPage() {
       const currentDay = day
       const dayProtocols: DayData['protocols'] = []
 
-      // Check each protocol to see if it applies to this day
       for (const protocol of protocols) {
         const protocolStart = new Date(protocol.startDate)
         const protocolEnd = protocol.endDate ? new Date(protocol.endDate) : null
-
-        // Check if protocol is active on this day
         if (currentDay < protocolStart) continue
         if (protocolEnd && currentDay > protocolEnd) continue
         if (protocol.status === 'completed') continue
+        if (!isDoseDay(currentDay, protocol.frequency, protocolStart, protocol.customDays)) continue
 
-        // Check if it's a dose day based on frequency
-        if (!isDoseDay(currentDay, protocol.frequency, protocolStart, protocol.customDays)) {
-          continue
-        }
-
-        // Find dose log for this day/protocol
         const log = doseLogs.find(
-          (l) =>
-            l.protocolId === protocol.id &&
-            isSameDay(new Date(l.scheduledDate), currentDay)
+          (l) => l.protocolId === protocol.id && isSameDay(new Date(l.scheduledDate), currentDay)
         )
 
         let status: DayData['protocols'][0]['status'] = 'scheduled'
@@ -195,7 +209,6 @@ export default function CalendarPage() {
     return days
   }, [currentMonth, protocols, doseLogs, monthStart, monthEnd])
 
-  // Calculate monthly compliance stats
   const monthlyStats = useMemo(() => {
     const today = new Date()
     let totalDoses = 0
@@ -203,18 +216,15 @@ export default function CalendarPage() {
     let currentStreak = 0
     let checkingStreak = true
 
-    // Only count days in the current month up to today
     const daysToCount = calendarDays.filter(
       (d) => d.isCurrentMonth && d.date <= today && d.protocols.length > 0
     )
 
-    // Count totals and check streak (going backwards from today)
     const sortedDays = [...daysToCount].sort((a, b) => b.date.getTime() - a.date.getTime())
 
     for (const day of sortedDays) {
       const dayTotal = day.protocols.length
       const dayCompleted = day.protocols.filter((p) => p.status === 'completed').length
-
       totalDoses += dayTotal
       completedDoses += dayCompleted
 
@@ -239,21 +249,15 @@ export default function CalendarPage() {
     ? calendarDays.find((d) => isSameDay(d.date, selectedDay))
     : null
 
-  async function handleStatusChange(
-    protocolId: string,
-    date: Date,
-    status: 'completed' | 'skipped' | 'pending'
-  ) {
+  async function handleStatusChange(protocolId: string, date: Date, status: 'completed' | 'skipped' | 'pending') {
     if (!currentUserId) return
 
-    // Optimistic update
     queryClient.setQueryData<DoseLog[]>(
       ['doseLogs', currentUserId, format(monthStart, 'yyyy-MM'), format(monthEnd, 'yyyy-MM')],
       (prev = []) => {
         const existingIndex = prev.findIndex(
           l => l.protocolId === protocolId && isSameDay(new Date(l.scheduledDate), date)
         )
-
         if (existingIndex >= 0) {
           const updated = [...prev]
           updated[existingIndex] = { ...updated[existingIndex], status }
@@ -278,18 +282,12 @@ export default function CalendarPage() {
       }
     )
 
-    // Send to server
     const dateStr = format(date, 'yyyy-MM-dd') + 'T12:00:00.000Z'
     try {
       await fetch('/api/doses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: currentUserId,
-          protocolId,
-          scheduledDate: dateStr,
-          status,
-        }),
+        body: JSON.stringify({ userId: currentUserId, protocolId, scheduledDate: dateStr, status }),
       })
     } catch (error) {
       console.error('Error updating dose:', error)
@@ -299,153 +297,173 @@ export default function CalendarPage() {
 
   return (
     <PullToRefresh onRefresh={handleRefresh} className="h-full">
-      <div className="p-4 pb-20">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <Button variant="ghost" size="sm" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
+      <div className="px-4 pb-24">
+        {/* Header with month navigation */}
+        <div className="flex items-center justify-between py-4">
+          <button
+            onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+            className="w-10 h-10 rounded-full flex items-center justify-center text-[var(--muted-foreground)] hover:bg-[var(--muted)] active:scale-95 transition-all"
+          >
             <ChevronLeft className="w-5 h-5" />
-          </Button>
-          <h2 className="text-xl font-semibold text-slate-900 dark:text-white">
-            {format(currentMonth, 'MMMM yyyy')}
-          </h2>
-          <Button variant="ghost" size="sm" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
+          </button>
+          <div className="text-center">
+            <h1 className="text-xl font-semibold text-[var(--foreground)]">
+              {format(currentMonth, 'MMMM')}
+            </h1>
+            <p className="text-sm text-[var(--muted-foreground)]">
+              {format(currentMonth, 'yyyy')}
+            </p>
+          </div>
+          <button
+            onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+            className="w-10 h-10 rounded-full flex items-center justify-center text-[var(--muted-foreground)] hover:bg-[var(--muted)] active:scale-95 transition-all"
+          >
             <ChevronRight className="w-5 h-5" />
-          </Button>
+          </button>
         </div>
 
-        {/* Monthly Summary Card */}
-        <Card className="mb-4">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <ComplianceRing
-                  completed={monthlyStats.completedDoses}
-                  total={monthlyStats.totalDoses}
-                  size="sm"
-                  showPercentage={true}
-                  showCheckOnComplete={true}
-                />
-                <div>
-                  <div className="text-lg font-semibold text-slate-900 dark:text-white">
-                    {monthlyStats.percentage}% Compliance
-                  </div>
-                  <div className="text-sm text-slate-500 dark:text-slate-400">
-                    {monthlyStats.completedDoses} of {monthlyStats.totalDoses} doses
-                  </div>
-                </div>
+        {/* Score Card - Oura style */}
+        <div className="rounded-3xl bg-gradient-to-br from-[var(--card)] to-[var(--muted)] p-6 mb-6 border border-[var(--border)]">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <p className="text-sm text-[var(--muted-foreground)] mb-1">Monthly Compliance</p>
+              <div className="flex items-baseline gap-2 mb-3">
+                <span className="text-5xl font-bold tabular-nums text-[var(--foreground)]">
+                  {monthlyStats.percentage}
+                </span>
+                <span className="text-xl text-[var(--muted-foreground)]">%</span>
               </div>
-              {monthlyStats.streak > 0 && (
-                <div className="flex items-center gap-1.5 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 px-3 py-1.5 rounded-full">
-                  <Flame className="w-4 h-4" />
-                  <span className="font-semibold">{monthlyStats.streak}</span>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-[var(--success)]" />
+                  <span className="text-sm text-[var(--muted-foreground)]">
+                    {monthlyStats.completedDoses}/{monthlyStats.totalDoses} doses
+                  </span>
                 </div>
-              )}
+                {monthlyStats.streak > 0 && (
+                  <div className="flex items-center gap-1 text-orange-500">
+                    <Flame className="w-4 h-4" />
+                    <span className="text-sm font-medium">{monthlyStats.streak} day streak</span>
+                  </div>
+                )}
+              </div>
             </div>
-          </CardContent>
-        </Card>
+            <ScoreRing score={monthlyStats.percentage} size={100} />
+          </div>
+        </div>
 
         {/* Today button */}
         {!isSameMonth(currentMonth, new Date()) && (
-          <div className="flex justify-center mb-4">
-            <Button variant="secondary" size="sm" onClick={() => setCurrentMonth(new Date())}>
-              Go to Today
-            </Button>
-          </div>
+          <button
+            onClick={() => setCurrentMonth(new Date())}
+            className="w-full mb-4 py-2 text-sm font-medium text-[var(--accent)] hover:bg-[var(--accent-muted)] rounded-xl transition-colors"
+          >
+            Go to Today
+          </button>
         )}
 
         {/* Calendar Grid */}
-        <Card className="mb-4 overflow-hidden">
-          <CardContent className="p-3">
-            {/* Day headers */}
-            <div className="grid grid-cols-7 mb-2">
-              {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, i) => (
-                <div
-                  key={i}
-                  className="text-center text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wide"
+        <div className="mb-4">
+          {/* Day headers */}
+          <div className="grid grid-cols-7 mb-3">
+            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, i) => (
+              <div
+                key={i}
+                className="text-center text-[11px] font-medium text-[var(--muted-foreground)] uppercase tracking-widest"
+              >
+                {day}
+              </div>
+            ))}
+          </div>
+
+          {/* Calendar days */}
+          <div className="grid grid-cols-7 gap-2">
+            {calendarDays.map((dayData, index) => {
+              const hasProtocols = dayData.protocols.length > 0
+              const completedCount = dayData.protocols.filter((p) => p.status === 'completed').length
+              const completionRatio = hasProtocols ? completedCount / dayData.protocols.length : 0
+              const allCompleted = hasProtocols && completedCount === dayData.protocols.length
+              const hasMissed = dayData.protocols.some((p) => p.status === 'missed')
+              const isFuture = dayData.date > new Date() && !dayData.isToday
+
+              // Get background color based on completion
+              const getBgStyle = () => {
+                if (!dayData.isCurrentMonth) return {}
+                if (!hasProtocols) return {}
+                if (isFuture) return { backgroundColor: 'var(--muted)', opacity: 0.5 }
+                if (allCompleted) return { backgroundColor: 'var(--success)', opacity: 0.15 + completionRatio * 0.25 }
+                if (hasMissed) return { backgroundColor: 'var(--error)', opacity: 0.15 }
+                if (completionRatio > 0) return { backgroundColor: 'var(--success)', opacity: 0.1 + completionRatio * 0.2 }
+                return { backgroundColor: 'var(--warning)', opacity: 0.15 }
+              }
+
+              return (
+                <button
+                  key={index}
+                  onClick={() => hasProtocols && setSelectedDay(dayData.date)}
+                  disabled={!hasProtocols}
+                  className={cn(
+                    'relative aspect-square rounded-2xl flex flex-col items-center justify-center transition-all duration-200',
+                    dayData.isCurrentMonth
+                      ? 'text-[var(--foreground)]'
+                      : 'text-[var(--muted-foreground)] opacity-30',
+                    dayData.isToday && 'ring-2 ring-[var(--foreground)] ring-offset-2 ring-offset-[var(--background)]',
+                    hasProtocols && !isFuture && 'hover:scale-110 active:scale-95 cursor-pointer',
+                    !hasProtocols && 'cursor-default'
+                  )}
+                  style={getBgStyle()}
                 >
-                  {day}
-                </div>
-              ))}
-            </div>
+                  <span className={cn(
+                    'text-sm font-medium',
+                    dayData.isToday && 'font-bold',
+                    allCompleted && !isFuture && 'text-[var(--success)]'
+                  )}>
+                    {format(dayData.date, 'd')}
+                  </span>
 
-            {/* Calendar days - flat grid for consistent sizing */}
-            <div className="grid grid-cols-7 gap-1">
-              {calendarDays.map((dayData, index) => {
-                const hasProtocols = dayData.protocols.length > 0
-                const completedCount = dayData.protocols.filter((p) => p.status === 'completed').length
-                const allCompleted = hasProtocols && completedCount === dayData.protocols.length
-                const hasMissed = dayData.protocols.some((p) => p.status === 'missed')
-                const isFuture = dayData.date > new Date() && !dayData.isToday
-
-                // Background tint based on status
-                const getBgClass = () => {
-                  if (!dayData.isCurrentMonth) return ''
-                  if (!hasProtocols) return ''
-                  if (isFuture) return 'bg-slate-50 dark:bg-slate-800/50'
-                  if (allCompleted) return 'bg-green-50 dark:bg-green-900/20'
-                  if (hasMissed) return 'bg-red-50 dark:bg-red-900/20'
-                  return 'bg-amber-50 dark:bg-amber-900/20'
-                }
-
-                return (
-                  <button
-                    key={index}
-                    onClick={() => setSelectedDay(dayData.date)}
-                    className={cn(
-                      'relative flex flex-col items-center justify-center rounded-xl transition-all duration-200 aspect-square',
-                      getBgClass(),
-                      dayData.isCurrentMonth
-                        ? isFuture
-                          ? 'text-slate-400 dark:text-slate-500'
-                          : 'text-slate-900 dark:text-white'
-                        : 'text-slate-300 dark:text-slate-700',
-                      dayData.isToday && 'ring-2 ring-slate-900 dark:ring-white ring-offset-1 ring-offset-[var(--card)]',
-                      selectedDay && isSameDay(dayData.date, selectedDay) && 'bg-slate-200 dark:bg-slate-600',
-                      hasProtocols && 'hover:scale-105 active:scale-95'
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        'text-[11px] leading-none',
-                        dayData.isToday && 'font-bold',
-                        hasProtocols && dayData.isCurrentMonth && 'mb-0.5'
-                      )}
-                    >
-                      {format(dayData.date, 'd')}
-                    </span>
-
-                    {/* Mini compliance ring */}
-                    {hasProtocols && dayData.isCurrentMonth && (
-                      <div className={cn(isFuture && 'opacity-40')}>
-                        <ComplianceRing
-                          completed={completedCount}
-                          total={dayData.protocols.length}
-                          size="xs"
-                          showPercentage={false}
-                          showCheckOnComplete={true}
+                  {/* Completion indicator */}
+                  {hasProtocols && dayData.isCurrentMonth && !isFuture && (
+                    <div className="mt-0.5 flex gap-0.5">
+                      {dayData.protocols.map((p, i) => (
+                        <div
+                          key={i}
+                          className={cn(
+                            'w-1.5 h-1.5 rounded-full transition-all',
+                            p.status === 'completed' && 'bg-[var(--success)]',
+                            p.status === 'missed' && 'bg-[var(--error)]',
+                            p.status === 'skipped' && 'bg-[var(--muted-foreground)]',
+                            (p.status === 'pending' || p.status === 'scheduled') && 'bg-[var(--warning)]'
+                          )}
                         />
-                      </div>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-          </CardContent>
-        </Card>
+                      ))}
+                    </div>
+                  )}
 
-        {/* Legend - more compact */}
-        <div className="flex items-center justify-center gap-6 text-[11px] text-slate-500 dark:text-slate-400">
+                  {/* Future scheduled indicator */}
+                  {hasProtocols && dayData.isCurrentMonth && isFuture && (
+                    <div className="mt-0.5">
+                      <div className="w-1.5 h-1.5 rounded-full bg-[var(--muted-foreground)] opacity-50" />
+                    </div>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Legend */}
+        <div className="flex items-center justify-center gap-5 text-[11px] text-[var(--muted-foreground)]">
           <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-full bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700" />
+            <div className="w-2 h-2 rounded-full bg-[var(--success)]" />
             <span>Done</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-full bg-amber-100 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700" />
-            <span>Partial</span>
+            <div className="w-2 h-2 rounded-full bg-[var(--warning)]" />
+            <span>Pending</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-600" />
-            <span>Scheduled</span>
+            <div className="w-2 h-2 rounded-full bg-[var(--error)]" />
+            <span>Missed</span>
           </div>
         </div>
 
@@ -459,7 +477,6 @@ export default function CalendarPage() {
             <>
               {selectedDayData.protocols.length > 0 ? (
                 <div className="space-y-3">
-                  {/* Mark All Done button */}
                   {selectedDayData.protocols.filter(p =>
                     p.status === 'pending' || p.status === 'missed' || p.status === 'scheduled'
                   ).length > 1 && (
@@ -471,7 +488,7 @@ export default function CalendarPage() {
                           }
                         })
                       }}
-                      className="w-full bg-green-600 hover:bg-green-700"
+                      className="w-full bg-[var(--success)] hover:opacity-90"
                     >
                       <CheckCheck className="w-4 h-4 mr-2" />
                       Mark All Done ({selectedDayData.protocols.filter(p =>
@@ -484,24 +501,26 @@ export default function CalendarPage() {
                     <div
                       key={protocol.id}
                       className={cn(
-                        'flex items-center justify-between p-4 rounded-xl',
-                        status === 'completed' ? 'bg-green-50 dark:bg-green-900/30' : 'bg-slate-50 dark:bg-slate-700'
+                        'flex items-center justify-between p-4 rounded-2xl transition-colors',
+                        status === 'completed'
+                          ? 'bg-[var(--success-muted)]'
+                          : 'bg-[var(--muted)]'
                       )}
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium text-slate-900 dark:text-white text-lg">
+                          <span className="font-semibold text-[var(--foreground)]">
                             {protocol.peptide.name}
                           </span>
                           {penUnits && (
-                            <span className="bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 text-sm font-semibold px-2 py-0.5 rounded-full">
-                              {penUnits} units
+                            <span className="bg-[var(--info-muted)] text-[var(--info)] text-xs font-medium px-2 py-0.5 rounded-full">
+                              {penUnits}u
                             </span>
                           )}
                         </div>
-                        <div className="text-sm text-slate-500 dark:text-slate-400">
+                        <div className="text-sm text-[var(--muted-foreground)]">
                           {protocol.doseAmount} {protocol.doseUnit}
-                          {protocol.timing && ` • ${protocol.timing}`}
+                          {protocol.timing && ` · ${protocol.timing}`}
                         </div>
                       </div>
 
@@ -510,28 +529,29 @@ export default function CalendarPage() {
                           <>
                             <button
                               onClick={() => handleStatusChange(protocol.id, selectedDayData.date, 'skipped')}
-                              className="p-2 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+                              className="p-2.5 rounded-full text-[var(--muted-foreground)] hover:bg-[var(--border)] transition-colors"
                             >
                               <X className="w-5 h-5" />
                             </button>
                             <button
                               onClick={() => handleStatusChange(protocol.id, selectedDayData.date, 'completed')}
-                              className="w-12 h-12 rounded-full border-2 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 hover:border-green-500 dark:hover:border-green-400 hover:bg-green-50 dark:hover:bg-green-900/30 flex items-center justify-center transition-colors"
+                              className="w-12 h-12 rounded-full border-2 border-[var(--border)] bg-[var(--card)] hover:border-[var(--success)] hover:bg-[var(--success-muted)] flex items-center justify-center transition-all"
                             >
-                              <Check className="w-6 h-6 text-slate-400" />
+                              <Check className="w-6 h-6 text-[var(--muted-foreground)]" />
                             </button>
                           </>
                         ) : status === 'completed' ? (
                           <button
                             onClick={() => handleStatusChange(protocol.id, selectedDayData.date, 'pending')}
-                            className="w-12 h-12 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-colors"
+                            className="w-12 h-12 rounded-full bg-[var(--success)] flex items-center justify-center transition-all hover:opacity-80"
+                            style={{ boxShadow: 'var(--glow-success)' }}
                           >
                             <Check className="w-6 h-6 text-white" />
                           </button>
                         ) : (
                           <button
                             onClick={() => handleStatusChange(protocol.id, selectedDayData.date, 'pending')}
-                            className="px-4 py-2 rounded-lg bg-slate-200 dark:bg-slate-600 hover:bg-slate-300 dark:hover:bg-slate-500 text-slate-600 dark:text-slate-200 text-sm transition-colors"
+                            className="px-4 py-2 rounded-xl bg-[var(--muted)] hover:bg-[var(--border)] text-[var(--muted-foreground)] text-sm transition-colors"
                           >
                             Skipped
                           </button>
@@ -542,7 +562,7 @@ export default function CalendarPage() {
                 </div>
               ) : (
                 <div className="text-center py-8">
-                  <p className="text-slate-500 dark:text-slate-400">No doses scheduled for this day</p>
+                  <p className="text-[var(--muted-foreground)]">No doses scheduled</p>
                 </div>
               )}
             </>
