@@ -22,7 +22,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { name, email, notes } = body
+    const { name, notes } = body
 
     if (!name || typeof name !== 'string') {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 })
@@ -35,7 +35,6 @@ export async function POST(request: NextRequest) {
     const user = await prisma.userProfile.create({
       data: {
         name,
-        email: email || null,
         notes,
         isActive,
       },
