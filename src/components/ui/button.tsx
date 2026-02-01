@@ -4,7 +4,7 @@ import { forwardRef } from 'react'
 import { cn } from '@/lib/utils'
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'ghost' | 'danger'
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'success'
   size?: 'sm' | 'md' | 'lg'
 }
 
@@ -14,20 +14,27 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       <button
         ref={ref}
         className={cn(
-          'inline-flex items-center justify-center rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-slate-900 disabled:opacity-50 disabled:pointer-events-none',
+          'inline-flex items-center justify-center rounded-xl font-semibold transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[var(--background)] disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98]',
           {
-            'bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100 focus:ring-slate-500':
+            // Primary - Uses accent color
+            'bg-[var(--accent)] text-[var(--accent-foreground)] hover:opacity-90 focus:ring-[var(--accent)] shadow-md hover:shadow-lg':
               variant === 'primary',
-            'bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-slate-100 hover:bg-slate-200 dark:hover:bg-slate-600 focus:ring-slate-400':
+            // Secondary - Muted background
+            'bg-[var(--muted)] text-[var(--foreground)] hover:bg-[var(--border)] focus:ring-[var(--ring)]':
               variant === 'secondary',
-            'bg-transparent text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 focus:ring-slate-400':
+            // Ghost - Transparent
+            'bg-transparent text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)] focus:ring-[var(--ring)]':
               variant === 'ghost',
-            'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500':
+            // Danger - Error color
+            'bg-[var(--error)] text-white hover:opacity-90 focus:ring-[var(--error)]':
               variant === 'danger',
+            // Success - Success color
+            'bg-[var(--success)] text-white hover:opacity-90 focus:ring-[var(--success)]':
+              variant === 'success',
           },
           {
-            'h-8 px-3 text-sm': size === 'sm',
-            'h-10 px-4 text-sm': size === 'md',
+            'h-9 px-4 text-sm': size === 'sm',
+            'h-11 px-5 text-sm': size === 'md',
             'h-12 px-6 text-base': size === 'lg',
           },
           className

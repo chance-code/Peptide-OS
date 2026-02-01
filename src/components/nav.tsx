@@ -34,8 +34,8 @@ export function BottomNav() {
   const pathname = usePathname()
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 glass border-t border-slate-200/50 dark:border-slate-700/50 safe-area-inset-bottom">
-      <div className="flex items-center justify-around h-14 max-w-lg mx-auto">
+    <nav className="fixed bottom-0 left-0 right-0 nav-premium safe-area-inset-bottom z-50">
+      <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-2">
         {navItems.map((item) => {
           const isActive = pathname.startsWith(item.href)
           const Icon = item.icon
@@ -46,13 +46,28 @@ export function BottomNav() {
               href={item.href}
               title={item.label}
               className={cn(
-                'flex items-center justify-center flex-1 h-full transition-colors',
-                isActive
-                  ? 'text-slate-900 dark:text-white'
-                  : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'
+                'nav-item flex-1 max-w-[72px]',
+                isActive && 'nav-item-active'
               )}
             >
-              <Icon className={cn('w-6 h-6', isActive && 'stroke-[2.5]')} />
+              <Icon
+                className={cn(
+                  'w-5 h-5 transition-all',
+                  isActive
+                    ? 'stroke-[2.5] text-[var(--accent)]'
+                    : 'text-[var(--muted-foreground)]'
+                )}
+              />
+              <span
+                className={cn(
+                  'text-[10px] font-medium transition-colors',
+                  isActive
+                    ? 'text-[var(--accent)]'
+                    : 'text-[var(--muted-foreground)]'
+                )}
+              >
+                {item.label}
+              </span>
             </Link>
           )
         })}
@@ -67,18 +82,18 @@ export function TopHeader({ title }: { title?: string }) {
   const initials = currentUser?.name ? getInitials(currentUser.name) : '?'
 
   return (
-    <header className="sticky top-0 z-40 glass border-b border-slate-200/50 dark:border-slate-700/50">
+    <header className="sticky top-0 z-40 glass border-b border-[var(--border)]">
       <div className="flex items-center justify-between h-14 px-4 max-w-lg mx-auto">
-        <h1 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-white">
+        <h1 className="text-lg font-semibold tracking-tight text-[var(--foreground)]">
           {title || 'Peptide OS'}
         </h1>
         <Link
           href="/settings"
           className={cn(
-            'w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold transition-colors',
+            'w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold transition-all',
             pathname === '/settings'
-              ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
-              : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600'
+              ? 'bg-[var(--accent)] text-[var(--accent-foreground)] shadow-lg'
+              : 'bg-[var(--muted)] text-[var(--muted-foreground)] hover:bg-[var(--border)]'
           )}
         >
           {initials}

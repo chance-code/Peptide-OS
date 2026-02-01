@@ -58,8 +58,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
-        <div className="text-slate-500 dark:text-slate-400">Loading...</div>
+      <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
+        <div className="text-[var(--muted-foreground)]">Loading...</div>
       </div>
     )
   }
@@ -73,9 +73,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="h-dvh flex flex-col bg-slate-50 dark:bg-slate-900">
+    <div className="h-dvh flex flex-col bg-[var(--background)]">
       <TopHeader />
-      <main className="flex-1 pb-14 max-w-lg mx-auto w-full overflow-auto animate-page-in">{children}</main>
+      <main className="flex-1 pb-16 max-w-lg mx-auto w-full overflow-auto animate-page-in">{children}</main>
       <BottomNav />
     </div>
   )

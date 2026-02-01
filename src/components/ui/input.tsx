@@ -30,7 +30,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
         {label && (
           <label
             htmlFor={inputId}
-            className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1"
+            className="text-label block mb-1.5"
           >
             {label}
           </label>
@@ -40,15 +40,16 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
           id={inputId}
           onFocus={handleFocus}
           className={cn(
-            'w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500',
-            'focus:outline-none focus:ring-2 focus:ring-slate-500 dark:focus:ring-slate-400 focus:border-transparent',
-            'disabled:bg-slate-50 dark:disabled:bg-slate-900 disabled:text-slate-500 dark:disabled:text-slate-400 disabled:cursor-not-allowed',
-            error && 'border-red-500 focus:ring-red-500',
+            'w-full rounded-xl border border-[var(--border)] bg-[var(--card)] px-4 py-3 text-sm text-[var(--foreground)] placeholder:text-[var(--muted-foreground)]',
+            'focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:border-transparent',
+            'disabled:bg-[var(--muted)] disabled:text-[var(--muted-foreground)] disabled:cursor-not-allowed',
+            'transition-all',
+            error && 'border-[var(--error)] focus:ring-[var(--error)]',
             className
           )}
           {...props}
         />
-        {error && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{error}</p>}
+        {error && <p className="mt-1.5 text-sm text-[var(--error)]">{error}</p>}
       </div>
     )
   }
