@@ -19,8 +19,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
     async function loadUser() {
       try {
-        // Get the logged-in user's name from the session
+        // Get the logged-in user's info from the session
         const sessionUserName = session?.user?.name
+        const sessionUserEmail = session?.user?.email
 
         // Fetch all users
         const usersRes = await fetch('/api/users')
@@ -32,20 +33,28 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         const users = await usersRes.json()
         let userToUse = null
 
-        // First, try to find user matching the session (password-based auth)
-        if (sessionUserName) {
-          userToUse = users.find((u: { name: string }) => u.name === sessionUserName)
+        // For OAuth users, try to find by email first
+        if (sessionUserEmail) {
+          userToUse = users.find((u: { email?: string }) => u.email === sessionUserEmail)
+        }
 
-          // If session user doesn't exist in database, create them
-          if (!userToUse) {
-            const createRes = await fetch('/api/users', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ name: sessionUserName }),
-            })
-            if (createRes.ok) {
-              userToUse = await createRes.json()
-            }
+        // Then try to find by name
+        if (!userToUse && sessionUserName) {
+          userToUse = users.find((u: { name: string }) => u.name === sessionUserName)
+        }
+
+        // If session user doesn't exist in database, create them
+        if (!userToUse && (sessionUserName || sessionUserEmail)) {
+          const createRes = await fetch('/api/users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: sessionUserName || sessionUserEmail?.split('@')[0] || 'User',
+              email: sessionUserEmail,
+            }),
+          })
+          if (createRes.ok) {
+            userToUse = await createRes.json()
           }
         }
 
