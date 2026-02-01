@@ -2,8 +2,8 @@ const sharp = require('sharp');
 const fs = require('fs');
 const path = require('path');
 
-// Premium app icon - dark background with glowing ring
-// Inspired by Oura's clean aesthetic
+// Premium app icon - clean, minimal design
+// Inspired by modern health apps like Oura, Eight Sleep
 async function generateIcons() {
   const sizes = [
     { name: 'apple-touch-icon.png', size: 180 },
@@ -12,36 +12,27 @@ async function generateIcons() {
   ];
 
   for (const { name, size } of sizes) {
-    const padding = Math.round(size * 0.15);
-    const ringSize = size - padding * 2;
-    const strokeWidth = Math.round(size * 0.08);
-    const radius = (ringSize - strokeWidth) / 2;
     const center = size / 2;
-
-    // Calculate arc for ~75% completion look
-    const circumference = 2 * Math.PI * radius;
-    const arcLength = circumference * 0.75;
-    const gapLength = circumference * 0.25;
 
     const svg = `
       <svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
         <defs>
-          <!-- Background gradient -->
+          <!-- Background gradient - deep navy to dark -->
           <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" style="stop-color:#1a1a2e"/>
-            <stop offset="100%" style="stop-color:#0f0f1a"/>
+            <stop offset="0%" style="stop-color:#1e1b4b"/>
+            <stop offset="100%" style="stop-color:#0f0a1e"/>
           </linearGradient>
 
-          <!-- Ring gradient - indigo to purple -->
-          <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" style="stop-color:#818cf8"/>
-            <stop offset="50%" style="stop-color:#6366f1"/>
-            <stop offset="100%" style="stop-color:#a78bfa"/>
+          <!-- Letter gradient - indigo/violet -->
+          <linearGradient id="letterGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" style="stop-color:#a78bfa"/>
+            <stop offset="50%" style="stop-color:#818cf8"/>
+            <stop offset="100%" style="stop-color:#6366f1"/>
           </linearGradient>
 
-          <!-- Glow filter -->
+          <!-- Subtle glow -->
           <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="${size * 0.02}" result="blur"/>
+            <feGaussianBlur stdDeviation="${size * 0.015}" result="blur"/>
             <feMerge>
               <feMergeNode in="blur"/>
               <feMergeNode in="SourceGraphic"/>
@@ -52,32 +43,24 @@ async function generateIcons() {
         <!-- Rounded rectangle background -->
         <rect width="${size}" height="${size}" rx="${size * 0.22}" fill="url(#bgGrad)"/>
 
-        <!-- Subtle inner shadow -->
-        <rect width="${size}" height="${size}" rx="${size * 0.22}" fill="none"
-              stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+        <!-- Subtle top highlight -->
+        <rect x="${size * 0.1}" y="${size * 0.05}" width="${size * 0.8}" height="${size * 0.3}"
+              rx="${size * 0.15}" fill="rgba(255,255,255,0.03)"/>
 
-        <!-- Background ring track -->
-        <circle cx="${center}" cy="${center}" r="${radius}"
-                fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="${strokeWidth}"/>
+        <!-- Large stylized P with gradient -->
+        <text x="${center}" y="${center + size * 0.15}"
+              font-family="system-ui, -apple-system, BlinkMacSystemFont, sans-serif"
+              font-size="${size * 0.6}"
+              font-weight="800"
+              fill="url(#letterGrad)"
+              text-anchor="middle"
+              filter="url(#glow)">P</text>
 
-        <!-- Main ring arc with glow -->
-        <circle cx="${center}" cy="${center}" r="${radius}"
-                fill="none"
-                stroke="url(#ringGrad)"
-                stroke-width="${strokeWidth}"
-                stroke-linecap="round"
-                stroke-dasharray="${arcLength} ${gapLength}"
-                stroke-dashoffset="${circumference * 0.25}"
-                filter="url(#glow)"
-                transform="rotate(-90 ${center} ${center})"/>
-
-        <!-- Center letter P -->
-        <text x="${center}" y="${center + size * 0.08}"
-              font-family="system-ui, -apple-system, sans-serif"
-              font-size="${size * 0.32}"
-              font-weight="700"
-              fill="white"
-              text-anchor="middle">P</text>
+        <!-- Small accent dot (like a molecule/peptide hint) -->
+        <circle cx="${center + size * 0.18}" cy="${center - size * 0.15}"
+                r="${size * 0.04}"
+                fill="#22c55e"
+                filter="url(#glow)"/>
       </svg>
     `;
 
