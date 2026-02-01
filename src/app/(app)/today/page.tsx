@@ -316,7 +316,7 @@ export default function TodayPage() {
                 pending={data.summary.pending}
                 nextDose={nextPendingDose ? {
                   name: nextPendingDose.peptideName,
-                  time: nextPendingDose.timing,
+                  time: nextPendingDose.timing ?? undefined,
                 } : undefined}
                 hasExpiredVials={hasExpiredVials}
                 userName={currentUser?.name}
