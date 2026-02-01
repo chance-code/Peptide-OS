@@ -12,17 +12,19 @@ import {
   ChevronRight,
   AlertTriangle,
   Clock,
+  Syringe,
 } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { BottomSheet } from '@/components/ui/bottom-sheet'
-import { DoseCardSkeleton, SummarySkeleton } from '@/components/ui/skeleton'
+import { DoseCardSkeleton } from '@/components/ui/skeleton'
 import { SyringeVisual } from '@/components/syringe-visual'
 import { AlertsBanner } from '@/components/alerts-banner'
 import { PullToRefresh } from '@/components/pull-to-refresh'
 import { SwipeableCard } from '@/components/swipeable-card'
+import { HeroCard } from '@/components/hero-card'
 import { cn } from '@/lib/utils'
 import type { TodayDoseItem } from '@/types'
 
@@ -43,9 +45,10 @@ function AnimatedCheckButton({
       <button
         type="button"
         onClick={onUndo}
-        className="w-10 h-10 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center"
+        className="w-11 h-11 rounded-full bg-[var(--success)] flex items-center justify-center shadow-lg"
         style={{
-          animation: justCompleted ? 'checkPop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)' : undefined
+          animation: justCompleted ? 'checkPop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)' : undefined,
+          boxShadow: justCompleted ? 'var(--glow-success)' : undefined,
         }}
       >
         <Check
@@ -62,9 +65,9 @@ function AnimatedCheckButton({
     <button
       type="button"
       onClick={onComplete}
-      className="w-10 h-10 rounded-full border-2 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 hover:border-green-500 dark:hover:border-green-400 hover:bg-green-50 dark:hover:bg-green-900/30 flex items-center justify-center transition-colors active:scale-95"
+      className="w-11 h-11 rounded-full border-2 border-[var(--border)] bg-[var(--card)] hover:border-[var(--success)] hover:bg-[var(--success-muted)] flex items-center justify-center transition-all active:scale-95"
     >
-      <Check className="w-5 h-5 text-slate-400" />
+      <Check className="w-5 h-5 text-[var(--muted-foreground)]" />
     </button>
   )
 }
@@ -82,37 +85,35 @@ interface TodayResponse {
 
 // Trigger confetti celebration
 function triggerConfetti() {
-  const colors = ['#22c55e', '#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4']
+  const colors = ['#22c55e', '#6366f1', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4']
 
-  // Single celebratory burst
   confetti({
-    particleCount: 50,
-    spread: 60,
-    origin: { y: 0.7 },
+    particleCount: 60,
+    spread: 70,
+    origin: { y: 0.6 },
     colors,
   })
 
-  // Small delayed side bursts
   setTimeout(() => {
     confetti({
-      particleCount: 25,
+      particleCount: 30,
       angle: 60,
-      spread: 45,
-      origin: { x: 0.1, y: 0.8 },
+      spread: 50,
+      origin: { x: 0.1, y: 0.7 },
       colors,
     })
     confetti({
-      particleCount: 25,
+      particleCount: 30,
       angle: 120,
-      spread: 45,
-      origin: { x: 0.9, y: 0.8 },
+      spread: 50,
+      origin: { x: 0.9, y: 0.7 },
       colors,
     })
   }, 150)
 }
 
 export default function TodayPage() {
-  const { currentUserId } = useAppStore()
+  const { currentUserId, currentUser } = useAppStore()
   const queryClient = useQueryClient()
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [justCompleted, setJustCompleted] = useState<Set<string>>(new Set())
@@ -130,7 +131,7 @@ export default function TodayPage() {
       return res.json()
     },
     enabled: !!currentUserId,
-    staleTime: 1000 * 30, // 30 seconds
+    staleTime: 1000 * 30,
   })
 
   const handleRefresh = useCallback(async () => {
@@ -148,13 +149,11 @@ export default function TodayPage() {
     const allCompleted = data.summary.completed === data.summary.total
     const wasNotAllCompleted = prevCompletedRef.current !== null && prevCompletedRef.current < data.summary.total
 
-    // Only trigger if we just completed everything (not on initial load)
     if (allCompleted && wasNotAllCompleted && !hasTriggeredConfetti.current) {
       hasTriggeredConfetti.current = true
       triggerConfetti()
     }
 
-    // Reset if we undo
     if (!allCompleted) {
       hasTriggeredConfetti.current = false
     }
@@ -162,7 +161,6 @@ export default function TodayPage() {
     prevCompletedRef.current = data.summary.completed
   }, [data])
 
-  // Reset confetti flag when date changes
   useEffect(() => {
     hasTriggeredConfetti.current = false
     prevCompletedRef.current = null
@@ -174,7 +172,6 @@ export default function TodayPage() {
   ) {
     if (!currentUserId || !data) return
 
-    // Track animation for newly completed items
     if (status === 'completed') {
       setJustCompleted(prev => new Set(prev).add(item.protocolId))
       setTimeout(() => {
@@ -186,7 +183,6 @@ export default function TodayPage() {
       }, 600)
     }
 
-    // Optimistic update
     queryClient.setQueryData<TodayResponse>(['today', currentUserId, dateParam], (old) => {
       if (!old) return old
       return {
@@ -209,7 +205,6 @@ export default function TodayPage() {
       }
     })
 
-    // Send to server in background
     const dateStr = format(selectedDate, 'yyyy-MM-dd') + 'T12:00:00.000Z'
     fetch('/api/doses', {
       method: 'POST',
@@ -232,7 +227,6 @@ export default function TodayPage() {
     const pendingItems = data.items.filter((item) => item.status === 'pending')
     if (pendingItems.length === 0) return
 
-    // Optimistic update
     queryClient.setQueryData<TodayResponse>(['today', currentUserId, dateParam], (old) => {
       if (!old) return old
       return {
@@ -271,63 +265,62 @@ export default function TodayPage() {
 
   const isToday = format(selectedDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
   const pendingCount = data?.summary.pending || 0
+  const nextPendingDose = data?.items.find(item => item.status === 'pending')
+  const hasExpiredVials = data?.items.some(item => item.vialExpired) || false
 
   return (
     <div>
-      {/* Alerts Banner */}
       <AlertsBanner />
 
       <PullToRefresh onRefresh={handleRefresh} className="h-full">
         <div className="p-4 pb-20">
           {/* Date Navigation */}
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between mb-4">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setSelectedDate((d) => new Date(d.getTime() - 86400000))}
+              className="w-10 h-10 p-0"
             >
               <ChevronLeft className="w-5 h-5" />
             </Button>
-            <div className="text-center">
-              <div className="text-sm text-slate-500 dark:text-slate-400">
+            <button
+              onClick={() => setSelectedDate(new Date())}
+              className="text-center hover:opacity-70 transition-opacity"
+            >
+              <div className="text-label">
                 {isToday ? 'Today' : format(selectedDate, 'EEEE')}
               </div>
-              <div className="font-semibold text-slate-900 dark:text-white">
+              <div className="font-semibold text-[var(--foreground)]">
                 {format(selectedDate, 'MMMM d, yyyy')}
               </div>
-            </div>
+            </button>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setSelectedDate((d) => new Date(d.getTime() + 86400000))}
+              className="w-10 h-10 p-0"
             >
               <ChevronRight className="w-5 h-5" />
             </Button>
           </div>
 
-          {/* Summary */}
+          {/* Hero Card */}
           {isLoading ? (
-            <SummarySkeleton />
-          ) : data && data.summary.total > 0 ? (
-            <div className="grid grid-cols-3 gap-3 mb-6 animate-card-in">
-              <div className="bg-white dark:bg-slate-800 rounded-lg p-3 text-center border border-slate-100 dark:border-slate-700">
-                <div className="text-2xl font-bold text-slate-900 dark:text-white">
-                  {data.summary.total}
-                </div>
-                <div className="text-xs text-slate-500 dark:text-slate-400">Total</div>
-              </div>
-              <div className="bg-green-50 dark:bg-green-900/30 rounded-lg p-3 text-center border border-green-100 dark:border-green-800">
-                <div className="text-2xl font-bold text-green-700 dark:text-green-400">
-                  {data.summary.completed}
-                </div>
-                <div className="text-xs text-green-600 dark:text-green-500">Done</div>
-              </div>
-              <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-3 text-center border border-slate-100 dark:border-slate-700">
-                <div className="text-2xl font-bold text-slate-700 dark:text-slate-200">
-                  {data.summary.pending}
-                </div>
-                <div className="text-xs text-slate-500 dark:text-slate-400">Pending</div>
-              </div>
+            <div className="h-[140px] rounded-2xl bg-[var(--muted)] animate-pulse mb-6" />
+          ) : data ? (
+            <div className="mb-6 animate-card-in">
+              <HeroCard
+                completed={data.summary.completed}
+                total={data.summary.total}
+                pending={data.summary.pending}
+                nextDose={nextPendingDose ? {
+                  name: nextPendingDose.peptideName,
+                  time: nextPendingDose.timing,
+                } : undefined}
+                hasExpiredVials={hasExpiredVials}
+                userName={currentUser?.name}
+              />
             </div>
           ) : null}
 
@@ -335,21 +328,27 @@ export default function TodayPage() {
           {pendingCount > 1 && (
             <Button
               onClick={handleMarkAllDone}
-              className="w-full mb-4 bg-green-600 hover:bg-green-700"
+              variant="success"
+              className="w-full mb-4"
             >
               <CheckCheck className="w-4 h-4 mr-2" />
-              Mark All Done ({pendingCount})
+              Complete All ({pendingCount})
             </Button>
           )}
 
-          {/* Swipe hint - only show on first visit */}
-          {data && data.items.length > 0 && pendingCount > 0 && (
-            <div className="text-center text-xs text-slate-400 dark:text-slate-500 mb-3">
-              Swipe right to complete, left to skip
+          {/* Section Header */}
+          {data && data.items.length > 0 && (
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-label">Your Doses</h3>
+              {pendingCount > 0 && (
+                <span className="text-xs text-[var(--muted-foreground)]">
+                  Swipe to complete or skip
+                </span>
+              )}
             </div>
           )}
 
-          {/* Checklist */}
+          {/* Dose List */}
           {isLoading ? (
             <div className="space-y-3">
               {[1, 2, 3].map((i) => (
@@ -379,26 +378,38 @@ export default function TodayPage() {
                     disabled={item.status !== 'pending'}
                   >
                     <Card
+                      interactive
                       className={cn(
-                        'transition-all border-0 shadow-none',
+                        'transition-all',
                         item.status === 'completed' && 'opacity-60',
-                        item.vialExpired && 'border-amber-300 bg-amber-50/50'
+                        item.vialExpired && 'border-l-4 border-l-[var(--warning)]'
                       )}
                     >
                       <CardContent className="p-4">
-                        <div className="flex items-start gap-3">
+                        <div className="flex items-center gap-4">
+                          {/* Status indicator */}
+                          <div
+                            className={cn(
+                              'w-1 h-12 rounded-full',
+                              item.status === 'completed' && 'bg-[var(--success)]',
+                              item.status === 'pending' && 'bg-[var(--accent)]',
+                              item.status === 'skipped' && 'bg-[var(--muted)]'
+                            )}
+                          />
+
+                          {/* Content */}
                           <button
                             type="button"
                             onClick={() => setSelectedDose(item)}
                             className="flex-1 min-w-0 text-left"
                           >
                             <div className="flex items-center gap-2 mb-1">
-                              <span className="font-medium text-slate-900 dark:text-white">
+                              <span className="font-semibold text-[var(--foreground)]">
                                 {item.peptideName}
                               </span>
                               {item.penUnits && (
-                                <Badge className="bg-blue-100 text-blue-800 font-semibold">
-                                  {item.penUnits} units
+                                <Badge variant="accent">
+                                  {item.penUnits}u
                                 </Badge>
                               )}
                               {item.vialExpired && (
@@ -408,13 +419,14 @@ export default function TodayPage() {
                                 </Badge>
                               )}
                             </div>
-                            <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                            <div className="flex items-center gap-2 text-sm text-[var(--muted-foreground)]">
+                              <Syringe className="w-3.5 h-3.5" />
                               <span>
                                 {item.doseAmount} {item.doseUnit}
                               </span>
                               {item.timing && (
                                 <>
-                                  <span className="text-slate-300 dark:text-slate-600">•</span>
+                                  <span className="text-[var(--border)]">•</span>
                                   <span className="flex items-center gap-1">
                                     <Clock className="w-3 h-3" />
                                     {item.timing}
@@ -424,6 +436,7 @@ export default function TodayPage() {
                             </div>
                           </button>
 
+                          {/* Action buttons */}
                           <div className="flex items-center gap-2">
                             {item.status === 'pending' ? (
                               <>
@@ -431,7 +444,7 @@ export default function TodayPage() {
                                   size="sm"
                                   variant="ghost"
                                   onClick={() => handleStatusChange(item, 'skipped')}
-                                  className="text-slate-400 hover:text-slate-600"
+                                  className="w-9 h-9 p-0"
                                 >
                                   <X className="w-5 h-5" />
                                 </Button>
@@ -453,7 +466,7 @@ export default function TodayPage() {
                               <button
                                 type="button"
                                 onClick={() => handleStatusChange(item, 'pending')}
-                                className="px-3 py-1 rounded bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 text-sm transition-colors active:scale-95"
+                                className="px-3 py-1.5 rounded-lg bg-[var(--muted)] hover:bg-[var(--border)] text-[var(--muted-foreground)] text-sm font-medium transition-colors active:scale-95"
                               >
                                 Skipped
                               </button>
@@ -467,10 +480,13 @@ export default function TodayPage() {
               ))}
             </div>
           ) : (
-            <Card>
-              <CardContent className="py-8 text-center">
-                <div className="text-slate-400 dark:text-slate-500 mb-2">No doses scheduled</div>
-                <div className="text-sm text-slate-500 dark:text-slate-400">
+            <Card className="mt-4">
+              <CardContent className="py-12 text-center">
+                <div className="w-16 h-16 rounded-full bg-[var(--muted)] flex items-center justify-center mx-auto mb-4">
+                  <Syringe className="w-8 h-8 text-[var(--muted-foreground)]" />
+                </div>
+                <div className="text-[var(--foreground)] font-medium mb-1">No doses scheduled</div>
+                <div className="text-sm text-[var(--muted-foreground)]">
                   {isToday
                     ? 'Add a protocol to get started'
                     : 'No doses were scheduled for this day'}
@@ -491,18 +507,18 @@ export default function TodayPage() {
           <div className="space-y-4">
             {/* Pen Units - Primary Info */}
             {selectedDose.penUnits ? (
-              <div className="text-center py-4 bg-blue-50 dark:bg-blue-900/30 rounded-xl">
-                <div className="text-4xl font-bold text-blue-800 dark:text-blue-300">
-                  {selectedDose.penUnits} units
+              <div className="text-center py-6 bg-[var(--accent-muted)] rounded-2xl">
+                <div className="text-hero text-[var(--accent)]">
+                  {selectedDose.penUnits}
                 </div>
-                <div className="text-blue-600 dark:text-blue-400 mt-1">
-                  Draw to this line
+                <div className="text-[var(--accent)] mt-1 font-medium">
+                  units to draw
                 </div>
               </div>
             ) : (
-              <div className="text-center py-4 bg-slate-50 dark:bg-slate-700 rounded-xl">
-                <div className="text-slate-500 dark:text-slate-400">
-                  Add reconstitution info to your protocol to see pen units
+              <div className="text-center py-6 bg-[var(--muted)] rounded-2xl">
+                <div className="text-[var(--muted-foreground)]">
+                  Add reconstitution info to see pen units
                 </div>
               </div>
             )}
@@ -518,16 +534,16 @@ export default function TodayPage() {
 
             {/* Dose Details */}
             <div className="grid grid-cols-2 gap-3">
-              <div className="bg-slate-50 dark:bg-slate-700 rounded-xl p-4">
-                <div className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Dose</div>
-                <div className="font-semibold text-slate-900 dark:text-white">
+              <div className="bg-[var(--muted)] rounded-xl p-4">
+                <div className="text-label mb-1">Dose</div>
+                <div className="font-semibold text-[var(--foreground)]">
                   {selectedDose.doseAmount} {selectedDose.doseUnit}
                 </div>
               </div>
               {selectedDose.concentration && (
-                <div className="bg-slate-50 dark:bg-slate-700 rounded-xl p-4">
-                  <div className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Concentration</div>
-                  <div className="font-semibold text-slate-900 dark:text-white">
+                <div className="bg-[var(--muted)] rounded-xl p-4">
+                  <div className="text-label mb-1">Concentration</div>
+                  <div className="font-semibold text-[var(--foreground)]">
                     {selectedDose.concentration}
                   </div>
                 </div>
@@ -535,9 +551,9 @@ export default function TodayPage() {
             </div>
 
             {selectedDose.timing && (
-              <div className="bg-slate-50 dark:bg-slate-700 rounded-xl p-4">
-                <div className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Timing</div>
-                <div className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+              <div className="bg-[var(--muted)] rounded-xl p-4">
+                <div className="text-label mb-1">Timing</div>
+                <div className="font-semibold text-[var(--foreground)] flex items-center gap-2">
                   <Clock className="w-4 h-4" />
                   {selectedDose.timing}
                 </div>
@@ -560,14 +576,15 @@ export default function TodayPage() {
                     Skip
                   </Button>
                   <Button
-                    className="flex-1 bg-green-600 hover:bg-green-700"
+                    variant="success"
+                    className="flex-1"
                     onClick={() => {
                       handleStatusChange(selectedDose, 'completed')
                       setSelectedDose(null)
                     }}
                   >
                     <Check className="w-4 h-4 mr-2" />
-                    Mark Done
+                    Complete
                   </Button>
                 </>
               ) : selectedDose.status === 'completed' ? (
@@ -579,7 +596,7 @@ export default function TodayPage() {
                     setSelectedDose(null)
                   }}
                 >
-                  Undo
+                  Undo Completion
                 </Button>
               ) : (
                 <Button
