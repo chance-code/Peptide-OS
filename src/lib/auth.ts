@@ -88,52 +88,8 @@ export const authOptions: NextAuthOptions = {
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   callbacks: {
-    async signIn({ user, account }) {
-      // For OAuth providers, ensure user exists in database
-      if (account?.provider === 'google' || account?.provider === 'apple') {
-        try {
-          const email = user.email
-          const name = user.name || 'User'
-
-          if (!email) {
-            console.error('OAuth user has no email')
-            return false
-          }
-
-          // Check if user exists by email
-          let userProfile = await prisma.userProfile.findFirst({
-            where: { email },
-          })
-
-          if (!userProfile) {
-            // Check if user exists by name (for migration from password users)
-            userProfile = await prisma.userProfile.findFirst({
-              where: { name },
-            })
-
-            if (userProfile && !userProfile.email) {
-              // Link email to existing user
-              userProfile = await prisma.userProfile.update({
-                where: { id: userProfile.id },
-                data: { email },
-              })
-            } else if (!userProfile) {
-              // Create new user
-              userProfile = await prisma.userProfile.create({
-                data: { name, email },
-              })
-            }
-            // If name exists with different email, that's fine -
-            // the app layout will handle finding/creating the right user
-          }
-
-          return true
-        } catch (error) {
-          console.error('OAuth sign in error:', error)
-          return false
-        }
-      }
-
+    async signIn() {
+      // Allow all sign-ins - the app layout will handle user creation
       return true
     },
 
