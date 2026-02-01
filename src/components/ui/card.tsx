@@ -10,7 +10,7 @@ const Card = forwardRef<HTMLDivElement, CardProps>(({ className, ...props }, ref
     <div
       ref={ref}
       className={cn(
-        'rounded-xl border border-slate-200 bg-white shadow-sm',
+        'rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm',
         className
       )}
       {...props}
@@ -24,7 +24,7 @@ const CardHeader = forwardRef<HTMLDivElement, CardProps>(
     return (
       <div
         ref={ref}
-        className={cn('px-4 py-3 border-b border-slate-100', className)}
+        className={cn('px-4 py-3 border-b border-slate-100 dark:border-slate-700', className)}
         {...props}
       />
     )
@@ -37,7 +37,7 @@ const CardTitle = forwardRef<HTMLHeadingElement, React.HTMLAttributes<HTMLHeadin
     return (
       <h3
         ref={ref}
-        className={cn('text-lg font-semibold text-slate-900', className)}
+        className={cn('text-lg font-semibold text-slate-900 dark:text-white', className)}
         {...props}
       />
     )
@@ -57,7 +57,7 @@ const CardFooter = forwardRef<HTMLDivElement, CardProps>(
     return (
       <div
         ref={ref}
-        className={cn('px-4 py-3 border-t border-slate-100', className)}
+        className={cn('px-4 py-3 border-t border-slate-100 dark:border-slate-700', className)}
         {...props}
       />
     )

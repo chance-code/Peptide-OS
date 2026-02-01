@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   format,
   startOfMonth,
@@ -20,6 +21,7 @@ import { useAppStore } from '@/store'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { BottomSheet } from '@/components/ui/bottom-sheet'
+import { PullToRefresh } from '@/components/pull-to-refresh'
 import { cn } from '@/lib/utils'
 import type { Protocol, Peptide, DoseLog, DayOfWeek } from '@/types'
 
@@ -93,50 +95,48 @@ function isDoseDay(
 
 export default function CalendarPage() {
   const { currentUserId } = useAppStore()
+  const queryClient = useQueryClient()
   const [currentMonth, setCurrentMonth] = useState(new Date())
-  const [protocols, setProtocols] = useState<ProtocolWithPeptide[]>([])
-  const [doseLogs, setDoseLogs] = useState<DoseLog[]>([])
   const [selectedDay, setSelectedDay] = useState<Date | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
 
-  const fetchData = useCallback(async () => {
-    if (!currentUserId) return
+  const monthStart = startOfMonth(currentMonth)
+  const monthEnd = endOfMonth(currentMonth)
 
-    try {
-      setIsLoading(true)
+  // Fetch protocols
+  const { data: protocols = [] } = useQuery<ProtocolWithPeptide[]>({
+    queryKey: ['protocols', currentUserId],
+    queryFn: async () => {
+      const res = await fetch(`/api/protocols?userId=${currentUserId}`)
+      if (!res.ok) throw new Error('Failed to fetch')
+      return res.json()
+    },
+    enabled: !!currentUserId,
+    staleTime: 1000 * 60, // 1 minute
+  })
 
-      // Fetch protocols
-      const protocolsRes = await fetch(`/api/protocols?userId=${currentUserId}`)
-      if (protocolsRes.ok) {
-        const protocolsData = await protocolsRes.json()
-        setProtocols(protocolsData)
-      }
-
-      // Fetch dose logs for the month range
-      const monthStart = startOfMonth(currentMonth)
-      const monthEnd = endOfMonth(currentMonth)
-      const logsRes = await fetch(
+  // Fetch dose logs for the month
+  const { data: doseLogs = [], refetch: refetchLogs } = useQuery<DoseLog[]>({
+    queryKey: ['doseLogs', currentUserId, format(monthStart, 'yyyy-MM'), format(monthEnd, 'yyyy-MM')],
+    queryFn: async () => {
+      const res = await fetch(
         `/api/doses?userId=${currentUserId}&startDate=${format(monthStart, 'yyyy-MM-dd')}&endDate=${format(monthEnd, 'yyyy-MM-dd')}`
       )
-      if (logsRes.ok) {
-        const logsData = await logsRes.json()
-        setDoseLogs(logsData)
-      }
-    } catch (error) {
-      console.error('Error fetching calendar data:', error)
-    } finally {
-      setIsLoading(false)
-    }
-  }, [currentUserId, currentMonth])
+      if (!res.ok) throw new Error('Failed to fetch')
+      return res.json()
+    },
+    enabled: !!currentUserId,
+    staleTime: 1000 * 30, // 30 seconds
+  })
 
-  useEffect(() => {
-    fetchData()
-  }, [fetchData])
+  const handleRefresh = useCallback(async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['protocols', currentUserId] }),
+      refetchLogs(),
+    ])
+  }, [queryClient, currentUserId, refetchLogs])
 
   // Generate calendar days
   const calendarDays = useMemo(() => {
-    const monthStart = startOfMonth(currentMonth)
-    const monthEnd = endOfMonth(currentMonth)
     const calendarStart = startOfWeek(monthStart)
     const calendarEnd = endOfWeek(monthEnd)
 
@@ -192,7 +192,7 @@ export default function CalendarPage() {
     }
 
     return days
-  }, [currentMonth, protocols, doseLogs])
+  }, [currentMonth, protocols, doseLogs, monthStart, monthEnd])
 
   const selectedDayData = selectedDay
     ? calendarDays.find((d) => isSameDay(d.date, selectedDay))
@@ -206,34 +206,36 @@ export default function CalendarPage() {
     if (!currentUserId) return
 
     // Optimistic update
-    setDoseLogs(prev => {
-      const existingIndex = prev.findIndex(
-        l => l.protocolId === protocolId && isSameDay(new Date(l.scheduledDate), date)
-      )
+    queryClient.setQueryData<DoseLog[]>(
+      ['doseLogs', currentUserId, format(monthStart, 'yyyy-MM'), format(monthEnd, 'yyyy-MM')],
+      (prev = []) => {
+        const existingIndex = prev.findIndex(
+          l => l.protocolId === protocolId && isSameDay(new Date(l.scheduledDate), date)
+        )
 
-      if (existingIndex >= 0) {
-        const updated = [...prev]
-        updated[existingIndex] = { ...updated[existingIndex], status }
-        return updated
-      } else {
-        // Create a minimal dose log for optimistic update
-        const newLog: DoseLog = {
-          id: `temp-${Date.now()}`,
-          protocolId,
-          userId: currentUserId,
-          scheduledDate: date,
-          status,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          notes: null,
-          completedAt: status === 'completed' ? new Date() : null,
-          actualDose: null,
-          actualUnit: null,
-          scheduleId: null,
+        if (existingIndex >= 0) {
+          const updated = [...prev]
+          updated[existingIndex] = { ...updated[existingIndex], status }
+          return updated
+        } else {
+          const newLog: DoseLog = {
+            id: `temp-${Date.now()}`,
+            protocolId,
+            userId: currentUserId,
+            scheduledDate: date,
+            status,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            notes: null,
+            completedAt: status === 'completed' ? new Date() : null,
+            actualDose: null,
+            actualUnit: null,
+            scheduleId: null,
+          }
+          return [...prev, newLog]
         }
-        return [...prev, newLog]
       }
-    })
+    )
 
     // Send to server
     const dateStr = format(date, 'yyyy-MM-dd') + 'T12:00:00.000Z'
@@ -250,224 +252,221 @@ export default function CalendarPage() {
       })
     } catch (error) {
       console.error('Error updating dose:', error)
-      fetchData() // Revert on error
+      refetchLogs()
     }
   }
 
   return (
-    <div className="p-4 pb-20">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <Button variant="ghost" size="sm" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
-          <ChevronLeft className="w-5 h-5" />
-        </Button>
-        <h2 className="text-xl font-semibold text-slate-900">
-          {format(currentMonth, 'MMMM yyyy')}
-        </h2>
-        <Button variant="ghost" size="sm" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
-          <ChevronRight className="w-5 h-5" />
-        </Button>
-      </div>
-
-      {/* Today button */}
-      {!isSameMonth(currentMonth, new Date()) && (
-        <div className="flex justify-center mb-4">
-          <Button variant="secondary" size="sm" onClick={() => setCurrentMonth(new Date())}>
-            Go to Today
+    <PullToRefresh onRefresh={handleRefresh} className="h-full">
+      <div className="p-4 pb-20">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-4">
+          <Button variant="ghost" size="sm" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
+            <ChevronLeft className="w-5 h-5" />
+          </Button>
+          <h2 className="text-xl font-semibold text-slate-900 dark:text-white">
+            {format(currentMonth, 'MMMM yyyy')}
+          </h2>
+          <Button variant="ghost" size="sm" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
+            <ChevronRight className="w-5 h-5" />
           </Button>
         </div>
-      )}
 
-      {/* Calendar Grid */}
-      <Card className="mb-4">
-        <CardContent className="p-2">
-          {/* Day headers */}
-          <div className="grid grid-cols-7 mb-1">
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-              <div
-                key={day}
-                className="text-center text-xs font-medium text-slate-500 py-2"
-              >
-                {day}
-              </div>
-            ))}
+        {/* Today button */}
+        {!isSameMonth(currentMonth, new Date()) && (
+          <div className="flex justify-center mb-4">
+            <Button variant="secondary" size="sm" onClick={() => setCurrentMonth(new Date())}>
+              Go to Today
+            </Button>
           </div>
+        )}
 
-          {/* Calendar days */}
-          <div className="grid grid-cols-7 gap-1">
-            {calendarDays.map((dayData, index) => {
-              const hasProtocols = dayData.protocols.length > 0
-              const allCompleted = hasProtocols && dayData.protocols.every((p) => p.status === 'completed')
-              const hasMissed = dayData.protocols.some((p) => p.status === 'missed')
-              const hasPending = dayData.protocols.some((p) => p.status === 'pending' || p.status === 'scheduled')
-
-              return (
-                <button
-                  key={index}
-                  onClick={() => setSelectedDay(dayData.date)}
-                  className={cn(
-                    'relative aspect-square p-1 rounded-lg text-sm transition-colors',
-                    dayData.isCurrentMonth ? 'text-slate-900' : 'text-slate-300',
-                    dayData.isToday && 'ring-2 ring-slate-900',
-                    selectedDay && isSameDay(dayData.date, selectedDay) && 'bg-slate-100',
-                    !selectedDay && hasProtocols && 'hover:bg-slate-50'
-                  )}
+        {/* Calendar Grid */}
+        <Card className="mb-4">
+          <CardContent className="p-2">
+            {/* Day headers */}
+            <div className="grid grid-cols-7 mb-1">
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                <div
+                  key={day}
+                  className="text-center text-xs font-medium text-slate-500 dark:text-slate-400 py-2"
                 >
-                  <span
+                  {day}
+                </div>
+              ))}
+            </div>
+
+            {/* Calendar days */}
+            <div className="grid grid-cols-7 gap-1">
+              {calendarDays.map((dayData, index) => {
+                const hasProtocols = dayData.protocols.length > 0
+                const allCompleted = hasProtocols && dayData.protocols.every((p) => p.status === 'completed')
+                const hasMissed = dayData.protocols.some((p) => p.status === 'missed')
+                const hasPending = dayData.protocols.some((p) => p.status === 'pending' || p.status === 'scheduled')
+
+                return (
+                  <button
+                    key={index}
+                    onClick={() => setSelectedDay(dayData.date)}
                     className={cn(
-                      'block text-center',
-                      dayData.isToday && 'font-bold'
+                      'relative aspect-square p-1 rounded-lg text-sm transition-colors',
+                      dayData.isCurrentMonth ? 'text-slate-900 dark:text-white' : 'text-slate-300 dark:text-slate-600',
+                      dayData.isToday && 'ring-2 ring-slate-900 dark:ring-white',
+                      selectedDay && isSameDay(dayData.date, selectedDay) && 'bg-slate-100 dark:bg-slate-700',
+                      !selectedDay && hasProtocols && 'hover:bg-slate-50 dark:hover:bg-slate-700'
                     )}
                   >
-                    {format(dayData.date, 'd')}
-                  </span>
-
-                  {/* Protocol indicators */}
-                  {hasProtocols && (
-                    <div className="absolute bottom-1 left-1/2 -translate-x-1/2 flex gap-0.5">
-                      {allCompleted ? (
-                        <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                      ) : hasMissed ? (
-                        <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                      ) : hasPending ? (
-                        <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                      ) : (
-                        <div className="w-1.5 h-1.5 rounded-full bg-slate-300" />
+                    <span
+                      className={cn(
+                        'block text-center',
+                        dayData.isToday && 'font-bold'
                       )}
-                      {dayData.protocols.length > 1 && (
-                        <span className="text-[8px] text-slate-400">
-                          +{dayData.protocols.length - 1}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </button>
-              )
-            })}
-          </div>
-        </CardContent>
-      </Card>
+                    >
+                      {format(dayData.date, 'd')}
+                    </span>
 
-      {/* Legend */}
-      <div className="flex items-center justify-center gap-4 text-xs text-slate-500 mb-4">
-        <div className="flex items-center gap-1">
-          <div className="w-2 h-2 rounded-full bg-green-500" />
-          <span>Completed</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="w-2 h-2 rounded-full bg-amber-500" />
-          <span>Pending</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="w-2 h-2 rounded-full bg-red-500" />
-          <span>Missed</span>
-        </div>
-      </div>
-
-      {/* Selected Day Bottom Sheet */}
-      <BottomSheet
-        isOpen={!!selectedDay}
-        onClose={() => setSelectedDay(null)}
-        title={selectedDayData ? format(selectedDayData.date, 'EEEE, MMMM d') : ''}
-      >
-        {selectedDayData && (
-          <>
-            {selectedDayData.protocols.length > 0 ? (
-              <div className="space-y-3">
-                {/* Mark All Done button */}
-                {selectedDayData.protocols.filter(p =>
-                  p.status === 'pending' || p.status === 'missed' || p.status === 'scheduled'
-                ).length > 1 && (
-                  <Button
-                    onClick={() => {
-                      selectedDayData.protocols.forEach(({ protocol, status }) => {
-                        if (status === 'pending' || status === 'missed' || status === 'scheduled') {
-                          handleStatusChange(protocol.id, selectedDayData.date, 'completed')
-                        }
-                      })
-                    }}
-                    className="w-full bg-green-600 hover:bg-green-700"
-                  >
-                    <CheckCheck className="w-4 h-4 mr-2" />
-                    Mark All Done ({selectedDayData.protocols.filter(p =>
-                      p.status === 'pending' || p.status === 'missed' || p.status === 'scheduled'
-                    ).length})
-                  </Button>
-                )}
-
-                {selectedDayData.protocols.map(({ protocol, status, penUnits }) => (
-                  <div
-                    key={protocol.id}
-                    className={cn(
-                      'flex items-center justify-between p-4 rounded-xl',
-                      status === 'completed' ? 'bg-green-50' : 'bg-slate-50'
-                    )}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-medium text-slate-900 text-lg">
-                          {protocol.peptide.name}
-                        </span>
-                        {penUnits && (
-                          <span className="bg-blue-100 text-blue-800 text-sm font-semibold px-2 py-0.5 rounded-full">
-                            {penUnits} units
+                    {/* Protocol indicators */}
+                    {hasProtocols && (
+                      <div className="absolute bottom-1 left-1/2 -translate-x-1/2 flex gap-0.5">
+                        {allCompleted ? (
+                          <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                        ) : hasMissed ? (
+                          <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                        ) : hasPending ? (
+                          <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                        ) : (
+                          <div className="w-1.5 h-1.5 rounded-full bg-slate-300" />
+                        )}
+                        {dayData.protocols.length > 1 && (
+                          <span className="text-[8px] text-slate-400">
+                            +{dayData.protocols.length - 1}
                           </span>
                         )}
                       </div>
-                      <div className="text-sm text-slate-500">
-                        {protocol.doseAmount} {protocol.doseUnit}
-                        {protocol.timing && ` • ${protocol.timing}`}
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Legend */}
+        <div className="flex items-center justify-center gap-4 text-xs text-slate-500 dark:text-slate-400 mb-4">
+          <div className="flex items-center gap-1">
+            <div className="w-2 h-2 rounded-full bg-green-500" />
+            <span>Completed</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-2 h-2 rounded-full bg-amber-500" />
+            <span>Pending</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-2 h-2 rounded-full bg-red-500" />
+            <span>Missed</span>
+          </div>
+        </div>
+
+        {/* Selected Day Bottom Sheet */}
+        <BottomSheet
+          isOpen={!!selectedDay}
+          onClose={() => setSelectedDay(null)}
+          title={selectedDayData ? format(selectedDayData.date, 'EEEE, MMMM d') : ''}
+        >
+          {selectedDayData && (
+            <>
+              {selectedDayData.protocols.length > 0 ? (
+                <div className="space-y-3">
+                  {/* Mark All Done button */}
+                  {selectedDayData.protocols.filter(p =>
+                    p.status === 'pending' || p.status === 'missed' || p.status === 'scheduled'
+                  ).length > 1 && (
+                    <Button
+                      onClick={() => {
+                        selectedDayData.protocols.forEach(({ protocol, status }) => {
+                          if (status === 'pending' || status === 'missed' || status === 'scheduled') {
+                            handleStatusChange(protocol.id, selectedDayData.date, 'completed')
+                          }
+                        })
+                      }}
+                      className="w-full bg-green-600 hover:bg-green-700"
+                    >
+                      <CheckCheck className="w-4 h-4 mr-2" />
+                      Mark All Done ({selectedDayData.protocols.filter(p =>
+                        p.status === 'pending' || p.status === 'missed' || p.status === 'scheduled'
+                      ).length})
+                    </Button>
+                  )}
+
+                  {selectedDayData.protocols.map(({ protocol, status, penUnits }) => (
+                    <div
+                      key={protocol.id}
+                      className={cn(
+                        'flex items-center justify-between p-4 rounded-xl',
+                        status === 'completed' ? 'bg-green-50 dark:bg-green-900/30' : 'bg-slate-50 dark:bg-slate-700'
+                      )}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-medium text-slate-900 dark:text-white text-lg">
+                            {protocol.peptide.name}
+                          </span>
+                          {penUnits && (
+                            <span className="bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 text-sm font-semibold px-2 py-0.5 rounded-full">
+                              {penUnits} units
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-sm text-slate-500 dark:text-slate-400">
+                          {protocol.doseAmount} {protocol.doseUnit}
+                          {protocol.timing && ` • ${protocol.timing}`}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {status === 'pending' || status === 'missed' || status === 'scheduled' ? (
+                          <>
+                            <button
+                              onClick={() => handleStatusChange(protocol.id, selectedDayData.date, 'skipped')}
+                              className="p-2 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+                            >
+                              <X className="w-5 h-5" />
+                            </button>
+                            <button
+                              onClick={() => handleStatusChange(protocol.id, selectedDayData.date, 'completed')}
+                              className="w-12 h-12 rounded-full border-2 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 hover:border-green-500 dark:hover:border-green-400 hover:bg-green-50 dark:hover:bg-green-900/30 flex items-center justify-center transition-colors"
+                            >
+                              <Check className="w-6 h-6 text-slate-400" />
+                            </button>
+                          </>
+                        ) : status === 'completed' ? (
+                          <button
+                            onClick={() => handleStatusChange(protocol.id, selectedDayData.date, 'pending')}
+                            className="w-12 h-12 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-colors"
+                          >
+                            <Check className="w-6 h-6 text-white" />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleStatusChange(protocol.id, selectedDayData.date, 'pending')}
+                            className="px-4 py-2 rounded-lg bg-slate-200 dark:bg-slate-600 hover:bg-slate-300 dark:hover:bg-slate-500 text-slate-600 dark:text-slate-200 text-sm transition-colors"
+                          >
+                            Skipped
+                          </button>
+                        )}
                       </div>
                     </div>
-
-                    <div className="flex items-center gap-2">
-                      {status === 'pending' || status === 'missed' || status === 'scheduled' ? (
-                        <>
-                          <button
-                            onClick={() => handleStatusChange(protocol.id, selectedDayData.date, 'skipped')}
-                            className="p-2 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors"
-                          >
-                            <X className="w-5 h-5" />
-                          </button>
-                          <button
-                            onClick={() => handleStatusChange(protocol.id, selectedDayData.date, 'completed')}
-                            className="w-12 h-12 rounded-full border-2 border-slate-300 bg-white hover:border-green-500 hover:bg-green-50 flex items-center justify-center transition-colors"
-                          >
-                            <Check className="w-6 h-6 text-slate-400" />
-                          </button>
-                        </>
-                      ) : status === 'completed' ? (
-                        <button
-                          onClick={() => handleStatusChange(protocol.id, selectedDayData.date, 'pending')}
-                          className="w-12 h-12 rounded-full bg-green-500 hover:bg-green-600 flex items-center justify-center transition-colors"
-                        >
-                          <Check className="w-6 h-6 text-white" />
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleStatusChange(protocol.id, selectedDayData.date, 'pending')}
-                          className="px-4 py-2 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-600 text-sm transition-colors"
-                        >
-                          Skipped
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-slate-500">No doses scheduled for this day</p>
-              </div>
-            )}
-          </>
-        )}
-      </BottomSheet>
-
-      {/* Loading state */}
-      {isLoading && (
-        <div className="text-center py-4 text-slate-500">Loading...</div>
-      )}
-    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-slate-500 dark:text-slate-400">No doses scheduled for this day</p>
+                </div>
+              )}
+            </>
+          )}
+        </BottomSheet>
+      </div>
+    </PullToRefresh>
   )
 }

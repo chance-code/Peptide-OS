@@ -1,8 +1,28 @@
 @import "tailwindcss";
 
+/* Enable class-based dark mode for Tailwind v4 */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #f8fafc;
   --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --border: #e2e8f0;
+  --ring: #475569;
+}
+
+.dark {
+  --background: #0f172a;
+  --foreground: #f8fafc;
+  --card: #1e293b;
+  --card-foreground: #f8fafc;
+  --muted: #334155;
+  --muted-foreground: #94a3b8;
+  --border: #334155;
+  --ring: #94a3b8;
 }
 
 @theme inline {
@@ -43,12 +63,12 @@ body {
 
 /* Custom focus styles */
 *:focus-visible {
-  outline: 2px solid #475569;
+  outline: 2px solid var(--ring);
   outline-offset: 2px;
 }
 
-/* Smooth transitions */
-* {
+/* Smooth theme transitions - only apply to specific elements, not inputs */
+button, a, [role="button"], .transition-colors {
   transition-property: background-color, border-color, color, fill, stroke;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   transition-duration: 150ms;
@@ -124,3 +144,53 @@ input[type='number'] {
 .stagger-8 { animation-delay: 350ms; }
 .stagger-9 { animation-delay: 400ms; }
 .stagger-10 { animation-delay: 450ms; }
+
+/* Page transition animations */
+@keyframes pageIn {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pageFadeIn {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.animate-page-in {
+  animation: pageIn 0.25s ease-out forwards;
+}
+
+.animate-fade-in {
+  animation: pageFadeIn 0.2s ease-out forwards;
+}
+
+/* Glassmorphism utilities */
+.glass {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.dark .glass {
+  background: rgba(15, 23, 42, 0.85);
+}
+
+.glass-subtle {
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.dark .glass-subtle {
+  background: rgba(15, 23, 42, 0.7);
+}

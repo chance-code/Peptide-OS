@@ -55,13 +55,13 @@ export function AlertsBanner() {
   const getSeverityStyles = (severity: Alert['severity']) => {
     switch (severity) {
       case 'danger':
-        return 'bg-red-50 border-red-200 text-red-800'
+        return 'bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800 text-red-800 dark:text-red-300'
       case 'warning':
-        return 'bg-amber-50 border-amber-200 text-amber-800'
+        return 'bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300'
       case 'info':
-        return 'bg-blue-50 border-blue-200 text-blue-800'
+        return 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-300'
       default:
-        return 'bg-slate-50 border-slate-200 text-slate-800'
+        return 'bg-slate-50 dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200'
     }
   }
 
@@ -124,7 +124,7 @@ export function AlertsBanner() {
       {visibleAlerts.length > 1 && (
         <button
           onClick={() => setIsExpanded(false)}
-          className="text-xs text-slate-500 hover:text-slate-700 w-full text-center py-1"
+          className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 w-full text-center py-1"
         >
           Collapse
         </button>

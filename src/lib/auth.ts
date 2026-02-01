@@ -40,23 +40,10 @@ export const authOptions: NextAuthOptions = {
           if (isValid) {
             console.log(`Login successful for ${userConfig.name}`)
 
-            // Set this user as active in the database
-            try {
-              // First, deactivate all users
-              await prisma.userProfile.updateMany({
-                data: { isActive: false }
-              })
-
-              // Then activate the matching user
-              await prisma.userProfile.updateMany({
-                where: { name: userConfig.name },
-                data: { isActive: true }
-              })
-
-              console.log(`Set ${userConfig.name} as active user`)
-            } catch (error) {
-              console.error('Error updating active user:', error)
-            }
+            // Don't modify database isActive flag here - each browser session
+            // manages its own current profile via localStorage independently.
+            // This allows multiple users to be logged in simultaneously on
+            // different devices without affecting each other.
 
             return {
               id: userConfig.name,

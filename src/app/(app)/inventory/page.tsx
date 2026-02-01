@@ -64,7 +64,7 @@ export default function InventoryPage() {
     <div className="p-4 pb-20">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold text-slate-900">Inventory</h2>
+        <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Inventory</h2>
         <Link href="/inventory/new">
           <Button size="sm">
             <Plus className="w-4 h-4 mr-1" />
@@ -77,26 +77,26 @@ export default function InventoryPage() {
       {!isLoading && (expiringVials.length > 0 || expiredVials.length > 0) && (
         <div className="space-y-2 mb-4">
           {expiredVials.length > 0 && (
-            <div className="flex items-start gap-3 p-3 bg-red-50 border border-red-200 rounded-lg">
-              <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+            <div className="flex items-start gap-3 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">
+              <AlertTriangle className="w-5 h-5 text-red-500 dark:text-red-400 flex-shrink-0 mt-0.5" />
               <div>
-                <div className="font-medium text-red-800">
+                <div className="font-medium text-red-800 dark:text-red-300">
                   {expiredVials.length} expired vial{expiredVials.length > 1 ? 's' : ''}
                 </div>
-                <div className="text-sm text-red-600">
+                <div className="text-sm text-red-600 dark:text-red-400">
                   {expiredVials.map(v => v.peptide.name).join(', ')}
                 </div>
               </div>
             </div>
           )}
           {expiringVials.length > 0 && (
-            <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-              <Clock className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+            <div className="flex items-start gap-3 p-3 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg">
+              <Clock className="w-5 h-5 text-amber-500 dark:text-amber-400 flex-shrink-0 mt-0.5" />
               <div>
-                <div className="font-medium text-amber-800">
+                <div className="font-medium text-amber-800 dark:text-amber-300">
                   {expiringVials.length} vial{expiringVials.length > 1 ? 's' : ''} expiring soon
                 </div>
-                <div className="text-sm text-amber-600">
+                <div className="text-sm text-amber-600 dark:text-amber-400">
                   {expiringVials.map(v => {
                     const days = v.expirationDate
                       ? differenceInDays(new Date(v.expirationDate), new Date())
@@ -113,19 +113,19 @@ export default function InventoryPage() {
       {/* Summary */}
       {!isLoading && (
         <div className="grid grid-cols-3 gap-3 mb-6">
-          <div className="bg-white rounded-lg p-3 text-center border border-slate-100">
-            <div className="text-2xl font-bold text-slate-900">{activeVials.length}</div>
-            <div className="text-xs text-slate-500">Active</div>
+          <div className="bg-white dark:bg-slate-800 rounded-lg p-3 text-center border border-slate-100 dark:border-slate-700">
+            <div className="text-2xl font-bold text-slate-900 dark:text-white">{activeVials.length}</div>
+            <div className="text-xs text-slate-500 dark:text-slate-400">Active</div>
           </div>
-          <div className="bg-amber-50 rounded-lg p-3 text-center border border-amber-100">
-            <div className="text-2xl font-bold text-amber-700">
+          <div className="bg-amber-50 dark:bg-amber-900/30 rounded-lg p-3 text-center border border-amber-100 dark:border-amber-800">
+            <div className="text-2xl font-bold text-amber-700 dark:text-amber-400">
               {activeVials.filter((v) => getExpirationStatus(v) === 'expiring-soon').length}
             </div>
-            <div className="text-xs text-amber-600">Expiring</div>
+            <div className="text-xs text-amber-600 dark:text-amber-500">Expiring</div>
           </div>
-          <div className="bg-red-50 rounded-lg p-3 text-center border border-red-100">
-            <div className="text-2xl font-bold text-red-700">{expiredVials.length}</div>
-            <div className="text-xs text-red-600">Expired</div>
+          <div className="bg-red-50 dark:bg-red-900/30 rounded-lg p-3 text-center border border-red-100 dark:border-red-800">
+            <div className="text-2xl font-bold text-red-700 dark:text-red-400">{expiredVials.length}</div>
+            <div className="text-xs text-red-600 dark:text-red-500">Expired</div>
           </div>
         </div>
       )}
@@ -137,16 +137,16 @@ export default function InventoryPage() {
           id="showExpired"
           checked={showExpired}
           onChange={(e) => setShowExpired(e.target.checked)}
-          className="rounded border-slate-300"
+          className="rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700"
         />
-        <label htmlFor="showExpired" className="text-sm text-slate-700">
+        <label htmlFor="showExpired" className="text-sm text-slate-700 dark:text-slate-300">
           Show expired vials
         </label>
       </div>
 
       {/* Vials List */}
       {isLoading ? (
-        <div className="text-center py-8 text-slate-500">Loading...</div>
+        <div className="text-center py-8 text-slate-500 dark:text-slate-400">Loading...</div>
       ) : vials.length > 0 ? (
         <div className="space-y-3">
           {vials.map((vial) => {
@@ -160,24 +160,24 @@ export default function InventoryPage() {
               <Card
                 className={cn(
                   'transition-all cursor-pointer hover:shadow-md',
-                  status === 'expired' && 'opacity-60 border-red-200 bg-red-50/30',
-                  status === 'expiring-soon' && 'border-amber-200 bg-amber-50/30'
+                  status === 'expired' && 'opacity-60 border-red-200 dark:border-red-800 bg-red-50/30 dark:bg-red-900/20',
+                  status === 'expiring-soon' && 'border-amber-200 dark:border-amber-800 bg-amber-50/30 dark:bg-amber-900/20'
                 )}
               >
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between mb-2">
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-medium text-slate-900">
+                        <span className="font-medium text-slate-900 dark:text-white">
                           {vial.peptide.name}
                         </span>
                         {vial.identifier && (
-                          <span className="text-xs text-slate-500">
+                          <span className="text-xs text-slate-500 dark:text-slate-400">
                             ({vial.identifier})
                           </span>
                         )}
                       </div>
-                      <div className="text-sm text-slate-500">
+                      <div className="text-sm text-slate-500 dark:text-slate-400">
                         {vial.totalAmount} {vial.totalUnit}
                       </div>
                     </div>
@@ -201,7 +201,7 @@ export default function InventoryPage() {
                   </div>
 
                   {vial.diluentVolume && vial.concentration && (
-                    <div className="flex items-center gap-4 text-xs text-slate-500 mt-2 pt-2 border-t border-slate-100">
+                    <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400 mt-2 pt-2 border-t border-slate-100 dark:border-slate-700">
                       <span className="flex items-center gap-1">
                         <Droplet className="w-3 h-3" />
                         {vial.diluentVolume} ml diluent
@@ -213,7 +213,7 @@ export default function InventoryPage() {
                   )}
 
                   {vial.dateReconstituted && (
-                    <div className="text-xs text-slate-400 mt-2">
+                    <div className="text-xs text-slate-400 dark:text-slate-500 mt-2">
                       Reconstituted: {format(new Date(vial.dateReconstituted), 'MMM d, yyyy')}
                     </div>
                   )}
@@ -226,9 +226,9 @@ export default function InventoryPage() {
       ) : (
         <Card>
           <CardContent className="py-8 text-center">
-            <Package className="w-12 h-12 mx-auto text-slate-300 mb-3" />
-            <div className="text-slate-400 mb-2">No inventory</div>
-            <div className="text-sm text-slate-500">
+            <Package className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
+            <div className="text-slate-400 dark:text-slate-500 mb-2">No inventory</div>
+            <div className="text-sm text-slate-500 dark:text-slate-400">
               Add your first vial to track your inventory
             </div>
           </CardContent>

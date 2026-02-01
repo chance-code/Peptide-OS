@@ -192,7 +192,7 @@ export function NotificationSettings() {
   if (!isSupported) {
     return (
       <Card>
-        <CardContent className="py-6 text-center text-slate-500">
+        <CardContent className="py-6 text-center text-slate-500 dark:text-slate-400">
           <BellOff className="w-8 h-8 mx-auto mb-2 opacity-50" />
           <p>Push notifications are not supported in this browser.</p>
         </CardContent>
@@ -203,7 +203,7 @@ export function NotificationSettings() {
   if (permission === 'denied') {
     return (
       <Card>
-        <CardContent className="py-6 text-center text-slate-500">
+        <CardContent className="py-6 text-center text-slate-500 dark:text-slate-400">
           <BellOff className="w-8 h-8 mx-auto mb-2 opacity-50" />
           <p>Notifications are blocked. Please enable them in your browser settings.</p>
         </CardContent>
@@ -222,7 +222,7 @@ export function NotificationSettings() {
       <CardContent className="space-y-4">
         {isSubscribed ? (
           <>
-            <div className="flex items-center gap-2 text-green-600 bg-green-50 p-3 rounded-lg">
+            <div className="flex items-center gap-2 text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 p-3 rounded-lg">
               <Check className="w-5 h-5" />
               <span className="text-sm font-medium">Notifications enabled</span>
             </div>
@@ -240,7 +240,7 @@ export function NotificationSettings() {
                 value={eveningTime}
                 onChange={(e) => setEveningTime(e.target.value)}
               />
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 You&apos;ll receive reminders at these times if you have pending doses.
               </p>
             </div>
@@ -260,7 +260,7 @@ export function NotificationSettings() {
                 size="sm"
                 onClick={unsubscribe}
                 disabled={isLoading}
-                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30"
               >
                 Disable
               </Button>
@@ -268,7 +268,7 @@ export function NotificationSettings() {
           </>
         ) : (
           <>
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-slate-600 dark:text-slate-300">
               Get reminders when it&apos;s time for your doses. Never miss a dose again.
             </p>
             <Button

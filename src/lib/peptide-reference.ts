@@ -23,6 +23,9 @@ export interface PeptideReference {
     unit: 'mcg' | 'mg' | 'IU'
   }
 
+  // Typical protocol duration in weeks (null = indefinite/ongoing)
+  typicalDurationWeeks?: number | null
+
   // Display info
   description?: string
 }
@@ -39,6 +42,7 @@ export const PEPTIDE_REFERENCE: PeptideReference[] = [
     ],
     recommendedDiluentMl: 2,
     typicalDose: { min: 500, max: 500, unit: 'mcg' }, // Standard dose: 500mcg 1-2x daily
+    typicalDurationWeeks: 8, // Typical 4-8 week cycles
     description: 'Healing peptide for gut, tendons, and tissue repair',
   },
   {
@@ -51,6 +55,7 @@ export const PEPTIDE_REFERENCE: PeptideReference[] = [
     ],
     recommendedDiluentMl: 2,
     typicalDose: { min: 2.5, max: 2.5, unit: 'mg' }, // Standard dose: 2.5mg 2x/week
+    typicalDurationWeeks: 8, // Typical 4-8 week cycles
     description: 'Promotes healing, flexibility, and tissue repair',
   },
 
@@ -151,6 +156,7 @@ export const PEPTIDE_REFERENCE: PeptideReference[] = [
     ],
     recommendedDiluentMl: 1,
     typicalDose: { min: 2.5, max: 2.5, unit: 'mg' }, // Start dose: 2.5mg weekly (titrate up)
+    typicalDurationWeeks: null, // Ongoing treatment
     description: 'GLP-1/GIP dual agonist for weight loss and blood sugar',
   },
   {
@@ -164,6 +170,7 @@ export const PEPTIDE_REFERENCE: PeptideReference[] = [
     ],
     recommendedDiluentMl: 2,
     typicalDose: { min: 0.25, max: 0.25, unit: 'mg' }, // Start dose: 0.25mg weekly (titrate up)
+    typicalDurationWeeks: null, // Ongoing treatment
     description: 'GLP-1 agonist for weight loss and blood sugar control',
   },
   {
@@ -237,6 +244,7 @@ export const PEPTIDE_REFERENCE: PeptideReference[] = [
     ],
     recommendedDiluentMl: 2,
     typicalDose: { min: 5, max: 5, unit: 'mg' }, // Standard dose: 5mg daily for 10-20 days
+    typicalDurationWeeks: 3, // 10-20 day protocol
     description: 'Telomerase activator for anti-aging',
   },
   {
@@ -318,6 +326,395 @@ export const PEPTIDE_REFERENCE: PeptideReference[] = [
     typicalDose: { min: 200, max: 200, unit: 'mg' }, // Standard dose: 200mg 2-3x/week
     description: 'Master antioxidant',
   },
+
+  // Additional Cosmetic Peptides
+  {
+    name: 'Melanotan I',
+    aliases: ['Melanotan 1', 'MT1', 'MT-I', 'Afamelanotide'],
+    category: 'cosmetic',
+    typicalVialSizes: [
+      { amount: 10, unit: 'mg' },
+    ],
+    recommendedDiluentMl: 2,
+    typicalDose: { min: 1, max: 1, unit: 'mg' }, // Standard dose: 1mg daily
+    description: 'Tanning peptide with longer-lasting effects than MT-II',
+  },
+
+  // Additional Growth Hormone Peptides
+  {
+    name: 'HGH',
+    aliases: ['Human Growth Hormone', 'Somatropin', 'Growth Hormone', 'GH'],
+    category: 'growth-hormone',
+    typicalVialSizes: [
+      { amount: 10, unit: 'IU' },
+      { amount: 36, unit: 'IU' },
+      { amount: 100, unit: 'IU' },
+    ],
+    recommendedDiluentMl: 1,
+    typicalDose: { min: 2, max: 2, unit: 'IU' }, // Standard dose: 2-4 IU daily
+    description: 'Recombinant human growth hormone',
+  },
+  {
+    name: 'IGF-1 LR3',
+    aliases: ['IGF1 LR3', 'Long R3 IGF-1'],
+    category: 'growth-hormone',
+    typicalVialSizes: [
+      { amount: 1, unit: 'mg' },
+    ],
+    recommendedDiluentMl: 1,
+    typicalDose: { min: 50, max: 50, unit: 'mcg' }, // Standard dose: 20-50mcg daily
+    description: 'Long-acting insulin-like growth factor for muscle growth',
+  },
+  {
+    name: 'IGF-1 DES',
+    aliases: ['IGF1 DES', 'DES IGF-1'],
+    category: 'growth-hormone',
+    typicalVialSizes: [
+      { amount: 1, unit: 'mg' },
+    ],
+    recommendedDiluentMl: 1,
+    typicalDose: { min: 50, max: 50, unit: 'mcg' }, // Standard dose: 50-100mcg pre-workout
+    description: 'Fast-acting IGF-1 variant for localized muscle growth',
+  },
+  {
+    name: 'Hexarelin',
+    aliases: ['Examorelin'],
+    category: 'growth-hormone',
+    typicalVialSizes: [
+      { amount: 5, unit: 'mg' },
+    ],
+    recommendedDiluentMl: 2,
+    typicalDose: { min: 200, max: 200, unit: 'mcg' }, // Standard dose: 200mcg 2-3x daily
+    description: 'Potent GHRP with cardiac benefits',
+  },
+  {
+    name: 'PEG-MGF',
+    aliases: ['PEGylated MGF', 'Pegylated Mechano Growth Factor'],
+    category: 'growth-hormone',
+    typicalVialSizes: [
+      { amount: 2, unit: 'mg' },
+    ],
+    recommendedDiluentMl: 2,
+    typicalDose: { min: 200, max: 200, unit: 'mcg' }, // Standard dose: 200mcg 2-3x/week
+    description: 'Long-acting mechano growth factor for muscle repair',
+  },
+  {
+    name: 'MGF',
+    aliases: ['Mechano Growth Factor'],
+    category: 'growth-hormone',
+    typicalVialSizes: [
+      { amount: 2, unit: 'mg' },
+    ],
+    recommendedDiluentMl: 2,
+    typicalDose: { min: 200, max: 200, unit: 'mcg' }, // Standard dose: 200mcg post-workout
+    description: 'Mechano growth factor for localized muscle growth',
+  },
+  {
+    name: 'Fragment 176-191',
+    aliases: ['HGH Frag', 'HGH Fragment', 'Frag 176-191'],
+    category: 'weight-loss',
+    typicalVialSizes: [
+      { amount: 5, unit: 'mg' },
+    ],
+    recommendedDiluentMl: 2,
+    typicalDose: { min: 250, max: 250, unit: 'mcg' }, // Standard dose: 250mcg 2x daily
+    description: 'Fat-burning fragment of growth hormone',
+  },
+
+  // Additional Weight Loss Peptides
+  {
+    name: 'Liraglutide',
+    aliases: ['Saxenda', 'Victoza'],
+    category: 'weight-loss',
+    typicalVialSizes: [
+      { amount: 3, unit: 'mg' },
+      { amount: 6, unit: 'mg' },
+    ],
+    recommendedDiluentMl: 1,
+    typicalDose: { min: 0.6, max: 0.6, unit: 'mg' }, // Start dose: 0.6mg daily (titrate to 3mg)
+    description: 'GLP-1 agonist for weight loss (daily injection)',
+  },
+  {
+    name: 'Exenatide',
+    aliases: ['Byetta', 'Bydureon'],
+    category: 'weight-loss',
+    typicalVialSizes: [
+      { amount: 2, unit: 'mg' },
+    ],
+    recommendedDiluentMl: 1,
+    typicalDose: { min: 5, max: 5, unit: 'mcg' }, // Start dose: 5mcg 2x daily
+    description: 'GLP-1 agonist for blood sugar and weight',
+  },
+  {
+    name: '5-Amino-1MQ',
+    aliases: ['5-Amino 1MQ'],
+    category: 'weight-loss',
+    typicalVialSizes: [
+      { amount: 50, unit: 'mg' },
+    ],
+    recommendedDiluentMl: 1,
+    typicalDose: { min: 50, max: 50, unit: 'mg' }, // Standard dose: 50mg daily (often oral)
+    description: 'NNMT inhibitor for fat metabolism',
+  },
+  {
+    name: 'MOTS-c',
+    aliases: ['MOTS-C', 'Mitochondrial ORF of the 12S rRNA type-c'],
+    category: 'weight-loss',
+    typicalVialSizes: [
+      { amount: 5, unit: 'mg' },
+    ],
+    recommendedDiluentMl: 2,
+    typicalDose: { min: 5, max: 5, unit: 'mg' }, // Standard dose: 5mg 2-3x/week
+    description: 'Mitochondrial peptide for metabolism and longevity',
+  },
+
+  // Additional Healing Peptides
+  {
+    name: 'Pentosan Polysulfate',
+    aliases: ['PPS', 'Cartrophen'],
+    category: 'healing',
+    typicalVialSizes: [
+      { amount: 100, unit: 'mg' },
+    ],
+    recommendedDiluentMl: 1,
+    typicalDose: { min: 3, max: 3, unit: 'mg' }, // Dose varies by weight
+    description: 'Joint and cartilage support',
+  },
+  {
+    name: 'KPV',
+    aliases: ['Lys-Pro-Val'],
+    category: 'healing',
+    typicalVialSizes: [
+      { amount: 5, unit: 'mg' },
+    ],
+    recommendedDiluentMl: 2,
+    typicalDose: { min: 500, max: 500, unit: 'mcg' }, // Standard dose: 500mcg daily
+    description: 'Anti-inflammatory peptide for gut and skin',
+  },
+  {
+    name: 'Larazotide',
+    aliases: ['AT-1001'],
+    category: 'healing',
+    typicalVialSizes: [
+      { amount: 5, unit: 'mg' },
+    ],
+    recommendedDiluentMl: 2,
+    typicalDose: { min: 500, max: 500, unit: 'mcg' }, // Standard dose: 0.5mg 3x daily
+    description: 'Gut barrier and tight junction support',
+  },
+
+  // Sleep & Recovery
+  {
+    name: 'DSIP',
+    aliases: ['Delta Sleep Inducing Peptide'],
+    category: 'other',
+    typicalVialSizes: [
+      { amount: 5, unit: 'mg' },
+    ],
+    recommendedDiluentMl: 2,
+    typicalDose: { min: 100, max: 100, unit: 'mcg' }, // Standard dose: 100mcg before bed
+    description: 'Sleep-promoting peptide',
+  },
+
+  // Cognitive & Neuro
+  {
+    name: 'Dihexa',
+    aliases: ['PNB-0408'],
+    category: 'other',
+    typicalVialSizes: [
+      { amount: 10, unit: 'mg' },
+    ],
+    recommendedDiluentMl: 2,
+    typicalDose: { min: 10, max: 10, unit: 'mg' }, // Standard dose: 10-20mg (often oral)
+    description: 'Cognitive enhancement and neuroprotection',
+  },
+  {
+    name: 'P21',
+    aliases: ['P-21'],
+    category: 'other',
+    typicalVialSizes: [
+      { amount: 10, unit: 'mg' },
+    ],
+    recommendedDiluentMl: 2,
+    typicalDose: { min: 500, max: 500, unit: 'mcg' }, // Standard dose: 500mcg daily
+    description: 'CNTF-derived cognitive peptide',
+  },
+  {
+    name: 'FGL',
+    aliases: ['FGL Peptide', 'NCAM Mimetic'],
+    category: 'other',
+    typicalVialSizes: [
+      { amount: 5, unit: 'mg' },
+    ],
+    recommendedDiluentMl: 2,
+    typicalDose: { min: 1, max: 1, unit: 'mg' }, // Standard dose: 1mg daily
+    description: 'Neural cell adhesion molecule mimetic for cognition',
+  },
+  {
+    name: 'Cerebrolysin',
+    aliases: [],
+    category: 'other',
+    typicalVialSizes: [
+      { amount: 5, unit: 'mg' },
+      { amount: 10, unit: 'mg' },
+    ],
+    recommendedDiluentMl: 1,
+    typicalDose: { min: 5, max: 5, unit: 'mg' }, // Standard dose: 5-10mg daily
+    description: 'Neuroprotective brain peptide complex',
+  },
+  {
+    name: 'Cortexin',
+    aliases: [],
+    category: 'other',
+    typicalVialSizes: [
+      { amount: 10, unit: 'mg' },
+    ],
+    recommendedDiluentMl: 2,
+    typicalDose: { min: 10, max: 10, unit: 'mg' }, // Standard dose: 10mg daily
+    description: 'Neuroprotective peptide complex',
+  },
+  {
+    name: 'NA-Selank',
+    aliases: ['N-Acetyl Selank', 'NA Selank'],
+    category: 'other',
+    typicalVialSizes: [
+      { amount: 5, unit: 'mg' },
+    ],
+    recommendedDiluentMl: 2,
+    typicalDose: { min: 500, max: 500, unit: 'mcg' }, // Standard dose: 500mcg 1-2x daily
+    description: 'Enhanced anxiolytic and cognitive peptide',
+  },
+  {
+    name: 'NA-Semax',
+    aliases: ['N-Acetyl Semax', 'NA Semax'],
+    category: 'other',
+    typicalVialSizes: [
+      { amount: 5, unit: 'mg' },
+    ],
+    recommendedDiluentMl: 2,
+    typicalDose: { min: 600, max: 600, unit: 'mcg' }, // Standard dose: 600mcg 1-2x daily
+    description: 'Enhanced cognitive and focus peptide',
+  },
+
+  // Immune & Longevity
+  {
+    name: 'Thymalin',
+    aliases: [],
+    category: 'other',
+    typicalVialSizes: [
+      { amount: 10, unit: 'mg' },
+    ],
+    recommendedDiluentMl: 2,
+    typicalDose: { min: 10, max: 10, unit: 'mg' }, // Standard dose: 10mg daily for 10 days
+    description: 'Thymic peptide for immune function',
+  },
+  {
+    name: 'Humanin',
+    aliases: ['HN'],
+    category: 'other',
+    typicalVialSizes: [
+      { amount: 5, unit: 'mg' },
+    ],
+    recommendedDiluentMl: 2,
+    typicalDose: { min: 1, max: 1, unit: 'mg' }, // Standard dose: 1-2mg daily
+    description: 'Mitochondrial-derived peptide for longevity',
+  },
+  {
+    name: 'SS-31',
+    aliases: ['Elamipretide', 'Bendavia', 'MTP-131'],
+    category: 'other',
+    typicalVialSizes: [
+      { amount: 5, unit: 'mg' },
+    ],
+    recommendedDiluentMl: 2,
+    typicalDose: { min: 5, max: 5, unit: 'mg' }, // Standard dose: 5mg daily
+    description: 'Mitochondrial-targeted peptide for energy',
+  },
+
+  // Sexual Health
+  {
+    name: 'Kisspeptin-10',
+    aliases: ['Kisspeptin', 'KP-10'],
+    category: 'other',
+    typicalVialSizes: [
+      { amount: 5, unit: 'mg' },
+    ],
+    recommendedDiluentMl: 2,
+    typicalDose: { min: 1, max: 1, unit: 'mg' }, // Dose varies
+    description: 'Hormone regulation and reproductive health',
+  },
+  {
+    name: 'Gonadorelin',
+    aliases: ['GnRH', 'LHRH'],
+    category: 'other',
+    typicalVialSizes: [
+      { amount: 2, unit: 'mg' },
+    ],
+    recommendedDiluentMl: 2,
+    typicalDose: { min: 100, max: 100, unit: 'mcg' }, // Standard dose: 100mcg 2x/week
+    description: 'Gonadotropin-releasing hormone for testosterone support',
+  },
+
+  // Hair & Skin
+  {
+    name: 'PTD-DBM',
+    aliases: ['Hair Growth Peptide'],
+    category: 'cosmetic',
+    typicalVialSizes: [
+      { amount: 5, unit: 'mg' },
+    ],
+    recommendedDiluentMl: 2,
+    typicalDose: { min: 100, max: 100, unit: 'mcg' }, // Standard dose: topical or 100mcg subQ
+    description: 'Hair follicle activation peptide',
+  },
+  {
+    name: 'Thymulin',
+    aliases: ['Zinc-Thymulin'],
+    category: 'cosmetic',
+    typicalVialSizes: [
+      { amount: 5, unit: 'mg' },
+    ],
+    recommendedDiluentMl: 2,
+    typicalDose: { min: 100, max: 100, unit: 'mcg' }, // For hair: topical or injection
+    description: 'Hair regrowth and immune peptide',
+  },
+
+  // Muscle Building
+  {
+    name: 'Follistatin-344',
+    aliases: ['Follistatin', 'FS-344'],
+    category: 'growth-hormone',
+    typicalVialSizes: [
+      { amount: 1, unit: 'mg' },
+    ],
+    recommendedDiluentMl: 1,
+    typicalDose: { min: 100, max: 100, unit: 'mcg' }, // Standard dose: 100mcg daily
+    description: 'Myostatin inhibitor for muscle growth',
+  },
+  {
+    name: 'ACE-031',
+    aliases: ['ACVR2B'],
+    category: 'growth-hormone',
+    typicalVialSizes: [
+      { amount: 1, unit: 'mg' },
+    ],
+    recommendedDiluentMl: 1,
+    typicalDose: { min: 1, max: 1, unit: 'mg' }, // Dose varies
+    description: 'Myostatin blocker for muscle mass',
+  },
+
+  // VIP & Related
+  {
+    name: 'VIP',
+    aliases: ['Vasoactive Intestinal Peptide'],
+    category: 'other',
+    typicalVialSizes: [
+      { amount: 6, unit: 'mg' },
+    ],
+    recommendedDiluentMl: 6,
+    typicalDose: { min: 50, max: 50, unit: 'mcg' }, // Often nasal: 50mcg 4x daily
+    description: 'Neuromodulator and immune regulator',
+  },
 ]
 
 /**
@@ -357,6 +754,7 @@ export function getReconstitutionDefaults(peptideName: string): {
   doseMin: number
   doseMax: number
   typicalVialSizes: { amount: number; unit: string }[]
+  typicalDurationWeeks: number | null | undefined
 } | null {
   const ref = findPeptideReference(peptideName)
   if (!ref) return null
@@ -369,6 +767,7 @@ export function getReconstitutionDefaults(peptideName: string): {
     doseMin: ref.typicalDose.min,
     doseMax: ref.typicalDose.max,
     typicalVialSizes: ref.typicalVialSizes,
+    typicalDurationWeeks: ref.typicalDurationWeeks,
   }
 }
 

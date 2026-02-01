@@ -22,6 +22,7 @@ import { Badge } from '@/components/ui/badge'
 import { Modal } from '@/components/ui/modal'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
+import { SyringeVisual } from '@/components/syringe-visual'
 import type { Protocol, Peptide, DoseLog, ProtocolHistory, DayOfWeek } from '@/types'
 
 interface ProtocolDetail extends Protocol {
@@ -272,6 +273,24 @@ export default function ProtocolDetailPage({
     return completedDoses
   }
   const expectedDoses = protocol.status === 'completed' ? calculateExpectedDoses() : completedDoses
+
+  // Calculate pen units and concentration
+  const penUnits = (() => {
+    if (!protocol.vialAmount || !protocol.diluentVolume) return null
+    const concentration = protocol.vialAmount / protocol.diluentVolume
+    let doseInVialUnits = protocol.doseAmount
+    if (protocol.doseUnit === 'mcg' && protocol.vialUnit === 'mg') {
+      doseInVialUnits = protocol.doseAmount / 1000
+    } else if (protocol.doseUnit === 'mg' && protocol.vialUnit === 'mcg') {
+      doseInVialUnits = protocol.doseAmount * 1000
+    }
+    const volumeMl = doseInVialUnits / concentration
+    return Math.round(volumeMl * 100)
+  })()
+
+  const concentration = protocol.vialAmount && protocol.diluentVolume
+    ? `${(protocol.vialAmount / protocol.diluentVolume).toFixed(2)} ${protocol.vialUnit || 'mg'}/mL`
+    : null
 
   // Format days for display
   const formatDays = () => {
@@ -609,6 +628,49 @@ export default function ProtocolDetailPage({
           </CardContent>
         </Card>
       </div>
+
+      {/* Dosing Card with Syringe Visual */}
+      {penUnits && concentration && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="text-base">Dosing</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Pen Units - Primary Info */}
+            <div className="text-center py-4 bg-blue-50 rounded-xl">
+              <div className="text-4xl font-bold text-blue-800">
+                {penUnits} units
+              </div>
+              <div className="text-blue-600 mt-1">
+                Draw to this line
+              </div>
+            </div>
+
+            {/* Syringe Visual */}
+            <SyringeVisual
+              units={penUnits}
+              dose={`${protocol.doseAmount}${protocol.doseUnit}`}
+              concentration={concentration}
+            />
+
+            {/* Dose Details */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-slate-50 rounded-xl p-4">
+                <div className="text-xs text-slate-500 uppercase tracking-wide mb-1">Dose</div>
+                <div className="font-semibold text-slate-900">
+                  {protocol.doseAmount} {protocol.doseUnit}
+                </div>
+              </div>
+              <div className="bg-slate-50 rounded-xl p-4">
+                <div className="text-xs text-slate-500 uppercase tracking-wide mb-1">Concentration</div>
+                <div className="font-semibold text-slate-900">
+                  {concentration}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Progress Bar */}
       {progress !== null && (

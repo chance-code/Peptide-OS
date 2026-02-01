@@ -74,6 +74,7 @@ export default function NewProtocolPage() {
     doseMin?: number
     doseMax?: number
     typicalVialSizes?: { amount: number; unit: string }[]
+    typicalDurationWeeks?: number | null
     peptideName: string
     // Previous protocol details
     vialAmount?: number
@@ -159,6 +160,22 @@ export default function NewProtocolPage() {
       }
       setVialUnit(defaults.vialUnit)
       setShowReconstitution(true)
+
+      // Auto-populate end date if peptide has a typical duration
+      if (defaults.typicalDurationWeeks !== undefined) {
+        if (defaults.typicalDurationWeeks === null) {
+          // Ongoing protocol - set indefinite
+          setIndefinite(true)
+          setEndDate('')
+        } else {
+          // Fixed duration - calculate end date
+          setIndefinite(false)
+          const start = new Date(startDate)
+          const end = new Date(start)
+          end.setDate(end.getDate() + defaults.typicalDurationWeeks * 7)
+          setEndDate(format(end, 'yyyy-MM-dd'))
+        }
+      }
     } else {
       setRecommendation(null)
     }
@@ -259,7 +276,7 @@ export default function NewProtocolPage() {
 
   return (
     <div className="p-4 pb-20">
-      <h2 className="text-xl font-semibold text-slate-900 mb-4">New Protocol</h2>
+      <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-4">New Protocol</h2>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Peptide Selection */}
@@ -321,17 +338,17 @@ export default function NewProtocolPage() {
 
         {/* Recommendation Banner */}
         {recommendation && recommendation.source === 'previous' && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-4">
             <div className="flex items-start gap-3">
-              <History className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
+              <History className="w-5 h-5 text-green-500 dark:text-green-400 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
-                <div className="font-medium text-green-900 text-sm">
+                <div className="font-medium text-green-900 dark:text-green-100 text-sm">
                   Using your previous {recommendation.peptideName} settings
                 </div>
-                <div className="text-green-700 text-sm mt-1">
+                <div className="text-green-700 dark:text-green-300 text-sm mt-1">
                   Your dose: {recommendation.doseAmount} {recommendation.doseUnit}
                   {recommendation.vialAmount && recommendation.diluentVolume && (
-                    <span className="text-green-600 ml-2">
+                    <span className="text-green-600 dark:text-green-400 ml-2">
                       ({recommendation.vialAmount}{recommendation.vialUnit} + {recommendation.diluentVolume}mL)
                     </span>
                   )}
@@ -341,18 +358,18 @@ export default function NewProtocolPage() {
           </div>
         )}
         {recommendation && recommendation.source === 'reference' && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
             <div className="flex items-start gap-3">
-              <Lightbulb className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+              <Lightbulb className="w-5 h-5 text-blue-500 dark:text-blue-400 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
-                <div className="font-medium text-blue-900 text-sm">
+                <div className="font-medium text-blue-900 dark:text-blue-100 text-sm">
                   {recommendation.peptideName} - Enter your vial size below
                 </div>
-                <div className="text-blue-700 text-sm mt-1">
+                <div className="text-blue-700 dark:text-blue-300 text-sm mt-1">
                   Recommended dose: {recommendation.doseAmount} {recommendation.doseUnit}
                 </div>
                 {recommendation.typicalVialSizes && (
-                  <div className="text-blue-600 text-xs mt-1">
+                  <div className="text-blue-600 dark:text-blue-400 text-xs mt-1">
                     Common vial sizes: {recommendation.typicalVialSizes.map(v => `${v.amount}${v.unit}`).join(', ')}
                   </div>
                 )}
@@ -414,7 +431,7 @@ export default function NewProtocolPage() {
           </CardHeader>
           {showReconstitution && (
             <CardContent className="space-y-3">
-              <p className="text-sm text-slate-500">Enter your vial size - BAC water will be suggested automatically</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Enter your vial size - BAC water will be suggested automatically</p>
               <div className="flex gap-3">
                 <div className="flex-1">
                   <Input
@@ -460,18 +477,18 @@ export default function NewProtocolPage() {
                   const concentrationStr = `${concentration.toFixed(2)} ${vialUnit}/mL`
 
                   return (
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                      <div className="text-green-800 font-medium mb-3">Your Reconstitution Summary</div>
+                    <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                      <div className="text-green-800 dark:text-green-100 font-medium mb-3">Your Reconstitution Summary</div>
 
                       {/* Key Info */}
                       <div className="grid grid-cols-2 gap-3 text-sm">
-                        <div className="bg-white rounded-lg p-2 text-center">
-                          <div className="text-slate-500 text-xs">Concentration</div>
-                          <div className="font-semibold text-slate-900">{concentrationStr}</div>
+                        <div className="bg-white dark:bg-slate-800 rounded-lg p-2 text-center">
+                          <div className="text-slate-500 dark:text-slate-400 text-xs">Concentration</div>
+                          <div className="font-semibold text-slate-900 dark:text-white">{concentrationStr}</div>
                         </div>
-                        <div className="bg-white rounded-lg p-2 text-center">
-                          <div className="text-slate-500 text-xs">Doses per vial</div>
-                          <div className="font-semibold text-slate-900">~{dosesPerVial}</div>
+                        <div className="bg-white dark:bg-slate-800 rounded-lg p-2 text-center">
+                          <div className="text-slate-500 dark:text-slate-400 text-xs">Doses per vial</div>
+                          <div className="font-semibold text-slate-900 dark:text-white">~{dosesPerVial}</div>
                         </div>
                       </div>
 
@@ -508,9 +525,9 @@ export default function NewProtocolPage() {
                 id="indefinite"
                 checked={indefinite}
                 onChange={(e) => setIndefinite(e.target.checked)}
-                className="rounded border-slate-300"
+                className="rounded border-slate-300 dark:border-slate-600 dark:bg-slate-800"
               />
-              <label htmlFor="indefinite" className="text-sm text-slate-700">
+              <label htmlFor="indefinite" className="text-sm text-slate-700 dark:text-slate-300">
                 Run indefinitely (no end date)
               </label>
             </div>
@@ -533,7 +550,7 @@ export default function NewProtocolPage() {
 
             {frequency === 'custom' && (
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   Select Days
                 </label>
                 <div className="flex flex-wrap gap-2">
@@ -544,8 +561,8 @@ export default function NewProtocolPage() {
                       onClick={() => toggleCustomDay(day.value)}
                       className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                         customDays.includes(day.value)
-                          ? 'bg-slate-900 text-white'
-                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900'
+                          : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
                       }`}
                     >
                       {day.label}
@@ -566,7 +583,7 @@ export default function NewProtocolPage() {
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 min-h-[80px]"
+              className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 dark:focus:ring-slate-400 min-h-[80px] placeholder:text-slate-400 dark:placeholder:text-slate-500"
               placeholder="Any additional notes..."
             />
           </CardContent>

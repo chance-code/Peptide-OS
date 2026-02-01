@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { signOut } from 'next-auth/react'
-import { User, Plus, Trash2, Edit2, LogOut, ArrowRightLeft, Crown, Zap } from 'lucide-react'
+import { User, Plus, Trash2, Edit2, LogOut, ArrowRightLeft, Crown, Zap, Sun, Moon, Monitor } from 'lucide-react'
 import { useAppStore } from '@/store'
+import { useTheme } from '@/components/theme-provider'
 import { Paywall } from '@/components/paywall'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -11,10 +12,12 @@ import { Input } from '@/components/ui/input'
 import { Modal } from '@/components/ui/modal'
 import { Badge } from '@/components/ui/badge'
 import { NotificationSettings } from '@/components/notification-settings'
+import { cn } from '@/lib/utils'
 import type { UserProfile } from '@/types'
 
 export default function SettingsPage() {
   const { currentUser, setCurrentUser, isPremium, setIsPremium, showPaywall, setShowPaywall } = useAppStore()
+  const { theme, setTheme } = useTheme()
   const [users, setUsers] = useState<UserProfile[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [showNewProfile, setShowNewProfile] = useState(false)
@@ -138,7 +141,7 @@ export default function SettingsPage() {
 
   return (
     <div className="p-4 pb-20">
-      <h2 className="text-xl font-semibold text-slate-900 mb-4">Settings</h2>
+      <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-4">Settings</h2>
 
       {/* Current Profile */}
       {currentUser && (
@@ -152,9 +155,9 @@ export default function SettingsPage() {
                 <User className="w-6 h-6 text-white" />
               </div>
               <div className="flex-1">
-                <div className="font-medium text-slate-900">{currentUser.name}</div>
+                <div className="font-medium text-slate-900 dark:text-white">{currentUser.name}</div>
                 {currentUser.notes && (
-                  <div className="text-sm text-slate-500">{currentUser.notes}</div>
+                  <div className="text-sm text-slate-500 dark:text-slate-400">{currentUser.notes}</div>
                 )}
               </div>
               <Button
@@ -178,8 +181,8 @@ export default function SettingsPage() {
                 <Crown className="w-5 h-5 text-white" />
               </div>
               <div className="flex-1">
-                <div className="font-medium text-slate-900">Premium Active</div>
-                <div className="text-sm text-slate-500">All features unlocked</div>
+                <div className="font-medium text-slate-900 dark:text-white">Premium Active</div>
+                <div className="text-sm text-slate-500 dark:text-slate-400">All features unlocked</div>
               </div>
               <Badge className="bg-gradient-to-r from-amber-400 to-orange-500 text-white">PRO</Badge>
             </div>
@@ -189,14 +192,44 @@ export default function SettingsPage() {
                 <Zap className="w-5 h-5 text-slate-400" />
               </div>
               <div className="flex-1">
-                <div className="font-medium text-slate-900">Free Plan</div>
-                <div className="text-sm text-slate-500">Upgrade for all features</div>
+                <div className="font-medium text-slate-900 dark:text-white">Free Plan</div>
+                <div className="text-sm text-slate-500 dark:text-slate-400">Upgrade for all features</div>
               </div>
               <Button size="sm" onClick={() => setShowPaywall(true)}>
                 Upgrade
               </Button>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Appearance */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="text-base">Appearance</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-2">
+            {[
+              { value: 'light' as const, icon: Sun, label: 'Light' },
+              { value: 'dark' as const, icon: Moon, label: 'Dark' },
+              { value: 'system' as const, icon: Monitor, label: 'System' },
+            ].map(({ value, icon: Icon, label }) => (
+              <button
+                key={value}
+                onClick={() => setTheme(value)}
+                className={cn(
+                  'flex-1 flex flex-col items-center gap-2 p-3 rounded-xl transition-colors',
+                  theme === value
+                    ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
+                    : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                )}
+              >
+                <Icon className="w-5 h-5" />
+                <span className="text-xs font-medium">{label}</span>
+              </button>
+            ))}
+          </div>
         </CardContent>
       </Card>
 
@@ -212,7 +245,7 @@ export default function SettingsPage() {
           {isLoading ? (
             <div className="p-4 text-center text-slate-500">Loading...</div>
           ) : (
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-slate-100 dark:divide-slate-700">
               {users.map((user) => {
                 const isActive = user.id === currentUser?.id
                 return (
@@ -220,8 +253,8 @@ export default function SettingsPage() {
                     key={user.id}
                     className={`flex items-center gap-3 p-4 transition-colors ${
                       isActive
-                        ? 'bg-green-50 border-l-4 border-green-500'
-                        : 'hover:bg-slate-50'
+                        ? 'bg-green-50 dark:bg-green-900/20 border-l-4 border-green-500'
+                        : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'
                     }`}
                   >
                     <div
@@ -233,7 +266,7 @@ export default function SettingsPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="font-medium text-slate-900">{user.name}</span>
+                        <span className="font-medium text-slate-900 dark:text-white">{user.name}</span>
                         {isActive && (
                           <Badge variant="success">Active</Badge>
                         )}
@@ -289,7 +322,7 @@ export default function SettingsPage() {
         <CardHeader>
           <CardTitle className="text-base">About</CardTitle>
         </CardHeader>
-        <CardContent className="text-sm text-slate-500 space-y-1">
+        <CardContent className="text-sm text-slate-500 dark:text-slate-400 space-y-1">
           <div>Peptide OS v1.0.0</div>
           <div>Local-first personal protocol management</div>
         </CardContent>
@@ -399,7 +432,7 @@ export default function SettingsPage() {
         onClose={() => setShowDeleteModal(null)}
         title="Delete Profile"
       >
-        <p className="text-slate-600 mb-4">
+        <p className="text-slate-600 dark:text-slate-300 mb-4">
           Are you sure you want to delete {showDeleteModal?.name}&apos;s profile? All their
           protocols, inventory, and history will be permanently deleted.
         </p>

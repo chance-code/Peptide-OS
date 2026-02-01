@@ -6,7 +6,7 @@ import { BottomNav, TopHeader } from '@/components/nav'
 import { ProfileSelector } from '@/components/profile-selector'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { setCurrentUser } = useAppStore()
+  const { currentUserId: storedUserId, setCurrentUser } = useAppStore()
   const [showProfileSelector, setShowProfileSelector] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [currentUserId, setLocalCurrentUserId] = useState<string | null>(null)
@@ -28,10 +28,24 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           return
         }
 
-        // Always use the active user from the database
-        const activeUser = users.find((u: { isActive: boolean }) => u.isActive) || users[0]
-        setCurrentUser(activeUser)
-        setLocalCurrentUserId(activeUser.id)
+        // Check if we have a stored user ID from localStorage (via Zustand)
+        // This allows each browser/device to have its own independent profile
+        let userToUse = null
+
+        if (storedUserId) {
+          // Try to find the stored user
+          userToUse = users.find((u: { id: string }) => u.id === storedUserId)
+        }
+
+        // If no stored user or stored user not found, show profile selector
+        if (!userToUse) {
+          setShowProfileSelector(true)
+          setIsLoading(false)
+          return
+        }
+
+        setCurrentUser(userToUse)
+        setLocalCurrentUserId(userToUse.id)
       } catch (error) {
         console.error('Error loading user:', error)
       } finally {
@@ -40,12 +54,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
 
     loadUser()
-  }, [setCurrentUser])
+  }, [setCurrentUser, storedUserId])
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="text-slate-500">Loading...</div>
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
+        <div className="text-slate-500 dark:text-slate-400">Loading...</div>
       </div>
     )
   }
@@ -59,9 +73,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="h-dvh flex flex-col bg-slate-50">
+    <div className="h-dvh flex flex-col bg-slate-50 dark:bg-slate-900">
       <TopHeader />
-      <main className="flex-1 pb-14 max-w-lg mx-auto w-full overflow-auto">{children}</main>
+      <main className="flex-1 pb-14 max-w-lg mx-auto w-full overflow-auto animate-page-in">{children}</main>
       <BottomNav />
     </div>
   )

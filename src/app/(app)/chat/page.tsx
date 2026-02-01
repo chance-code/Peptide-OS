@@ -133,7 +133,7 @@ export default function ChatPage() {
         <div className="flex justify-end px-4 pt-2">
           <button
             onClick={clearChat}
-            className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 transition-colors"
+            className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
           >
             <Trash2 className="w-3 h-3" />
             Clear chat
@@ -155,7 +155,7 @@ export default function ChatPage() {
               className={cn(
                 'w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0',
                 message.role === 'user'
-                  ? 'bg-slate-900 text-white'
+                  ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
                   : 'bg-gradient-to-br from-emerald-400 to-cyan-500 text-white'
               )}
             >
@@ -169,8 +169,8 @@ export default function ChatPage() {
               className={cn(
                 'rounded-2xl px-4 py-3 text-base leading-relaxed',
                 message.role === 'user'
-                  ? 'bg-slate-900 text-white rounded-tr-sm'
-                  : 'bg-slate-100 text-slate-800 rounded-tl-sm'
+                  ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-tr-sm'
+                  : 'bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-100 rounded-tl-sm'
               )}
             >
               <div className="whitespace-pre-wrap">{message.content}</div>
@@ -183,7 +183,7 @@ export default function ChatPage() {
             <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-emerald-400 to-cyan-500 text-white">
               <Bot className="w-4 h-4" />
             </div>
-            <div className="bg-slate-100 rounded-2xl rounded-tl-sm px-4 py-3">
+            <div className="bg-slate-100 dark:bg-slate-700 rounded-2xl rounded-tl-sm px-4 py-3">
               <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
             </div>
           </div>
@@ -193,7 +193,7 @@ export default function ChatPage() {
       </div>
 
       {/* Input */}
-      <div className="border-t border-slate-200 bg-white p-3 pb-16">
+      <div className="border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 pb-16">
         <form onSubmit={handleSubmit} className="flex gap-2 items-end">
           <div className="flex-1">
             <textarea
@@ -207,7 +207,7 @@ export default function ChatPage() {
               onKeyDown={handleKeyDown}
               placeholder="Ask anything..."
               rows={1}
-              className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent placeholder:text-slate-400"
+              className="w-full resize-none rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-slate-400 focus:border-transparent placeholder:text-slate-400 dark:placeholder:text-slate-500"
               style={{ minHeight: '48px', maxHeight: '120px' }}
             />
           </div>
@@ -217,8 +217,8 @@ export default function ChatPage() {
             className={cn(
               'w-12 h-12 rounded-full flex items-center justify-center transition-all flex-shrink-0',
               input.trim() && !isLoading
-                ? 'bg-slate-900 text-white hover:bg-slate-800'
-                : 'bg-slate-200 text-slate-400'
+                ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-slate-100'
+                : 'bg-slate-200 dark:bg-slate-700 text-slate-400'
             )}
           >
             <Send className="w-5 h-5" />
