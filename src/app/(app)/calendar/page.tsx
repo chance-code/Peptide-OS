@@ -235,36 +235,6 @@ export default function CalendarPage() {
     }
   }, [calendarDays])
 
-  // Group calendar days by week with stats
-  const weeks = useMemo(() => {
-    const today = new Date()
-    const result: { days: DayData[]; stats: { completed: number; total: number; percentage: number } }[] = []
-
-    for (let i = 0; i < calendarDays.length; i += 7) {
-      const weekDays = calendarDays.slice(i, i + 7)
-      let weekTotal = 0
-      let weekCompleted = 0
-
-      for (const day of weekDays) {
-        if (day.isCurrentMonth && day.date <= today) {
-          weekTotal += day.protocols.length
-          weekCompleted += day.protocols.filter((p) => p.status === 'completed').length
-        }
-      }
-
-      result.push({
-        days: weekDays,
-        stats: {
-          completed: weekCompleted,
-          total: weekTotal,
-          percentage: weekTotal > 0 ? Math.round((weekCompleted / weekTotal) * 100) : 0,
-        },
-      })
-    }
-
-    return result
-  }, [calendarDays])
-
   const selectedDayData = selectedDay
     ? calendarDays.find((d) => isSameDay(d.date, selectedDay))
     : null
@@ -384,113 +354,98 @@ export default function CalendarPage() {
         )}
 
         {/* Calendar Grid */}
-        <Card className="mb-4">
-          <CardContent className="p-2">
+        <Card className="mb-4 overflow-hidden">
+          <CardContent className="p-3">
             {/* Day headers */}
-            <div className="grid grid-cols-7 mb-1">
+            <div className="grid grid-cols-7 mb-2">
               {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, i) => (
                 <div
                   key={i}
-                  className="text-center text-xs font-medium text-slate-500 dark:text-slate-400 py-2"
+                  className="text-center text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wide"
                 >
                   {day}
                 </div>
               ))}
             </div>
 
-            {/* Calendar weeks with stats */}
-            {weeks.map((week, weekIndex) => (
-              <div key={weekIndex}>
-                {/* Weekly compliance indicator */}
-                {week.stats.total > 0 && (
-                  <div className="flex items-center justify-end gap-1 mb-1 pr-1">
-                    <div
+            {/* Calendar days - flat grid for consistent sizing */}
+            <div className="grid grid-cols-7 gap-1">
+              {calendarDays.map((dayData, index) => {
+                const hasProtocols = dayData.protocols.length > 0
+                const completedCount = dayData.protocols.filter((p) => p.status === 'completed').length
+                const allCompleted = hasProtocols && completedCount === dayData.protocols.length
+                const hasMissed = dayData.protocols.some((p) => p.status === 'missed')
+                const isFuture = dayData.date > new Date() && !dayData.isToday
+
+                // Background tint based on status
+                const getBgClass = () => {
+                  if (!dayData.isCurrentMonth) return ''
+                  if (!hasProtocols) return ''
+                  if (isFuture) return 'bg-slate-50 dark:bg-slate-800/50'
+                  if (allCompleted) return 'bg-green-50 dark:bg-green-900/20'
+                  if (hasMissed) return 'bg-red-50 dark:bg-red-900/20'
+                  return 'bg-amber-50 dark:bg-amber-900/20'
+                }
+
+                return (
+                  <button
+                    key={index}
+                    onClick={() => setSelectedDay(dayData.date)}
+                    className={cn(
+                      'relative flex flex-col items-center justify-center rounded-xl transition-all duration-200 aspect-square',
+                      getBgClass(),
+                      dayData.isCurrentMonth
+                        ? isFuture
+                          ? 'text-slate-400 dark:text-slate-500'
+                          : 'text-slate-900 dark:text-white'
+                        : 'text-slate-300 dark:text-slate-700',
+                      dayData.isToday && 'ring-2 ring-slate-900 dark:ring-white ring-offset-1 ring-offset-[var(--card)]',
+                      selectedDay && isSameDay(dayData.date, selectedDay) && 'bg-slate-200 dark:bg-slate-600',
+                      hasProtocols && 'hover:scale-105 active:scale-95'
+                    )}
+                  >
+                    <span
                       className={cn(
-                        'text-[10px] font-medium px-1.5 py-0.5 rounded',
-                        week.stats.percentage === 100
-                          ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
-                          : week.stats.percentage >= 80
-                            ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
-                            : week.stats.percentage >= 50
-                              ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'
-                              : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
+                        'text-[11px] leading-none',
+                        dayData.isToday && 'font-bold',
+                        hasProtocols && dayData.isCurrentMonth && 'mb-0.5'
                       )}
                     >
-                      {week.stats.percentage}%
-                    </div>
-                  </div>
-                )}
+                      {format(dayData.date, 'd')}
+                    </span>
 
-                {/* Week days */}
-                <div className="grid grid-cols-7 gap-1 mb-1">
-                  {week.days.map((dayData, dayIndex) => {
-                    const hasProtocols = dayData.protocols.length > 0
-                    const completedCount = dayData.protocols.filter((p) => p.status === 'completed').length
-                    const isFuture = dayData.date > new Date() && !dayData.isToday
-
-                    return (
-                      <button
-                        key={dayIndex}
-                        onClick={() => setSelectedDay(dayData.date)}
-                        className={cn(
-                          'relative flex flex-col items-center justify-center py-1 rounded-lg text-sm transition-colors min-h-[52px]',
-                          dayData.isCurrentMonth
-                            ? isFuture
-                              ? 'text-slate-400 dark:text-slate-500'
-                              : 'text-slate-900 dark:text-white'
-                            : 'text-slate-300 dark:text-slate-600',
-                          dayData.isToday && 'ring-2 ring-slate-900 dark:ring-white',
-                          selectedDay && isSameDay(dayData.date, selectedDay) && 'bg-slate-100 dark:bg-slate-700',
-                          !selectedDay && hasProtocols && 'hover:bg-slate-50 dark:hover:bg-slate-700'
-                        )}
-                      >
-                        <span
-                          className={cn(
-                            'text-xs mb-0.5',
-                            dayData.isToday && 'font-bold'
-                          )}
-                        >
-                          {format(dayData.date, 'd')}
-                        </span>
-
-                        {/* Mini compliance ring or empty state */}
-                        {hasProtocols ? (
-                          <div className={cn(isFuture && 'opacity-40')}>
-                            <ComplianceRing
-                              completed={completedCount}
-                              total={dayData.protocols.length}
-                              size="xs"
-                              showPercentage={false}
-                              showCheckOnComplete={true}
-                            />
-                          </div>
-                        ) : dayData.isCurrentMonth ? (
-                          <div className="w-6 h-6" />
-                        ) : null}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            ))}
+                    {/* Mini compliance ring */}
+                    {hasProtocols && dayData.isCurrentMonth && (
+                      <div className={cn(isFuture && 'opacity-40')}>
+                        <ComplianceRing
+                          completed={completedCount}
+                          total={dayData.protocols.length}
+                          size="xs"
+                          showPercentage={false}
+                          showCheckOnComplete={true}
+                        />
+                      </div>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
           </CardContent>
         </Card>
 
-        {/* Legend */}
-        <div className="flex items-center justify-center gap-4 text-xs text-slate-500 dark:text-slate-400 mb-4">
+        {/* Legend - more compact */}
+        <div className="flex items-center justify-center gap-6 text-[11px] text-slate-500 dark:text-slate-400">
           <div className="flex items-center gap-1.5">
-            <div className="w-4 h-4 rounded-full border-2 border-[var(--success)] flex items-center justify-center">
-              <Check className="w-2.5 h-2.5 text-[var(--success)]" />
-            </div>
+            <div className="w-3 h-3 rounded-full bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700" />
             <span>Done</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="w-4 h-4 rounded-full border-2 border-[var(--accent)]" />
+            <div className="w-3 h-3 rounded-full bg-amber-100 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700" />
             <span>Partial</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="w-4 h-4 rounded-full border-2 border-[var(--muted)]" />
-            <span>Pending</span>
+            <div className="w-3 h-3 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-600" />
+            <span>Scheduled</span>
           </div>
         </div>
 
