@@ -180,12 +180,20 @@ export function NotificationSettings() {
         }),
       })
 
-      if (response.ok) {
+      const data = await response.json()
+      console.log('Push send response:', data)
+
+      if (response.ok && data.sent > 0) {
         setTestSent(true)
         setTimeout(() => setTestSent(false), 3000)
+      } else if (data.sent === 0) {
+        alert('No subscriptions found. Try disabling and re-enabling notifications.')
+      } else if (data.error) {
+        alert(`Error: ${data.error}`)
       }
     } catch (error) {
       console.error('Failed to send test notification:', error)
+      alert('Failed to send test notification')
     }
   }
 

@@ -214,8 +214,8 @@ export default function NewInventoryPage() {
       : null
 
   return (
-    <div className="p-4 pb-20">
-      <h2 className="text-xl font-semibold text-slate-900 mb-4">Add Vial</h2>
+    <div className="p-4 pb-48">
+      <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-4">Add Vial</h2>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Peptide Selection */}
@@ -277,17 +277,17 @@ export default function NewInventoryPage() {
 
         {/* Recommendation Banner */}
         {recommendation && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
             <div className="flex items-start gap-3">
-              <Lightbulb className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+              <Lightbulb className="w-5 h-5 text-blue-500 dark:text-blue-400 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
-                <div className="font-medium text-blue-900 text-sm">
+                <div className="font-medium text-blue-900 dark:text-blue-100 text-sm">
                   {recommendation.source === 'protocol'
                     ? `Using settings from your ${recommendation.peptideName} protocol`
                     : `Info for ${recommendation.peptideName}`}
                 </div>
                 {recommendation.source === 'reference' && recommendation.typicalVialSizes && (
-                  <div className="text-blue-600 text-xs mt-1">
+                  <div className="text-blue-600 dark:text-blue-400 text-xs mt-1">
                     Common vial sizes: {recommendation.typicalVialSizes.map(v => `${v.amount}${v.unit}`).join(', ')}
                   </div>
                 )}
@@ -346,9 +346,9 @@ export default function NewInventoryPage() {
               placeholder="e.g., 2"
             />
             {concentration && (
-              <div className="p-3 bg-slate-50 rounded-lg">
-                <div className="text-sm text-slate-500">Concentration</div>
-                <div className="font-mono text-lg font-semibold text-slate-900">
+              <div className="p-3 bg-slate-50 dark:bg-slate-700 rounded-lg">
+                <div className="text-sm text-slate-500 dark:text-slate-400">Concentration</div>
+                <div className="font-mono text-lg font-semibold text-slate-900 dark:text-white">
                   {concentration} {totalUnit}/ml
                 </div>
               </div>
@@ -380,7 +380,7 @@ export default function NewInventoryPage() {
               value={expirationDate}
               onChange={(e) => setExpirationDate(e.target.value)}
             />
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
               Tip: Most reconstituted peptides expire 28 days after reconstitution when
               refrigerated.
             </p>
@@ -396,7 +396,7 @@ export default function NewInventoryPage() {
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 min-h-[80px]"
+              className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 dark:focus:ring-slate-400 min-h-[80px] placeholder:text-slate-400 dark:placeholder:text-slate-500"
               placeholder="Storage location, supplier, etc."
             />
           </CardContent>
