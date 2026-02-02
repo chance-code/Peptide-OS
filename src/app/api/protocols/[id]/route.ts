@@ -14,9 +14,11 @@ export async function GET(
         peptide: true,
         doseLogs: {
           orderBy: { scheduledDate: 'desc' },
+          take: 60, // Limit to last 60 logs for performance
         },
         history: {
           orderBy: { createdAt: 'desc' },
+          take: 20, // Limit history entries
         },
       },
     })

@@ -140,7 +140,7 @@ export default function CalendarPage() {
       return res.json()
     },
     enabled: !!currentUserId,
-    staleTime: 1000 * 60,
+    staleTime: 1000 * 60 * 15, // 15 minutes - protocols don't change often
   })
 
   const { data: doseLogs = [], refetch: refetchLogs } = useQuery<DoseLog[]>({
@@ -157,11 +157,9 @@ export default function CalendarPage() {
   })
 
   const handleRefresh = useCallback(async () => {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['protocols', currentUserId] }),
-      refetchLogs(),
-    ])
-  }, [queryClient, currentUserId, refetchLogs])
+    // Only refetch dose logs - protocols rarely change during refresh
+    await refetchLogs()
+  }, [refetchLogs])
 
   const calendarDays = useMemo(() => {
     const calendarStart = startOfWeek(monthStart)
@@ -178,7 +176,7 @@ export default function CalendarPage() {
         const protocolEnd = protocol.endDate ? new Date(protocol.endDate) : null
         if (currentDay < protocolStart) continue
         if (protocolEnd && currentDay > protocolEnd) continue
-        if (protocol.status === 'completed') continue
+        // Don't filter out completed protocols - we need their historical data for compliance stats
         if (!isDoseDay(currentDay, protocol.frequency, protocolStart, protocol.customDays)) continue
 
         // Get timings - either from timings array or single timing
@@ -400,7 +398,7 @@ export default function CalendarPage() {
 
           {/* Calendar days */}
           <div className="grid grid-cols-7 gap-2">
-            {calendarDays.map((dayData, index) => {
+            {calendarDays.map((dayData) => {
               const hasProtocols = dayData.protocols.length > 0
               const completedCount = dayData.protocols.filter((p) => p.status === 'completed').length
               const completionRatio = hasProtocols ? completedCount / dayData.protocols.length : 0
@@ -421,7 +419,7 @@ export default function CalendarPage() {
 
               return (
                 <button
-                  key={index}
+                  key={dayData.date.toISOString()}
                   onClick={() => hasProtocols && setSelectedDay(dayData.date)}
                   disabled={!hasProtocols}
                   className={cn(

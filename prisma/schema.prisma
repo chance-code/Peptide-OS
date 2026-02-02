@@ -96,6 +96,7 @@ model Protocol {
   @@index([userId])
   @@index([userId, status])
   @@index([startDate])
+  @@index([userId, status, startDate])
 }
 
 // ============================================
@@ -117,6 +118,7 @@ model DoseSchedule {
   doseLog     DoseLog?
 
   @@unique([protocolId, scheduledDate])
+  @@index([scheduledDate])
 }
 
 // ============================================
@@ -149,6 +151,7 @@ model DoseLog {
   @@index([userId])
   @@index([userId, scheduledDate])
   @@index([protocolId])
+  @@index([protocolId, scheduledDate])
 }
 
 // ============================================
@@ -195,6 +198,7 @@ model InventoryVial {
   @@index([userId])
   @@index([userId, isExhausted])
   @@index([expirationDate])
+  @@index([userId, isExpired, isExhausted])
 }
 
 // ============================================

@@ -78,10 +78,12 @@ export async function GET(request: NextRequest) {
         message: `${vial.identifier || 'Vial'} should be discarded`,
         link: `/inventory/${vial.id}`,
       })
+    }
 
-      // Auto-mark as expired
-      await prisma.inventoryVial.update({
-        where: { id: vial.id },
+    // Batch update expired vials (avoid N+1)
+    if (expiredVials.length > 0) {
+      await prisma.inventoryVial.updateMany({
+        where: { id: { in: expiredVials.map(v => v.id) } },
         data: { isExpired: true },
       })
     }

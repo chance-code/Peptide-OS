@@ -68,10 +68,16 @@ if (!res.ok) {
 - `prisma/schema.prisma` - Requires migration
 - `ios/` - Native iOS project files
 
-## Git Workflow
+## Deployment Workflow (MANDATORY)
 
-- Always push to origin immediately after committing
-- Deploy with `vercel --prod` after pushing
+**Every code change MUST be deployed. No exceptions.**
+
+After ANY file modification:
+1. `npm run build` - Verify no errors
+2. `vercel --prod` - Deploy immediately
+3. Confirm deployment URL in output
+
+**Do NOT end a task without deploying.** If build fails, fix it before moving on.
 
 ## Common Mistakes to Avoid
 
