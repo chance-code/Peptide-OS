@@ -1,17 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { verifyUserAccess } from '@/lib/api-auth'
 
 // GET /api/inventory - List inventory for a user
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
-    const userId = searchParams.get('userId')
     const includeExpired = searchParams.get('includeExpired') === 'true'
     const includeExhausted = searchParams.get('includeExhausted') === 'true'
 
-    if (!userId) {
-      return NextResponse.json({ error: 'userId is required' }, { status: 400 })
-    }
+    // Verify user has access to requested userId
+    const auth = await verifyUserAccess(searchParams.get('userId'))
+    if (!auth.success) return auth.response
+    const { userId } = auth
 
     // Check expiration by date directly in query (no separate update needed)
     const today = new Date()

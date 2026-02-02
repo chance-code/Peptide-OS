@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { startOfDay, endOfDay, isSameDay, getDay } from 'date-fns'
+import { verifyUserAccess } from '@/lib/api-auth'
 import type { TodayDoseItem, DayOfWeek, ItemType } from '@/types'
 
 // Map day of week index to our DayOfWeek type (0 = Sunday)
@@ -51,12 +52,12 @@ function isDoseDay(
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
-    const userId = searchParams.get('userId')
     const dateParam = searchParams.get('date')
 
-    if (!userId) {
-      return NextResponse.json({ error: 'userId is required' }, { status: 400 })
-    }
+    // Verify user has access to requested userId
+    const auth = await verifyUserAccess(searchParams.get('userId'))
+    if (!auth.success) return auth.response
+    const { userId } = auth
 
     // Parse date in local timezone (dateParam is 'yyyy-MM-dd')
     let targetDate: Date

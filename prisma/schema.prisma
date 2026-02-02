@@ -91,6 +91,11 @@ model Protocol {
   doseLogs    DoseLog[]
   schedules   DoseSchedule[]
   history     ProtocolHistory[]
+
+  // Indexes for query performance
+  @@index([userId])
+  @@index([userId, status])
+  @@index([startDate])
 }
 
 // ============================================
@@ -139,6 +144,11 @@ model DoseLog {
   user        UserProfile   @relation(fields: [userId], references: [id], onDelete: Cascade)
   protocol    Protocol      @relation(fields: [protocolId], references: [id], onDelete: Cascade)
   schedule    DoseSchedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+
+  // Indexes for query performance
+  @@index([userId])
+  @@index([userId, scheduledDate])
+  @@index([protocolId])
 }
 
 // ============================================
@@ -180,6 +190,11 @@ model InventoryVial {
   // Relations
   user            UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
   peptide         Peptide     @relation(fields: [peptideId], references: [id])
+
+  // Indexes for query performance
+  @@index([userId])
+  @@index([userId, isExhausted])
+  @@index([expirationDate])
 }
 
 // ============================================
@@ -211,6 +226,9 @@ model Reconstitution {
   // Relations
   user          UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
   peptide       Peptide     @relation(fields: [peptideId], references: [id])
+
+  // Indexes for query performance
+  @@index([userId])
 }
 
 // ============================================
@@ -227,6 +245,9 @@ model ProtocolHistory {
 
   // Relations
   protocol    Protocol @relation(fields: [protocolId], references: [id], onDelete: Cascade)
+
+  // Indexes for query performance
+  @@index([protocolId])
 }
 
 // ============================================

@@ -1,20 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { startOfDay, endOfDay } from 'date-fns'
+import { verifyUserAccess } from '@/lib/api-auth'
 
 // GET /api/doses - List dose logs for a user
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
-    const userId = searchParams.get('userId')
     const protocolId = searchParams.get('protocolId')
     const date = searchParams.get('date')
-    const startDate = searchParams.get('startDate')
-    const endDate = searchParams.get('endDate')
+    const startDateParam = searchParams.get('startDate')
+    const endDateParam = searchParams.get('endDate')
 
-    if (!userId) {
-      return NextResponse.json({ error: 'userId is required' }, { status: 400 })
-    }
+    // Verify user has access to requested userId
+    const auth = await verifyUserAccess(searchParams.get('userId'))
+    if (!auth.success) return auth.response
+    const { userId } = auth
 
     const where: Record<string, unknown> = { userId }
 
@@ -28,10 +29,10 @@ export async function GET(request: NextRequest) {
         gte: startOfDay(targetDate),
         lte: endOfDay(targetDate),
       }
-    } else if (startDate && endDate) {
+    } else if (startDateParam && endDateParam) {
       where.scheduledDate = {
-        gte: startOfDay(new Date(startDate)),
-        lte: endOfDay(new Date(endDate)),
+        gte: startOfDay(new Date(startDateParam)),
+        lte: endOfDay(new Date(endDateParam)),
       }
     }
 
@@ -61,7 +62,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const {
-      userId,
+      userId: requestedUserId,
       protocolId,
       scheduleId,
       scheduledDate,
@@ -72,7 +73,12 @@ export async function POST(request: NextRequest) {
       timing, // For multi-timing protocols
     } = body
 
-    if (!userId || !protocolId || !scheduledDate || !status) {
+    // Verify user has access to requested userId
+    const auth = await verifyUserAccess(requestedUserId)
+    if (!auth.success) return auth.response
+    const { userId } = auth
+
+    if (!protocolId || !scheduledDate || !status) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 

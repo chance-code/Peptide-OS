@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { verifyUserAccess } from '@/lib/api-auth'
 
 // GET /api/protocols - List protocols for a user
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
-    const userId = searchParams.get('userId')
     const status = searchParams.get('status')
 
-    if (!userId) {
-      return NextResponse.json({ error: 'userId is required' }, { status: 400 })
-    }
+    // Verify user has access to requested userId
+    const auth = await verifyUserAccess(searchParams.get('userId'))
+    if (!auth.success) return auth.response
+    const { userId } = auth
 
     const protocols = await prisma.protocol.findMany({
       where: {
@@ -40,7 +41,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const {
-      userId,
+      userId: requestedUserId,
       peptideId,
       startDate,
       endDate,
@@ -58,7 +59,12 @@ export async function POST(request: NextRequest) {
       servingUnit,
     } = body
 
-    if (!userId || !peptideId || !startDate || !frequency || !doseAmount || !doseUnit) {
+    // Verify user has access to requested userId
+    const auth = await verifyUserAccess(requestedUserId)
+    if (!auth.success) return auth.response
+    const { userId } = auth
+
+    if (!peptideId || !startDate || !frequency || !doseAmount || !doseUnit) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 

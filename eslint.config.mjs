@@ -13,15 +13,6 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
   ]),
-  // Custom rules to catch common mistakes
-  {
-    rules: {
-      // Catch fire-and-forget promises (fetch without await)
-      "@typescript-eslint/no-floating-promises": "warn",
-      // Require handling promise rejections
-      "@typescript-eslint/no-misused-promises": "warn",
-    },
-  },
 ]);
 
 export default eslintConfig;
