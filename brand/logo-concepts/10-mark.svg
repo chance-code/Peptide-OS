@@ -1,9 +1,0 @@
-<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-  <rect width="200" height="200" fill="#FAFAFA"/>
-
-  <!-- Small dot above -->
-  <circle cx="100" cy="55" r="10" fill="#0A0A0A"/>
-
-  <!-- Vertical line below -->
-  <rect x="88" y="80" width="24" height="70" rx="12" fill="#0A0A0A"/>
-</svg>
