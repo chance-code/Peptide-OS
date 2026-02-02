@@ -1,13 +1,8 @@
 <svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
-  <!-- The Core - Golden Ratio (Light) -->
-  <rect width="1024" height="1024" fill="#FFFFFF"/>
+  <!-- The Core - Aged Bronze (Light Mode) -->
+  <rect width="1024" height="1024" fill="#FAFAF9"/>
 
-  <!-- Outer ring -->
-  <circle cx="512" cy="512" r="307" stroke="#0A0A0A" stroke-width="21" fill="none"/>
-
-  <!-- Inner ring -->
-  <circle cx="512" cy="512" r="190" stroke="#0A0A0A" stroke-width="21" fill="none"/>
-
-  <!-- Solid core -->
-  <circle cx="512" cy="512" r="77" fill="#0A0A0A"/>
+  <circle cx="512" cy="512" r="307" stroke="#44403C" stroke-width="21" fill="none"/>
+  <circle cx="512" cy="512" r="190" stroke="#44403C" stroke-width="21" fill="none"/>
+  <circle cx="512" cy="512" r="77" fill="#44403C"/>
 </svg>
