@@ -553,9 +553,14 @@ export default function ProtocolDetailPage({
     <div className="p-4 pb-20">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <Button variant="ghost" size="sm" onClick={() => router.back()}>
-          <ArrowLeft className="w-4 h-4 mr-1" />
-          Back
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => router.push('/protocols')}
+          className="gap-1"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Protocols
         </Button>
         {protocol.status !== 'completed' && (
           <div className="flex gap-2">
