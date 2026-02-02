@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
 import { format, differenceInDays } from 'date-fns'
-import { Plus, Play, Pause, Infinity, Syringe, Pill } from 'lucide-react'
+import { Plus, Play, Pause, Infinity, Syringe, Pill, Heart, Zap, Scale, Sparkles } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -14,8 +14,16 @@ import { StackAssessmentCard } from '@/components/stack-assessment-card'
 import { cn } from '@/lib/utils'
 import type { Protocol, Peptide, ItemType } from '@/types'
 
+const CATEGORY_INFO: Record<string, { label: string; icon: typeof Pill; color: string }> = {
+  healing: { label: 'Healing', icon: Heart, color: 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300' },
+  'growth-hormone': { label: 'GH', icon: Zap, color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300' },
+  'weight-loss': { label: 'Weight Loss', icon: Scale, color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300' },
+  cosmetic: { label: 'Cosmetic', icon: Sparkles, color: 'bg-pink-100 text-pink-800 dark:bg-pink-900/50 dark:text-pink-300' },
+  other: { label: 'Other', icon: Pill, color: 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300' },
+}
+
 interface ProtocolWithPeptide extends Protocol {
-  peptide: Peptide & { type?: string }
+  peptide: Peptide & { type?: string; category?: string }
 }
 
 type TypeFilter = 'all' | ItemType
@@ -227,6 +235,8 @@ export default function ProtocolsPage() {
             {filteredProtocols.map((protocol, index) => {
               const stats = getProgressStats(protocol)
               const penUnits = getPenUnits(protocol)
+              const categoryInfo = CATEGORY_INFO[protocol.peptide.category || 'other'] || CATEGORY_INFO.other
+              const CategoryIcon = categoryInfo.icon
 
               return (
                 <Link key={protocol.id} href={`/protocols/${protocol.id}`}>
@@ -234,13 +244,17 @@ export default function ProtocolsPage() {
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between mb-2">
                         <div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-medium text-slate-900 dark:text-white">
                               {protocol.peptide.name}
                             </span>
+                            <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1', categoryInfo.color)}>
+                              <CategoryIcon className="w-3 h-3" />
+                              {categoryInfo.label}
+                            </span>
                             {penUnits && (
                               <span className="bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 text-xs font-semibold px-2 py-0.5 rounded-full">
-                                {penUnits} units
+                                {penUnits}u
                               </span>
                             )}
                           </div>
