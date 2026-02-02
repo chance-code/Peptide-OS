@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import prisma from '@/lib/prisma'
+import { startOfDay, endOfDay, subDays } from 'date-fns'
 
 // Lazy initialize to avoid build-time errors
 let openai: OpenAI | null = null
@@ -11,32 +12,77 @@ function getOpenAI() {
   return openai
 }
 
+interface ChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
 // POST /api/chat - Chat with AI about peptides
 export async function POST(request: NextRequest) {
   try {
-    const { message, userId } = await request.json()
+    const { message, messages, userId } = await request.json()
 
     if (!message) {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 })
     }
 
-    // Fetch user's protocols and schedule
+    // Fetch user's protocols, inventory, and dose history
     let userContext = ''
     if (userId) {
-      const protocols = await prisma.protocol.findMany({
-        where: { userId },
-        include: { peptide: true },
-      })
+      const today = new Date()
+      const thirtyDaysAgo = subDays(today, 30)
 
-      const user = await prisma.userProfile.findUnique({
-        where: { id: userId },
-      })
+      const [protocols, user, inventory, recentDoses] = await Promise.all([
+        prisma.protocol.findMany({
+          where: { userId },
+          include: { peptide: true },
+        }),
+        prisma.userProfile.findUnique({
+          where: { id: userId },
+        }),
+        prisma.inventoryVial.findMany({
+          where: { userId },
+          include: { peptide: true },
+        }),
+        prisma.doseLog.findMany({
+          where: {
+            userId,
+            scheduledDate: { gte: thirtyDaysAgo },
+          },
+          include: {
+            protocol: { include: { peptide: true } },
+          },
+          orderBy: { scheduledDate: 'desc' },
+        }),
+      ])
 
-      if (protocols.length > 0) {
-        userContext = `
+      // Calculate adherence stats
+      const totalDoses = recentDoses.length
+      const completedDoses = recentDoses.filter(d => d.status === 'completed').length
+      const skippedDoses = recentDoses.filter(d => d.status === 'skipped').length
+      const adherenceRate = totalDoses > 0 ? Math.round((completedDoses / totalDoses) * 100) : 0
+
+      // Today's doses
+      const todaysDoses = recentDoses.filter(d => {
+        const doseDate = new Date(d.scheduledDate)
+        return doseDate >= startOfDay(today) && doseDate <= endOfDay(today)
+      })
+      const todayCompleted = todaysDoses.filter(d => d.status === 'completed').length
+      const todayTotal = todaysDoses.length
+
+      // Build context
+      userContext = `
 Current User: ${user?.name || 'Unknown'}
 
-Active Protocols:
+=== TODAY'S PROGRESS ===
+${todayTotal > 0 ? `Completed ${todayCompleted}/${todayTotal} doses today` : 'No doses scheduled today'}
+${todaysDoses.map(d => `- ${d.protocol.peptide.name}: ${d.status}`).join('\n')}
+
+=== 30-DAY ADHERENCE ===
+Overall: ${adherenceRate}% (${completedDoses}/${totalDoses} doses completed)
+Skipped: ${skippedDoses} doses
+
+=== ACTIVE PROTOCOLS ===
 ${protocols
   .filter(p => p.status === 'active')
   .map(p => {
@@ -45,42 +91,61 @@ ${protocols
   Notes: ${p.notes || 'none'}
   Started: ${new Date(p.startDate).toLocaleDateString()}${p.endDate ? `, Ends: ${new Date(p.endDate).toLocaleDateString()}` : ' (ongoing)'}`
   })
-  .join('\n')}
+  .join('\n') || 'None'}
 
-Completed/Paused Protocols (Past Experience):
+=== INVENTORY ===
+${inventory.map(v => {
+  const isExpired = v.expirationDate && new Date(v.expirationDate) < today
+  const status = v.isExhausted ? '(empty)' : isExpired ? '(expired)' : ''
+  return `- ${v.peptide.name}: ${v.totalAmount}${v.totalUnit} ${status}`
+}).join('\n') || 'No inventory'}
+
+=== PAST PROTOCOLS ===
 ${protocols
   .filter(p => p.status !== 'active')
-  .map(p => {
-    const days = p.customDays ? JSON.parse(p.customDays).join(', ') : p.frequency
-    return `- ${p.peptide.name} (${p.status}): was ${p.doseAmount} ${p.doseUnit}, ${days}
-  Notes: ${p.notes || 'none'}`
-  })
+  .map(p => `- ${p.peptide.name} (${p.status})`)
   .join('\n') || 'None'}
 `
+    }
+
+    const systemPrompt = `You are a knowledgeable assistant specializing in peptides, supplements, and wellness optimization. You're integrated into a tracking app called "PepTrack".
+
+${userContext ? `Here is the user's current data:\n${userContext}` : 'The user has not set up any protocols yet.'}
+
+Guidelines:
+- Be helpful, direct, and conversational
+- Reference their actual data - today's doses, adherence rate, inventory
+- Use **bold** for emphasis and bullet points for lists
+- Keep responses concise but informative
+- No medical disclaimers - they understand this already
+- When suggesting peptides, consider what they're already taking
+- If adherence is low, gently encourage without being preachy
+- Be like a knowledgeable friend, not a formal assistant`
+
+    // Build conversation history for context
+    const conversationHistory: OpenAI.ChatCompletionMessageParam[] = [
+      { role: 'system', content: systemPrompt },
+    ]
+
+    // Add previous messages for context (limit to last 10 for token efficiency)
+    if (messages && Array.isArray(messages)) {
+      const recentMessages = messages.slice(-10)
+      for (const msg of recentMessages) {
+        if (msg.role === 'user' || msg.role === 'assistant') {
+          conversationHistory.push({
+            role: msg.role,
+            content: msg.content,
+          })
+        }
       }
     }
 
-    const systemPrompt = `You are a knowledgeable health assistant specializing in peptides, supplements, and wellness optimization. You're integrated into a peptide tracking app called "Peptide OS".
-
-${userContext ? `Here is the user's current peptide protocol information:\n${userContext}` : 'The user has not set up any protocols yet.'}
-
-Guidelines:
-- Be helpful, direct, and informative - share practical insights freely
-- When discussing peptides, include mechanisms, typical dosing, timing, benefits, and what to expect
-- Do NOT add disclaimers about consulting doctors or that you can't give medical advice - the user understands this already
-- ALWAYS reference the user's current and past protocols when making recommendations
-- When suggesting new peptides, consider what they're already taking to avoid redundancy, suggest synergies, and note any timing considerations
-- Factor in their completed protocols as past experience - they already know those peptides
-- Be conversational and knowledgeable, like a well-informed friend who knows peptides
-- Share specific, actionable information rather than vague suggestions
-- Keep responses focused and practical`
+    // Add the current message
+    conversationHistory.push({ role: 'user', content: message })
 
     const completion = await getOpenAI().chat.completions.create({
       model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: message },
-      ],
+      messages: conversationHistory,
       max_tokens: 1000,
       temperature: 0.7,
     })

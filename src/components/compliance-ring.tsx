@@ -98,9 +98,14 @@ export function ComplianceRing({
             </div>
           )
         ) : showPercentage ? (
-          <span className={cn('font-bold tabular-nums text-[var(--foreground)]', text)}>
-            {animatedProgress}%
-          </span>
+          <div className="flex items-baseline">
+            <span className={cn('font-bold tabular-nums text-[var(--foreground)]', text)}>
+              {animatedProgress}
+            </span>
+            <span className={cn('font-bold text-[var(--muted-foreground)]', size === 'lg' ? 'text-lg' : size === 'md' ? 'text-sm' : 'text-[6px]')}>
+              %
+            </span>
+          </div>
         ) : (
           <span className={cn('font-bold tabular-nums text-[var(--foreground)]', text)}>
             {completed}/{total}

@@ -34,6 +34,7 @@ interface DayData {
   isToday: boolean
   protocols: {
     protocol: ProtocolWithPeptide
+    timing: string | null
     status: 'pending' | 'completed' | 'skipped' | 'missed' | 'scheduled'
     penUnits?: number | null
   }[]
@@ -180,20 +181,38 @@ export default function CalendarPage() {
         if (protocol.status === 'completed') continue
         if (!isDoseDay(currentDay, protocol.frequency, protocolStart, protocol.customDays)) continue
 
-        const log = doseLogs.find(
-          (l) => l.protocolId === protocol.id && isSameDay(new Date(l.scheduledDate), currentDay)
-        )
-
-        let status: DayData['protocols'][0]['status'] = 'scheduled'
-        if (log) {
-          status = log.status as DayData['protocols'][0]['status']
-        } else if (currentDay < new Date() && !isToday(currentDay)) {
-          status = 'missed'
-        } else if (isToday(currentDay)) {
-          status = 'pending'
+        // Get timings - either from timings array or single timing
+        let timingsToProcess: (string | null)[] = [protocol.timing]
+        if (protocol.timings) {
+          try {
+            const parsedTimings = JSON.parse(protocol.timings) as string[]
+            if (parsedTimings.length > 0) {
+              timingsToProcess = parsedTimings
+            }
+          } catch {
+            // Fall back to single timing
+          }
         }
 
-        dayProtocols.push({ protocol, status, penUnits: calculatePenUnits(protocol) })
+        // Create one entry per timing
+        for (const timing of timingsToProcess) {
+          const log = doseLogs.find(
+            (l) => l.protocolId === protocol.id &&
+                   isSameDay(new Date(l.scheduledDate), currentDay) &&
+                   (l.timing || null) === timing
+          )
+
+          let status: DayData['protocols'][0]['status'] = 'scheduled'
+          if (log) {
+            status = log.status as DayData['protocols'][0]['status']
+          } else if (currentDay < new Date() && !isToday(currentDay)) {
+            status = 'missed'
+          } else if (isToday(currentDay)) {
+            status = 'pending'
+          }
+
+          dayProtocols.push({ protocol, timing, status, penUnits: calculatePenUnits(protocol) })
+        }
       }
 
       days.push({
@@ -249,14 +268,16 @@ export default function CalendarPage() {
     ? calendarDays.find((d) => isSameDay(d.date, selectedDay))
     : null
 
-  async function handleStatusChange(protocolId: string, date: Date, status: 'completed' | 'skipped' | 'pending') {
+  async function handleStatusChange(protocolId: string, date: Date, status: 'completed' | 'skipped' | 'pending', timing: string | null) {
     if (!currentUserId) return
 
     queryClient.setQueryData<DoseLog[]>(
       ['doseLogs', currentUserId, format(monthStart, 'yyyy-MM'), format(monthEnd, 'yyyy-MM')],
       (prev = []) => {
         const existingIndex = prev.findIndex(
-          l => l.protocolId === protocolId && isSameDay(new Date(l.scheduledDate), date)
+          l => l.protocolId === protocolId &&
+               isSameDay(new Date(l.scheduledDate), date) &&
+               (l.timing || null) === timing
         )
         if (existingIndex >= 0) {
           const updated = [...prev]
@@ -276,6 +297,7 @@ export default function CalendarPage() {
             actualDose: null,
             actualUnit: null,
             scheduleId: null,
+            timing,
           }
           return [...prev, newLog]
         }
@@ -287,7 +309,7 @@ export default function CalendarPage() {
       await fetch('/api/doses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: currentUserId, protocolId, scheduledDate: dateStr, status }),
+        body: JSON.stringify({ userId: currentUserId, protocolId, scheduledDate: dateStr, status, timing }),
       })
     } catch (error) {
       console.error('Error updating dose:', error)
@@ -327,11 +349,11 @@ export default function CalendarPage() {
           <div className="flex items-center justify-between">
             <div className="flex-1">
               <p className="text-sm text-[var(--muted-foreground)] mb-1">Monthly Compliance</p>
-              <div className="flex items-baseline gap-2 mb-3">
+              <div className="flex items-baseline mb-3">
                 <span className="text-5xl font-bold tabular-nums text-[var(--foreground)]">
                   {monthlyStats.percentage}
                 </span>
-                <span className="text-xl text-[var(--muted-foreground)]">%</span>
+                <span className="text-2xl font-bold text-[var(--muted-foreground)] ml-0.5">%</span>
               </div>
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-1.5">
@@ -482,9 +504,9 @@ export default function CalendarPage() {
                   ).length > 1 && (
                     <Button
                       onClick={() => {
-                        selectedDayData.protocols.forEach(({ protocol, status }) => {
+                        selectedDayData.protocols.forEach(({ protocol, timing, status }) => {
                           if (status === 'pending' || status === 'missed' || status === 'scheduled') {
-                            handleStatusChange(protocol.id, selectedDayData.date, 'completed')
+                            handleStatusChange(protocol.id, selectedDayData.date, 'completed', timing)
                           }
                         })
                       }}
@@ -497,9 +519,9 @@ export default function CalendarPage() {
                     </Button>
                   )}
 
-                  {selectedDayData.protocols.map(({ protocol, status, penUnits }) => (
+                  {selectedDayData.protocols.map(({ protocol, timing, status, penUnits }) => (
                     <div
-                      key={protocol.id}
+                      key={`${protocol.id}-${timing || 'default'}`}
                       className={cn(
                         'flex items-center justify-between p-4 rounded-2xl transition-colors',
                         status === 'completed'
@@ -520,7 +542,7 @@ export default function CalendarPage() {
                         </div>
                         <div className="text-sm text-[var(--muted-foreground)]">
                           {protocol.doseAmount} {protocol.doseUnit}
-                          {protocol.timing && ` · ${protocol.timing}`}
+                          {timing && ` · ${timing}`}
                         </div>
                       </div>
 
@@ -528,13 +550,13 @@ export default function CalendarPage() {
                         {status === 'pending' || status === 'missed' || status === 'scheduled' ? (
                           <>
                             <button
-                              onClick={() => handleStatusChange(protocol.id, selectedDayData.date, 'skipped')}
+                              onClick={() => handleStatusChange(protocol.id, selectedDayData.date, 'skipped', timing)}
                               className="p-2.5 rounded-full text-[var(--muted-foreground)] hover:bg-[var(--border)] transition-colors"
                             >
                               <X className="w-5 h-5" />
                             </button>
                             <button
-                              onClick={() => handleStatusChange(protocol.id, selectedDayData.date, 'completed')}
+                              onClick={() => handleStatusChange(protocol.id, selectedDayData.date, 'completed', timing)}
                               className="w-12 h-12 rounded-full border-2 border-[var(--border)] bg-[var(--card)] hover:border-[var(--success)] hover:bg-[var(--success-muted)] flex items-center justify-center transition-all"
                             >
                               <Check className="w-6 h-6 text-[var(--muted-foreground)]" />
@@ -542,7 +564,7 @@ export default function CalendarPage() {
                           </>
                         ) : status === 'completed' ? (
                           <button
-                            onClick={() => handleStatusChange(protocol.id, selectedDayData.date, 'pending')}
+                            onClick={() => handleStatusChange(protocol.id, selectedDayData.date, 'pending', timing)}
                             className="w-12 h-12 rounded-full bg-[var(--success)] flex items-center justify-center transition-all hover:opacity-80"
                             style={{ boxShadow: 'var(--glow-success)' }}
                           >
@@ -550,7 +572,7 @@ export default function CalendarPage() {
                           </button>
                         ) : (
                           <button
-                            onClick={() => handleStatusChange(protocol.id, selectedDayData.date, 'pending')}
+                            onClick={() => handleStatusChange(protocol.id, selectedDayData.date, 'pending', timing)}
                             className="px-4 py-2 rounded-xl bg-[var(--muted)] hover:bg-[var(--border)] text-[var(--muted-foreground)] text-sm transition-colors"
                           >
                             Skipped

@@ -23,6 +23,7 @@ import { Modal } from '@/components/ui/modal'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { SyringeVisual } from '@/components/syringe-visual'
+import { AIInsightsCard } from '@/components/ai-insights-card'
 import type { Protocol, Peptide, DoseLog, ProtocolHistory, DayOfWeek } from '@/types'
 
 interface ProtocolDetail extends Protocol {
@@ -39,6 +40,7 @@ const DOSE_UNITS = [
 
 const FREQUENCIES = [
   { value: 'daily', label: 'Daily' },
+  { value: 'every_other_day', label: 'Every Other Day' },
   { value: 'weekly', label: 'Weekly' },
   { value: 'custom', label: 'Custom Days' },
 ]
@@ -589,6 +591,13 @@ export default function ProtocolDetailPage({
           {protocol.doseAmount} {protocol.doseUnit} • {formatDays()}
         </p>
       </div>
+
+      {/* AI Insights */}
+      <AIInsightsCard
+        protocolId={protocol.id}
+        peptideName={protocol.peptide.name}
+        className="mb-6"
+      />
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 gap-3 mb-6">

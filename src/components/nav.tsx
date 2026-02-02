@@ -35,7 +35,7 @@ export function BottomNav() {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 nav-premium safe-area-inset-bottom z-50">
-      <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-2">
+      <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-2 pb-2">
         {navItems.map((item) => {
           const isActive = pathname.startsWith(item.href)
           const Icon = item.icon
@@ -82,10 +82,10 @@ export function TopHeader({ title }: { title?: string }) {
   const initials = currentUser?.name ? getInitials(currentUser.name) : '?'
 
   return (
-    <header className="sticky top-0 z-40 glass border-b border-[var(--border)]">
-      <div className="flex items-center justify-between h-14 px-4 max-w-lg mx-auto">
+    <header className="sticky top-0 z-40 glass border-b border-[var(--border)] pt-[env(safe-area-inset-top)]">
+      <div className="flex items-center justify-between h-12 px-4 max-w-lg mx-auto">
         <h1 className="text-lg font-semibold tracking-tight text-[var(--foreground)]">
-          {title || 'Peptide OS'}
+          {title || 'PepTrack'}
         </h1>
         <Link
           href="/settings"
