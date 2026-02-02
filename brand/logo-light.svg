@@ -1,8 +1,8 @@
 <svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
-  <!-- The Core - Aged Bronze (Light Mode) -->
-  <rect width="1024" height="1024" fill="#FAFAF9"/>
+  <!-- The Core - Soft Graphite (Light Mode) -->
+  <rect width="1024" height="1024" fill="#F8FAFC"/>
 
-  <circle cx="512" cy="512" r="307" stroke="#44403C" stroke-width="21" fill="none"/>
-  <circle cx="512" cy="512" r="190" stroke="#44403C" stroke-width="21" fill="none"/>
-  <circle cx="512" cy="512" r="77" fill="#44403C"/>
+  <circle cx="512" cy="512" r="307" stroke="#6B7280" stroke-width="21" fill="none"/>
+  <circle cx="512" cy="512" r="190" stroke="#6B7280" stroke-width="21" fill="none"/>
+  <circle cx="512" cy="512" r="77" fill="#6B7280"/>
 </svg>

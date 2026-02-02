@@ -4,8 +4,8 @@
   "description": "Precision tracking for peptides and supplements",
   "start_url": "/today",
   "display": "standalone",
-  "background_color": "#0C0A09",
-  "theme_color": "#292524",
+  "background_color": "#0B1220",
+  "theme_color": "#111827",
   "icons": [
     {
       "src": "/icon-192.png",

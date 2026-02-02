@@ -9,87 +9,87 @@
    ======================================== */
 
 :root {
-  /* Background layers - Warm stone */
-  --background: #FAFAF9;
-  --background-secondary: #F5F5F4;
-  --foreground: #1C1917;
+  /* Background layers - Soft Graphite */
+  --background: #F8FAFC;
+  --background-secondary: #F1F5F9;
+  --foreground: #1F2A37;
 
   /* Card system */
   --card: #FFFFFF;
-  --card-foreground: #1C1917;
-  --card-hover: #FAFAF9;
+  --card-foreground: #1F2A37;
+  --card-hover: #F8FAFC;
 
   /* Muted/subtle */
-  --muted: #F5F5F4;
-  --muted-foreground: #78716C;
+  --muted: #F1F5F9;
+  --muted-foreground: #6B7280;
 
   /* Borders & rings */
-  --border: #E7E5E4;
-  --border-subtle: #F5F5F4;
-  --ring: #57534E;
+  --border: #E5E7EB;
+  --border-subtle: #F1F5F9;
+  --ring: #4B5563;
 
-  /* Semantic colors - Warmer tones */
+  /* Semantic colors - Muted, not loud */
   --success: #059669;
-  --success-muted: #D1FAE5;
+  --success-muted: #ECFDF5;
   --warning: #D97706;
-  --warning-muted: #FEF3C7;
+  --warning-muted: #FFFBEB;
   --error: #DC2626;
-  --error-muted: #FEE2E2;
-  --info: #78716C;
-  --info-muted: #F5F5F4;
+  --error-muted: #FEF2F2;
+  --info: #6B7280;
+  --info-muted: #F3F4F6;
 
-  /* Accent - Aged Bronze */
-  --accent: #57534E;
+  /* Accent - Soft Graphite */
+  --accent: #4B5563;
   --accent-foreground: #FFFFFF;
-  --accent-muted: #E7E5E4;
+  --accent-muted: #E5E7EB;
 
-  /* Premium effects */
-  --glow-success: 0 0 20px rgba(5, 150, 105, 0.3);
-  --glow-accent: 0 0 20px rgba(87, 83, 78, 0.3);
-  --shadow-card: 0 1px 3px rgba(28, 25, 23, 0.05), 0 1px 2px rgba(28, 25, 23, 0.03);
-  --shadow-card-hover: 0 4px 12px rgba(28, 25, 23, 0.08), 0 2px 4px rgba(28, 25, 23, 0.04);
+  /* Premium effects - subtle */
+  --glow-success: 0 0 20px rgba(5, 150, 105, 0.2);
+  --glow-accent: 0 0 20px rgba(75, 85, 99, 0.2);
+  --shadow-card: 0 1px 3px rgba(31, 42, 55, 0.04), 0 1px 2px rgba(31, 42, 55, 0.02);
+  --shadow-card-hover: 0 4px 12px rgba(31, 42, 55, 0.06), 0 2px 4px rgba(31, 42, 55, 0.03);
 }
 
 .dark {
-  /* Warm dark - Aged Bronze palette */
-  --background: #0C0A09;
-  --background-secondary: #1C1917;
-  --foreground: #FAFAF9;
+  /* Soft Graphite - Dark mode */
+  --background: #0B1220;
+  --background-secondary: #111827;
+  --foreground: #F8FAFC;
 
-  /* Dark card system with warm undertones */
-  --card: #1C1917;
-  --card-foreground: #FAFAF9;
-  --card-hover: #292524;
+  /* Dark card system */
+  --card: #111827;
+  --card-foreground: #F8FAFC;
+  --card-hover: #1F2937;
 
   /* Muted dark */
-  --muted: #292524;
-  --muted-foreground: #A8A29E;
+  --muted: #1F2937;
+  --muted-foreground: #9CA3AF;
 
-  /* Borders - warm in dark mode */
-  --border: #44403C;
-  --border-subtle: #292524;
-  --ring: #A8A29E;
+  /* Borders - subtle graphite */
+  --border: #374151;
+  --border-subtle: #1F2937;
+  --ring: #9CA3AF;
 
-  /* Semantic colors - warm tones for dark mode */
+  /* Semantic colors - muted for dark mode */
   --success: #34D399;
-  --success-muted: rgba(52, 211, 153, 0.15);
+  --success-muted: rgba(52, 211, 153, 0.12);
   --warning: #FBBF24;
-  --warning-muted: rgba(251, 191, 36, 0.15);
+  --warning-muted: rgba(251, 191, 36, 0.12);
   --error: #F87171;
-  --error-muted: rgba(248, 113, 113, 0.15);
-  --info: #A8A29E;
-  --info-muted: rgba(168, 162, 158, 0.15);
+  --error-muted: rgba(248, 113, 113, 0.12);
+  --info: #9CA3AF;
+  --info-muted: rgba(156, 163, 175, 0.12);
 
-  /* Accent - Warm stone */
-  --accent: #D6D3D1;
-  --accent-foreground: #1C1917;
-  --accent-muted: rgba(214, 211, 209, 0.15);
+  /* Accent - Light graphite for contrast */
+  --accent: #D1D5DB;
+  --accent-foreground: #1F2A37;
+  --accent-muted: rgba(209, 213, 219, 0.12);
 
-  /* Premium effects - warm glows */
-  --glow-success: 0 0 30px rgba(52, 211, 153, 0.4);
-  --glow-accent: 0 0 30px rgba(214, 211, 209, 0.2);
-  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.03);
-  --shadow-card-hover: 0 8px 25px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  /* Premium effects - subtle */
+  --glow-success: 0 0 24px rgba(52, 211, 153, 0.25);
+  --glow-accent: 0 0 24px rgba(209, 213, 219, 0.15);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.02);
+  --shadow-card-hover: 0 8px 25px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.04);
 }
 
 @theme inline {
