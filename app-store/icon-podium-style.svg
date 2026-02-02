@@ -1,0 +1,31 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Clean black background with rounded corners -->
+  <rect width="1024" height="1024" rx="220" fill="#0A0A0A"/>
+
+  <!-- Off-white/cream "P" in friendly serif style (Bonobos-inspired) -->
+  <!-- The P has soft curves, blunt serifs, and a sophisticated yet approachable feel -->
+  <path d="
+    M 300 200
+    L 300 824
+    Q 300 840 316 840
+    L 396 840
+    Q 412 840 412 824
+    L 412 620
+    L 540 620
+    C 720 620 780 520 780 420
+    C 780 280 680 200 540 200
+    Z
+    M 412 320
+    L 520 320
+    Q 620 320 620 420
+    Q 620 500 520 500
+    L 412 500
+    Z
+  " fill="#FAF9F6" fill-rule="evenodd"/>
+
+  <!-- Subtle serif details on the P -->
+  <!-- Bottom left serif -->
+  <rect x="270" y="820" width="80" height="20" rx="4" fill="#FAF9F6"/>
+  <!-- Top left serif -->
+  <rect x="270" y="200" width="60" height="16" rx="4" fill="#FAF9F6"/>
+</svg>

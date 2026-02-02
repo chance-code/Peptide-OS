@@ -1,0 +1,29 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Rich black background -->
+  <rect width="1024" height="1024" rx="220" fill="#0D0D0D"/>
+
+  <!-- Elegant slab serif P - clean, confident, sophisticated -->
+  <!-- Off-white color like Podium's cream tones -->
+
+  <!-- P stem -->
+  <rect x="260" y="180" width="140" height="664" rx="8" fill="#F5F4F0"/>
+
+  <!-- P bowl -->
+  <path d="
+    M 400 180
+    L 540 180
+    C 760 180 760 540 540 540
+    L 400 540
+    L 400 400
+    L 520 400
+    C 600 400 600 320 520 320
+    L 400 320
+    Z
+  " fill="#F5F4F0" fill-rule="evenodd"/>
+
+  <!-- Top slab serif -->
+  <rect x="220" y="180" width="100" height="32" rx="4" fill="#F5F4F0"/>
+
+  <!-- Bottom slab serif -->
+  <rect x="220" y="812" width="220" height="32" rx="4" fill="#F5F4F0"/>
+</svg>

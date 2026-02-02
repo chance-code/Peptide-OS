@@ -1,0 +1,44 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Clean black background -->
+  <rect width="1024" height="1024" rx="220" fill="#0A0A0A"/>
+
+  <!-- Friendly serif P with rounded terminals and warm personality -->
+  <!-- Inspired by Bonobos' approachable serif aesthetic -->
+  <defs>
+    <clipPath id="pClip">
+      <rect x="240" y="160" width="560" height="704" rx="20"/>
+    </clipPath>
+  </defs>
+
+  <!-- Main P body - thick stem with soft curves -->
+  <path d="
+    M 280 180
+    Q 260 180 260 200
+    L 260 820
+    Q 260 850 290 850
+    L 390 850
+    Q 420 850 420 820
+    L 420 600
+    L 530 600
+    C 740 600 800 480 800 380
+    C 800 240 700 180 530 180
+    L 280 180
+    Z
+  " fill="#FAF9F6"/>
+
+  <!-- P bowl (inner cutout) with soft rounded corners -->
+  <path d="
+    M 420 300
+    L 500 300
+    Q 620 300 620 390
+    Q 620 480 500 480
+    L 420 480
+    Z
+  " fill="#0A0A0A"/>
+
+  <!-- Blunt bottom serif -->
+  <rect x="240" y="830" width="100" height="24" rx="8" fill="#FAF9F6"/>
+
+  <!-- Blunt top serif -->
+  <rect x="240" y="180" width="60" height="20" rx="6" fill="#FAF9F6"/>
+</svg>
