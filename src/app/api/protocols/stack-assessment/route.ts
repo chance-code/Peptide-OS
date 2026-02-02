@@ -1,14 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import OpenAI from 'openai'
 import prisma from '@/lib/prisma'
-
-let openai: OpenAI | null = null
-function getOpenAI() {
-  if (!openai) {
-    openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  }
-  return openai
-}
+import { getOpenAI, handleOpenAIError } from '@/lib/openai'
 
 interface StackAssessmentResponse {
   summary: string
@@ -110,6 +102,7 @@ Respond with valid JSON only (no markdown):
     })
   } catch (error) {
     console.error('Stack assessment error:', error)
-    return NextResponse.json({ error: 'Failed to generate assessment' }, { status: 500 })
+    const { message, status } = handleOpenAIError(error)
+    return NextResponse.json({ error: message }, { status })
   }
 }

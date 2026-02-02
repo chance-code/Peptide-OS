@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { verifyUserAccess } from '@/lib/api-auth'
+import { createProtocolSchema, validate } from '@/lib/validations'
 
 // GET /api/protocols - List protocols for a user
 export async function GET(request: NextRequest) {
@@ -40,53 +41,38 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const {
-      userId: requestedUserId,
-      peptideId,
-      startDate,
-      endDate,
-      frequency,
-      customDays,
-      doseAmount,
-      doseUnit,
-      timing,
-      timings,
-      notes,
-      vialAmount,
-      vialUnit,
-      diluentVolume,
-      servingSize,
-      servingUnit,
-    } = body
+
+    // Validate input
+    const validation = validate(createProtocolSchema, body)
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 })
+    }
+    const data = validation.data
 
     // Verify user has access to requested userId
-    const auth = await verifyUserAccess(requestedUserId)
+    const auth = await verifyUserAccess(data.userId)
     if (!auth.success) return auth.response
     const { userId } = auth
-
-    if (!peptideId || !startDate || !frequency || !doseAmount || !doseUnit) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
-    }
 
     const protocol = await prisma.protocol.create({
       data: {
         userId,
-        peptideId,
-        startDate: new Date(startDate),
-        endDate: endDate ? new Date(endDate) : null,
-        frequency,
-        customDays: customDays ? JSON.stringify(customDays) : null,
-        doseAmount,
-        doseUnit,
-        timing,
-        timings: timings || null,
-        notes,
+        peptideId: data.peptideId,
+        startDate: new Date(data.startDate),
+        endDate: data.endDate ? new Date(data.endDate) : null,
+        frequency: data.frequency,
+        customDays: data.customDays ? JSON.stringify(data.customDays) : null,
+        doseAmount: data.doseAmount,
+        doseUnit: data.doseUnit,
+        timing: data.timing || null,
+        timings: data.timings || null,
+        notes: data.notes || null,
         status: 'active',
-        vialAmount: vialAmount || null,
-        vialUnit: vialUnit || null,
-        diluentVolume: diluentVolume || null,
-        servingSize: servingSize || null,
-        servingUnit: servingUnit || null,
+        vialAmount: data.vialAmount || null,
+        vialUnit: data.vialUnit || null,
+        diluentVolume: data.diluentVolume || null,
+        servingSize: data.servingSize || null,
+        servingUnit: data.servingUnit || null,
       },
       include: {
         peptide: true,
@@ -99,13 +85,13 @@ export async function POST(request: NextRequest) {
         protocolId: protocol.id,
         changeType: 'created',
         changeData: JSON.stringify({
-          peptideId,
-          startDate,
-          endDate,
-          frequency,
-          doseAmount,
-          doseUnit,
-          timing,
+          peptideId: data.peptideId,
+          startDate: data.startDate,
+          endDate: data.endDate,
+          frequency: data.frequency,
+          doseAmount: data.doseAmount,
+          doseUnit: data.doseUnit,
+          timing: data.timing,
         }),
       },
     })

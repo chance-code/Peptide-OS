@@ -2,15 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import prisma from '@/lib/prisma'
 import { startOfDay, endOfDay, subDays } from 'date-fns'
-
-// Lazy initialize to avoid build-time errors
-let openai: OpenAI | null = null
-function getOpenAI() {
-  if (!openai) {
-    openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  }
-  return openai
-}
+import { getOpenAI, handleOpenAIError } from '@/lib/openai'
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -155,9 +147,7 @@ Guidelines:
     return NextResponse.json({ reply })
   } catch (error) {
     console.error('Chat error:', error)
-    return NextResponse.json(
-      { error: 'Failed to process chat message' },
-      { status: 500 }
-    )
+    const { message, status } = handleOpenAIError(error)
+    return NextResponse.json({ error: message }, { status })
   }
 }

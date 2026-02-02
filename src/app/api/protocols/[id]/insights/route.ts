@@ -1,15 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import OpenAI from 'openai'
 import prisma from '@/lib/prisma'
-
-// Lazy initialize to avoid build-time errors
-let openai: OpenAI | null = null
-function getOpenAI() {
-  if (!openai) {
-    openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  }
-  return openai
-}
+import { getOpenAI, handleOpenAIError } from '@/lib/openai'
 
 interface InsightsResponse {
   benefit: string
@@ -145,9 +136,7 @@ export async function GET(
     })
   } catch (error) {
     console.error('Insights error:', error)
-    return NextResponse.json(
-      { error: 'Failed to generate insights' },
-      { status: 500 }
-    )
+    const { message, status } = handleOpenAIError(error)
+    return NextResponse.json({ error: message }, { status })
   }
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { startOfDay, endOfDay } from 'date-fns'
 import { verifyUserAccess } from '@/lib/api-auth'
+import { createDoseSchema, validate } from '@/lib/validations'
 
 // GET /api/doses - List dose logs for a user
 export async function GET(request: NextRequest) {
@@ -61,36 +62,28 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const {
-      userId: requestedUserId,
-      protocolId,
-      scheduleId,
-      scheduledDate,
-      status,
-      actualDose,
-      actualUnit,
-      notes,
-      timing, // For multi-timing protocols
-    } = body
+
+    // Validate input
+    const validation = validate(createDoseSchema, body)
+    if (!validation.success) {
+      return NextResponse.json({ error: validation.error }, { status: 400 })
+    }
+    const data = validation.data
 
     // Verify user has access to requested userId
-    const auth = await verifyUserAccess(requestedUserId)
+    const auth = await verifyUserAccess(data.userId)
     if (!auth.success) return auth.response
     const { userId } = auth
-
-    if (!protocolId || !scheduledDate || !status) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
-    }
 
     // Check if a dose log already exists for this protocol, date, and timing
     const existingLog = await prisma.doseLog.findFirst({
       where: {
         userId,
-        protocolId,
-        timing: timing || null,
+        protocolId: data.protocolId,
+        timing: data.timing || null,
         scheduledDate: {
-          gte: startOfDay(new Date(scheduledDate)),
-          lte: endOfDay(new Date(scheduledDate)),
+          gte: startOfDay(new Date(data.scheduledDate)),
+          lte: endOfDay(new Date(data.scheduledDate)),
         },
       },
     })
@@ -102,11 +95,11 @@ export async function POST(request: NextRequest) {
       doseLog = await prisma.doseLog.update({
         where: { id: existingLog.id },
         data: {
-          status,
-          completedAt: status === 'completed' ? new Date() : null,
-          actualDose,
-          actualUnit,
-          notes,
+          status: data.status,
+          completedAt: data.status === 'completed' ? new Date() : null,
+          actualDose: data.actualDose,
+          actualUnit: data.actualUnit,
+          notes: data.notes,
         },
         include: {
           protocol: {
@@ -119,15 +112,15 @@ export async function POST(request: NextRequest) {
       doseLog = await prisma.doseLog.create({
         data: {
           userId,
-          protocolId,
-          scheduleId,
-          scheduledDate: new Date(scheduledDate),
-          timing: timing || null,
-          status,
-          completedAt: status === 'completed' ? new Date() : null,
-          actualDose,
-          actualUnit,
-          notes,
+          protocolId: data.protocolId,
+          scheduleId: data.scheduleId,
+          scheduledDate: new Date(data.scheduledDate),
+          timing: data.timing || null,
+          status: data.status,
+          completedAt: data.status === 'completed' ? new Date() : null,
+          actualDose: data.actualDose,
+          actualUnit: data.actualUnit,
+          notes: data.notes,
         },
         include: {
           protocol: {
