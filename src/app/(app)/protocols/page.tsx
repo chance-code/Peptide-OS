@@ -35,7 +35,7 @@ export default function ProtocolsPage() {
       return res.json()
     },
     enabled: !!currentUserId,
-    staleTime: 1000 * 30, // 30 seconds
+    staleTime: 1000 * 60 * 5, // 5 minutes - pull to refresh for updates
   })
 
   const handleRefresh = useCallback(async () => {
@@ -205,10 +205,16 @@ export default function ProtocolsPage() {
         </div>
 
         {/* Stack Assessment */}
-        {currentUserId && (
+        {currentUserId && protocols.length > 0 && (
           <StackAssessmentCard
             userId={currentUserId}
-            activeProtocolCount={protocols.filter(p => p.status === 'active').length}
+            protocols={protocols.map(p => ({
+              id: p.id,
+              peptideName: p.peptide.name,
+              doseAmount: p.doseAmount,
+              doseUnit: p.doseUnit,
+              status: p.status,
+            }))}
             className="mb-4"
           />
         )}

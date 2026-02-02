@@ -1,12 +1,25 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState, useEffect, useMemo } from 'react'
 import { Sparkles, Zap, AlertTriangle, RefreshCw, TrendingUp, Shield, Target, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-function getStorageKey(userId: string) {
+function getCollapsedKey(userId: string) {
   return `stack-assessment-collapsed-${userId}`
+}
+
+function getCacheKey(userId: string) {
+  return `stack-assessment-cache-${userId}`
+}
+
+// Create a hash of protocols to detect changes
+function hashProtocols(protocols: Array<{ id: string; peptideName: string; doseAmount: number; doseUnit: string; status: string }>): string {
+  const activeProtocols = protocols
+    .filter(p => p.status === 'active')
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .map(p => `${p.peptideName}:${p.doseAmount}${p.doseUnit}`)
+    .join('|')
+  return btoa(activeProtocols).slice(0, 20)
 }
 
 interface StackAssessment {
@@ -16,9 +29,23 @@ interface StackAssessment {
   overallScore: 'excellent' | 'good' | 'moderate' | 'needs_attention'
 }
 
+interface ProtocolSummary {
+  id: string
+  peptideName: string
+  doseAmount: number
+  doseUnit: string
+  status: string
+}
+
+interface CachedAssessment {
+  hash: string
+  data: StackAssessment
+  timestamp: number
+}
+
 interface StackAssessmentCardProps {
   userId: string
-  activeProtocolCount: number
+  protocols: ProtocolSummary[]
   className?: string
 }
 
@@ -53,45 +80,95 @@ const scoreConfig = {
   },
 }
 
-export function StackAssessmentCard({ userId, activeProtocolCount, className }: StackAssessmentCardProps) {
-  const queryClient = useQueryClient()
+export function StackAssessmentCard({ userId, protocols, className }: StackAssessmentCardProps) {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(false)
+  const [data, setData] = useState<StackAssessment | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<Error | null>(null)
 
-  // Load collapsed state from localStorage
+  const activeProtocols = useMemo(() => protocols.filter(p => p.status === 'active'), [protocols])
+  const currentHash = useMemo(() => hashProtocols(protocols), [protocols])
+
+  // Load collapsed state and cached data from localStorage
   useEffect(() => {
-    const stored = localStorage.getItem(getStorageKey(userId))
-    if (stored === 'true') setIsCollapsed(true)
-  }, [userId])
+    const collapsed = localStorage.getItem(getCollapsedKey(userId))
+    if (collapsed === 'true') setIsCollapsed(true)
+
+    // Check for cached assessment
+    const cachedStr = localStorage.getItem(getCacheKey(userId))
+    if (cachedStr) {
+      try {
+        const cached: CachedAssessment = JSON.parse(cachedStr)
+        // Use cache if hash matches (protocols haven't changed)
+        if (cached.hash === currentHash) {
+          setData(cached.data)
+          return
+        }
+      } catch {}
+    }
+
+    // No valid cache, fetch fresh data
+    if (activeProtocols.length > 0) {
+      fetchAssessment()
+    }
+  }, [userId, currentHash, activeProtocols.length])
 
   function toggleCollapsed() {
     const newState = !isCollapsed
     setIsCollapsed(newState)
-    localStorage.setItem(getStorageKey(userId), String(newState))
+    localStorage.setItem(getCollapsedKey(userId), String(newState))
   }
 
-  const { data, isLoading, error, refetch } = useQuery<StackAssessment>({
-    queryKey: ['stack-assessment', userId],
-    queryFn: async () => {
+  async function fetchAssessment(force = false) {
+    if (activeProtocols.length === 0) return
+
+    // Check cache again unless forcing refresh
+    if (!force) {
+      const cachedStr = localStorage.getItem(getCacheKey(userId))
+      if (cachedStr) {
+        try {
+          const cached: CachedAssessment = JSON.parse(cachedStr)
+          if (cached.hash === currentHash) {
+            setData(cached.data)
+            return
+          }
+        } catch {}
+      }
+    }
+
+    setIsLoading(true)
+    setError(null)
+
+    try {
       const res = await fetch(`/api/protocols/stack-assessment?userId=${userId}`)
       if (!res.ok) throw new Error('Failed to fetch')
-      return res.json()
-    },
-    enabled: !!userId && activeProtocolCount > 0,
-    staleTime: 1000 * 60 * 60 * 24,
-    gcTime: 1000 * 60 * 60 * 24 * 7,
-    retry: 1,
-  })
+      const result: StackAssessment = await res.json()
+
+      // Cache the result with the current hash
+      const cacheData: CachedAssessment = {
+        hash: currentHash,
+        data: result,
+        timestamp: Date.now(),
+      }
+      localStorage.setItem(getCacheKey(userId), JSON.stringify(cacheData))
+
+      setData(result)
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error('Unknown error'))
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   async function handleRefresh() {
     setIsRefreshing(true)
-    await queryClient.invalidateQueries({ queryKey: ['stack-assessment', userId] })
-    await refetch()
+    await fetchAssessment(true)
     setIsRefreshing(false)
   }
 
   // Don't show if no active protocols
-  if (activeProtocolCount === 0) return null
+  if (activeProtocols.length === 0) return null
 
   // Loading state
   if (isLoading) {
@@ -141,7 +218,7 @@ export function StackAssessmentCard({ userId, activeProtocolCount, className }: 
           </button>
         </div>
         <p className="text-sm text-[var(--muted-foreground)] mt-3">
-          Tap refresh to analyze your {activeProtocolCount} active protocol{activeProtocolCount > 1 ? 's' : ''}
+          Tap refresh to analyze your {activeProtocols.length} active protocol{activeProtocols.length > 1 ? 's' : ''}
         </p>
       </div>
     )
@@ -180,10 +257,10 @@ export function StackAssessmentCard({ userId, activeProtocolCount, className }: 
 
       {/* Collapsible content */}
       <div className={cn(
-        'transition-all duration-200 ease-in-out overflow-hidden',
-        isCollapsed ? 'max-h-0 opacity-0' : 'max-h-[500px] opacity-100'
+        'transition-all duration-200 ease-in-out',
+        isCollapsed ? 'max-h-0 overflow-hidden opacity-0' : 'max-h-[800px] opacity-100'
       )}>
-        <div className="px-5 pb-5">
+        <div className="px-5 pb-6">
           {/* Refresh button */}
           <div className="flex justify-end mb-3">
             <button

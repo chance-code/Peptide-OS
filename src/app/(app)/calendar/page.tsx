@@ -153,7 +153,7 @@ export default function CalendarPage() {
       return res.json()
     },
     enabled: !!currentUserId,
-    staleTime: 1000 * 30,
+    staleTime: 1000 * 60 * 5, // 5 minutes
   })
 
   const handleRefresh = useCallback(async () => {
