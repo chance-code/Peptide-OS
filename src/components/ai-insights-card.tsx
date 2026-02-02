@@ -106,7 +106,33 @@ export function AIInsightsCard({ protocolId, peptideName, className }: AIInsight
     )
   }
 
-  if (!data) return null
+  if (!data) {
+    return (
+      <div className={cn(
+        'rounded-2xl p-5 border',
+        'bg-gradient-to-br from-violet-500/10 via-purple-500/5 to-blue-500/10',
+        'border-violet-500/20',
+        className
+      )}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-violet-400" />
+            <span className="text-sm font-medium text-violet-400">AI Insights</span>
+          </div>
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="p-2 rounded-lg hover:bg-[var(--muted)] transition-colors"
+          >
+            <RefreshCw className={cn('w-4 h-4 text-[var(--muted-foreground)]', isRefreshing && 'animate-spin')} />
+          </button>
+        </div>
+        <p className="text-sm text-[var(--muted-foreground)] mt-3">
+          Tap refresh to generate AI insights for {peptideName}
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className={cn(
