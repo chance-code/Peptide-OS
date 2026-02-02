@@ -235,47 +235,43 @@ export function StackAssessmentCard({ userId, protocols, className }: StackAsses
       className
     )}>
       {/* Header - Always visible, clickable to toggle */}
-      <button
-        onClick={toggleCollapsed}
-        className="w-full p-5 flex items-center justify-between text-left"
-      >
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between px-4 py-3">
+        <button
+          onClick={toggleCollapsed}
+          className="flex items-center gap-2"
+        >
           <Sparkles className="w-5 h-5 text-emerald-400" />
           <span className="font-semibold text-emerald-400">Stack Assessment</span>
-        </div>
+          <ChevronDown className={cn(
+            'w-4 h-4 text-[var(--muted-foreground)] transition-transform duration-200',
+            isCollapsed ? '' : 'rotate-180'
+          )} />
+        </button>
         <div className="flex items-center gap-2">
           <div className={cn('flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium', score.bg, score.color)}>
             <ScoreIcon className="w-3.5 h-3.5" />
             {score.label}
           </div>
-          <ChevronDown className={cn(
-            'w-5 h-5 text-[var(--muted-foreground)] transition-transform duration-200',
-            isCollapsed ? '' : 'rotate-180'
-          )} />
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              handleRefresh()
+            }}
+            disabled={isRefreshing}
+            className="p-1.5 rounded-lg hover:bg-[var(--muted)] transition-colors"
+            title="Refresh assessment"
+          >
+            <RefreshCw className={cn('w-4 h-4 text-[var(--muted-foreground)]', isRefreshing && 'animate-spin')} />
+          </button>
         </div>
-      </button>
+      </div>
 
       {/* Collapsible content */}
       <div className={cn(
         'transition-all duration-200 ease-in-out',
         isCollapsed ? 'max-h-0 overflow-hidden opacity-0' : 'max-h-[800px] opacity-100'
       )}>
-        <div className="px-5 pb-6">
-          {/* Refresh button */}
-          <div className="flex justify-end mb-3">
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                handleRefresh()
-              }}
-              disabled={isRefreshing}
-              className="p-2 -m-2 rounded-lg hover:bg-[var(--muted)] transition-colors"
-              title="Refresh assessment"
-            >
-              <RefreshCw className={cn('w-4 h-4 text-[var(--muted-foreground)]', isRefreshing && 'animate-spin')} />
-            </button>
-          </div>
-
+        <div className="px-4 pb-4">
           {/* Summary */}
           <p className="text-sm text-[var(--foreground)] leading-relaxed mb-4">
             {data.summary}
