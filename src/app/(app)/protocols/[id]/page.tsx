@@ -728,12 +728,24 @@ export default function ProtocolDetailPage({
               </div>
             </div>
           </div>
-          {protocol.timing && (
+          {(protocol.timing || protocol.timings) && (
             <div className="flex items-center gap-3">
               <Clock className="w-4 h-4 text-slate-400" />
               <div>
                 <div className="text-sm text-slate-500">Timing</div>
-                <div className="font-medium">{protocol.timing}</div>
+                <div className="font-medium">
+                  {(() => {
+                    if (protocol.timings) {
+                      try {
+                        const timings = JSON.parse(protocol.timings) as string[]
+                        return timings.join(' & ')
+                      } catch {
+                        return protocol.timing
+                      }
+                    }
+                    return protocol.timing
+                  })()}
+                </div>
               </div>
             </div>
           )}

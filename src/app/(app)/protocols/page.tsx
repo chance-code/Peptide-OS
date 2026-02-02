@@ -16,8 +16,12 @@ import type { Protocol, Peptide, ItemType } from '@/types'
 import { PEPTIDE_REFERENCE } from '@/lib/peptide-reference'
 
 // Look up category from reference database by peptide name
-function getCategoryForPeptide(peptideName: string, dbCategory?: string | null): string {
+function getCategoryForPeptide(peptideName: string, peptideType?: string | null, dbCategory?: string | null): string {
+  // If it's a supplement, show as supplement
+  if (peptideType === 'supplement') return 'supplement'
+  // Use database category if set
   if (dbCategory) return dbCategory
+  // Look up in reference database
   const ref = PEPTIDE_REFERENCE.find(p =>
     p.name.toLowerCase() === peptideName.toLowerCase() ||
     p.aliases?.some(a => a.toLowerCase() === peptideName.toLowerCase())
@@ -30,7 +34,8 @@ const CATEGORY_INFO: Record<string, { label: string; icon: typeof Pill; color: s
   'growth-hormone': { label: 'GH', icon: Zap, color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300' },
   'weight-loss': { label: 'Weight Loss', icon: Scale, color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300' },
   cosmetic: { label: 'Cosmetic', icon: Sparkles, color: 'bg-pink-100 text-pink-800 dark:bg-pink-900/50 dark:text-pink-300' },
-  other: { label: 'Other', icon: Pill, color: 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300' },
+  supplement: { label: 'Supplement', icon: Pill, color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-300' },
+  other: { label: 'Other', icon: Syringe, color: 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300' },
 }
 
 interface ProtocolWithPeptide extends Protocol {
@@ -246,7 +251,7 @@ export default function ProtocolsPage() {
             {filteredProtocols.map((protocol, index) => {
               const stats = getProgressStats(protocol)
               const penUnits = getPenUnits(protocol)
-              const category = getCategoryForPeptide(protocol.peptide.name, protocol.peptide.category)
+              const category = getCategoryForPeptide(protocol.peptide.name, protocol.peptide.type, protocol.peptide.category)
               const categoryInfo = CATEGORY_INFO[category] || CATEGORY_INFO.other
               const CategoryIcon = categoryInfo.icon
 
