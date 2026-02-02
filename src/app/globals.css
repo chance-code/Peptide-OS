@@ -9,87 +9,87 @@
    ======================================== */
 
 :root {
-  /* Background layers */
-  --background: #f8fafc;
-  --background-secondary: #f1f5f9;
-  --foreground: #0f172a;
+  /* Background layers - Warm stone */
+  --background: #FAFAF9;
+  --background-secondary: #F5F5F4;
+  --foreground: #1C1917;
 
   /* Card system */
-  --card: #ffffff;
-  --card-foreground: #0f172a;
-  --card-hover: #f8fafc;
+  --card: #FFFFFF;
+  --card-foreground: #1C1917;
+  --card-hover: #FAFAF9;
 
   /* Muted/subtle */
-  --muted: #f1f5f9;
-  --muted-foreground: #64748b;
+  --muted: #F5F5F4;
+  --muted-foreground: #78716C;
 
   /* Borders & rings */
-  --border: #e2e8f0;
-  --border-subtle: #f1f5f9;
-  --ring: #475569;
+  --border: #E7E5E4;
+  --border-subtle: #F5F5F4;
+  --ring: #57534E;
 
-  /* Semantic colors - Status system like Oura */
-  --success: #10b981;
-  --success-muted: #d1fae5;
-  --warning: #f59e0b;
-  --warning-muted: #fef3c7;
-  --error: #ef4444;
-  --error-muted: #fee2e2;
-  --info: #3b82f6;
-  --info-muted: #dbeafe;
+  /* Semantic colors - Warmer tones */
+  --success: #059669;
+  --success-muted: #D1FAE5;
+  --warning: #D97706;
+  --warning-muted: #FEF3C7;
+  --error: #DC2626;
+  --error-muted: #FEE2E2;
+  --info: #78716C;
+  --info-muted: #F5F5F4;
 
-  /* Accent - Primary brand color */
-  --accent: #6366f1;
-  --accent-foreground: #ffffff;
-  --accent-muted: #e0e7ff;
+  /* Accent - Aged Bronze */
+  --accent: #57534E;
+  --accent-foreground: #FFFFFF;
+  --accent-muted: #E7E5E4;
 
   /* Premium effects */
-  --glow-success: 0 0 20px rgba(16, 185, 129, 0.3);
-  --glow-accent: 0 0 20px rgba(99, 102, 241, 0.3);
-  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
-  --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
+  --glow-success: 0 0 20px rgba(5, 150, 105, 0.3);
+  --glow-accent: 0 0 20px rgba(87, 83, 78, 0.3);
+  --shadow-card: 0 1px 3px rgba(28, 25, 23, 0.05), 0 1px 2px rgba(28, 25, 23, 0.03);
+  --shadow-card-hover: 0 4px 12px rgba(28, 25, 23, 0.08), 0 2px 4px rgba(28, 25, 23, 0.04);
 }
 
 .dark {
-  /* True dark for OLED - richer blacks */
-  --background: #000000;
-  --background-secondary: #0a0a0a;
-  --foreground: #fafafa;
+  /* Warm dark - Aged Bronze palette */
+  --background: #0C0A09;
+  --background-secondary: #1C1917;
+  --foreground: #FAFAF9;
 
-  /* Dark card system with subtle elevation */
-  --card: #111111;
-  --card-foreground: #fafafa;
-  --card-hover: #1a1a1a;
+  /* Dark card system with warm undertones */
+  --card: #1C1917;
+  --card-foreground: #FAFAF9;
+  --card-hover: #292524;
 
   /* Muted dark */
-  --muted: #1a1a1a;
-  --muted-foreground: #a1a1aa;
+  --muted: #292524;
+  --muted-foreground: #A8A29E;
 
-  /* Borders - subtle in dark mode */
-  --border: #262626;
-  --border-subtle: #1a1a1a;
-  --ring: #a1a1aa;
+  /* Borders - warm in dark mode */
+  --border: #44403C;
+  --border-subtle: #292524;
+  --ring: #A8A29E;
 
-  /* Semantic colors - slightly brighter for dark mode */
-  --success: #22c55e;
-  --success-muted: rgba(34, 197, 94, 0.15);
-  --warning: #fbbf24;
+  /* Semantic colors - warm tones for dark mode */
+  --success: #34D399;
+  --success-muted: rgba(52, 211, 153, 0.15);
+  --warning: #FBBF24;
   --warning-muted: rgba(251, 191, 36, 0.15);
-  --error: #f87171;
+  --error: #F87171;
   --error-muted: rgba(248, 113, 113, 0.15);
-  --info: #60a5fa;
-  --info-muted: rgba(96, 165, 250, 0.15);
+  --info: #A8A29E;
+  --info-muted: rgba(168, 162, 158, 0.15);
 
-  /* Accent */
-  --accent: #818cf8;
-  --accent-foreground: #000000;
-  --accent-muted: rgba(129, 140, 248, 0.15);
+  /* Accent - Warm stone */
+  --accent: #D6D3D1;
+  --accent-foreground: #1C1917;
+  --accent-muted: rgba(214, 211, 209, 0.15);
 
-  /* Premium effects - glows pop more on dark */
-  --glow-success: 0 0 30px rgba(34, 197, 94, 0.4);
-  --glow-accent: 0 0 30px rgba(129, 140, 248, 0.4);
-  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.03);
-  --shadow-card-hover: 0 8px 25px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  /* Premium effects - warm glows */
+  --glow-success: 0 0 30px rgba(52, 211, 153, 0.4);
+  --glow-accent: 0 0 30px rgba(214, 211, 209, 0.2);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.03);
+  --shadow-card-hover: 0 8px 25px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
 }
 
 @theme inline {
