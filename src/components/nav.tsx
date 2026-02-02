@@ -34,8 +34,8 @@ export function BottomNav() {
   const pathname = usePathname()
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 nav-premium safe-area-inset-bottom z-50">
-      <div className="flex items-center justify-around h-16 max-w-lg mx-auto px-2 pb-2">
+    <nav className="fixed bottom-0 left-0 right-0 nav-premium z-50" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+      <div className="flex items-center justify-around h-14 max-w-lg mx-auto px-2">
         {navItems.map((item) => {
           const isActive = pathname.startsWith(item.href)
           const Icon = item.icon
