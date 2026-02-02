@@ -10,6 +10,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { PullToRefresh } from '@/components/pull-to-refresh'
+import { StackAssessmentCard } from '@/components/stack-assessment-card'
 import { cn } from '@/lib/utils'
 import type { Protocol, Peptide, ItemType } from '@/types'
 
@@ -202,6 +203,15 @@ export default function ProtocolsPage() {
             </button>
           ))}
         </div>
+
+        {/* Stack Assessment */}
+        {currentUserId && (
+          <StackAssessmentCard
+            userId={currentUserId}
+            activeProtocolCount={protocols.filter(p => p.status === 'active').length}
+            className="mb-4"
+          />
+        )}
 
         {/* Protocols List */}
         {isLoading ? (

@@ -593,13 +593,11 @@ export default function ProtocolDetailPage({
       </div>
 
       {/* AI Insights */}
-      <div className="mb-6 p-4 bg-purple-100 dark:bg-purple-900 rounded-xl border-2 border-purple-500">
-        <p className="text-purple-800 dark:text-purple-200 font-medium mb-2">AI Insights Test</p>
-        <AIInsightsCard
-          protocolId={protocol.id}
-          peptideName={protocol.peptide.name}
-        />
-      </div>
+      <AIInsightsCard
+        protocolId={protocol.id}
+        peptideName={protocol.peptide.name}
+        className="mb-6"
+      />
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 gap-3 mb-6">
