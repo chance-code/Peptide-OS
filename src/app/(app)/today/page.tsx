@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   Clock,
   Syringe,
+  Pill,
 } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { Card, CardContent } from '@/components/ui/card'
@@ -172,34 +173,36 @@ export default function TodayPage() {
   ) {
     if (!currentUserId || !data) return
 
+    // Use item.id for tracking since same protocol can have multiple timings
     if (status === 'completed') {
-      setJustCompleted(prev => new Set(prev).add(item.protocolId))
+      setJustCompleted(prev => new Set(prev).add(item.id))
       setTimeout(() => {
         setJustCompleted(prev => {
           const next = new Set(prev)
-          next.delete(item.protocolId)
+          next.delete(item.id)
           return next
         })
       }, 600)
     }
 
+    // Match by item.id to handle multi-timing protocols correctly
     queryClient.setQueryData<TodayResponse>(['today', currentUserId, dateParam], (old) => {
       if (!old) return old
       return {
         ...old,
         items: old.items.map((i) =>
-          i.protocolId === item.protocolId ? { ...i, status } : i
+          i.id === item.id ? { ...i, status } : i
         ),
         summary: {
           ...old.summary,
           completed: old.items.filter((i) =>
-            i.protocolId === item.protocolId ? status === 'completed' : i.status === 'completed'
+            i.id === item.id ? status === 'completed' : i.status === 'completed'
           ).length,
           pending: old.items.filter((i) =>
-            i.protocolId === item.protocolId ? status === 'pending' : i.status === 'pending'
+            i.id === item.id ? status === 'pending' : i.status === 'pending'
           ).length,
           skipped: old.items.filter((i) =>
-            i.protocolId === item.protocolId ? status === 'skipped' : i.status === 'skipped'
+            i.id === item.id ? status === 'skipped' : i.status === 'skipped'
           ).length,
         },
       }
@@ -214,6 +217,7 @@ export default function TodayPage() {
         protocolId: item.protocolId,
         scheduledDate: dateStr,
         status,
+        timing: item.timing,
       }),
     }).catch((error) => {
       console.error('Error updating dose:', error)
@@ -253,6 +257,7 @@ export default function TodayPage() {
               protocolId: item.protocolId,
               scheduledDate: selectedDate.toISOString(),
               status: 'completed',
+              timing: item.timing,
             }),
           })
         )
@@ -337,14 +342,11 @@ export default function TodayPage() {
           )}
 
           {/* Section Header */}
-          {data && data.items.length > 0 && (
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-label">Your Doses</h3>
-              {pendingCount > 0 && (
-                <span className="text-xs text-[var(--muted-foreground)]">
-                  Swipe to complete or skip
-                </span>
-              )}
+          {data && data.items.length > 0 && pendingCount > 0 && (
+            <div className="flex items-center justify-end mb-3">
+              <span className="text-xs text-[var(--muted-foreground)]">
+                Swipe to complete or skip
+              </span>
             </div>
           )}
 
@@ -359,125 +361,147 @@ export default function TodayPage() {
             </div>
           ) : data && data.items.length > 0 ? (
             <div className="space-y-3">
-              {data.items.map((item, index) => (
-                <div
-                  key={item.id}
-                  className={cn('animate-card-in', `stagger-${Math.min(index + 1, 10)}`)}
-                >
-                  <SwipeableCard
-                    onSwipeRight={
-                      item.status === 'pending'
-                        ? () => handleStatusChange(item, 'completed')
-                        : undefined
-                    }
-                    onSwipeLeft={
-                      item.status === 'pending'
-                        ? () => handleStatusChange(item, 'skipped')
-                        : undefined
-                    }
-                    disabled={item.status !== 'pending'}
-                  >
-                    <Card
-                      interactive
-                      className={cn(
-                        'transition-all',
-                        item.status === 'completed' && 'opacity-60',
-                        item.vialExpired && 'border-l-4 border-l-[var(--warning)]'
-                      )}
-                    >
-                      <CardContent className="p-4">
-                        <div className="flex items-center gap-4">
-                          {/* Status indicator */}
-                          <div
-                            className={cn(
-                              'w-1 h-12 rounded-full',
-                              item.status === 'completed' && 'bg-[var(--success)]',
-                              item.status === 'pending' && 'bg-[var(--accent)]',
-                              item.status === 'skipped' && 'bg-[var(--muted)]'
-                            )}
-                          />
+              {data.items.map((item, index) => {
+                const itemType = item.itemType || 'peptide'
+                const isSupplement = itemType === 'supplement'
+                const isFirstOfType = index === 0 || (data.items[index - 1].itemType || 'peptide') !== itemType
 
-                          {/* Content */}
-                          <button
-                            type="button"
-                            onClick={() => setSelectedDose(item)}
-                            className="flex-1 min-w-0 text-left"
-                          >
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="font-semibold text-[var(--foreground)]">
-                                {item.peptideName}
-                              </span>
-                              {item.penUnits && (
-                                <Badge variant="accent">
-                                  {item.penUnits}u
-                                </Badge>
-                              )}
-                              {item.vialExpired && (
-                                <Badge variant="warning" className="flex items-center gap-1">
-                                  <AlertTriangle className="w-3 h-3" />
-                                  Expired
-                                </Badge>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2 text-sm text-[var(--muted-foreground)]">
-                              <Syringe className="w-3.5 h-3.5" />
-                              <span>
-                                {item.doseAmount} {item.doseUnit}
-                              </span>
-                              {item.timing && (
-                                <>
-                                  <span className="text-[var(--border)]">•</span>
-                                  <span className="flex items-center gap-1">
-                                    <Clock className="w-3 h-3" />
-                                    {item.timing}
-                                  </span>
-                                </>
-                              )}
-                            </div>
-                          </button>
-
-                          {/* Action buttons */}
-                          <div className="flex items-center gap-2">
-                            {item.status === 'pending' ? (
-                              <>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => handleStatusChange(item, 'skipped')}
-                                  className="w-9 h-9 p-0"
-                                >
-                                  <X className="w-5 h-5" />
-                                </Button>
-                                <AnimatedCheckButton
-                                  isCompleted={false}
-                                  justCompleted={false}
-                                  onComplete={() => handleStatusChange(item, 'completed')}
-                                  onUndo={() => handleStatusChange(item, 'pending')}
-                                />
-                              </>
-                            ) : item.status === 'completed' ? (
-                              <AnimatedCheckButton
-                                isCompleted={true}
-                                justCompleted={justCompleted.has(item.protocolId)}
-                                onComplete={() => handleStatusChange(item, 'completed')}
-                                onUndo={() => handleStatusChange(item, 'pending')}
+                return (
+                  <div key={item.id}>
+                    {/* Section header when type changes */}
+                    {isFirstOfType && (
+                      <div className="flex items-center gap-2 mb-2 pt-2">
+                        {isSupplement ? (
+                          <Pill className="w-4 h-4 text-[var(--success)]" />
+                        ) : (
+                          <Syringe className="w-4 h-4 text-[var(--accent)]" />
+                        )}
+                        <h3 className="text-label">{isSupplement ? 'Supplements' : 'Peptides'}</h3>
+                      </div>
+                    )}
+                    <div className={cn('animate-card-in', `stagger-${Math.min(index + 1, 10)}`)}>
+                      <SwipeableCard
+                        onSwipeRight={
+                          item.status === 'pending'
+                            ? () => handleStatusChange(item, 'completed')
+                            : undefined
+                        }
+                        onSwipeLeft={
+                          item.status === 'pending'
+                            ? () => handleStatusChange(item, 'skipped')
+                            : undefined
+                        }
+                        disabled={item.status !== 'pending'}
+                      >
+                        <Card
+                          interactive
+                          className={cn(
+                            'transition-all',
+                            item.status === 'completed' && 'opacity-60',
+                            item.vialExpired && 'border-l-4 border-l-[var(--warning)]'
+                          )}
+                        >
+                          <CardContent className="p-4">
+                            <div className="flex items-center gap-4">
+                              {/* Status indicator */}
+                              <div
+                                className={cn(
+                                  'w-1 h-12 rounded-full',
+                                  item.status === 'completed' && 'bg-[var(--success)]',
+                                  item.status === 'pending' && (isSupplement ? 'bg-[var(--success)]' : 'bg-[var(--accent)]'),
+                                  item.status === 'skipped' && 'bg-[var(--muted)]'
+                                )}
                               />
-                            ) : (
+
+                              {/* Content */}
                               <button
                                 type="button"
-                                onClick={() => handleStatusChange(item, 'pending')}
-                                className="px-3 py-1.5 rounded-lg bg-[var(--muted)] hover:bg-[var(--border)] text-[var(--muted-foreground)] text-sm font-medium transition-colors active:scale-95"
+                                onClick={() => setSelectedDose(item)}
+                                className="flex-1 min-w-0 text-left"
                               >
-                                Skipped
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="font-semibold text-[var(--foreground)]">
+                                    {item.peptideName}
+                                  </span>
+                                  {item.penUnits && (
+                                    <Badge variant="accent">
+                                      {item.penUnits}u
+                                    </Badge>
+                                  )}
+                                  {item.vialExpired && (
+                                    <Badge variant="warning" className="flex items-center gap-1">
+                                      <AlertTriangle className="w-3 h-3" />
+                                      Expired
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 text-sm text-[var(--muted-foreground)]">
+                                  {isSupplement ? (
+                                    <Pill className="w-3.5 h-3.5" />
+                                  ) : (
+                                    <Syringe className="w-3.5 h-3.5" />
+                                  )}
+                                  <span>
+                                    {isSupplement && item.servingSize
+                                      ? `${item.servingSize} ${item.servingUnit || 'serving'}${item.servingSize > 1 ? 's' : ''}`
+                                      : `${item.doseAmount} ${item.doseUnit}`}
+                                  </span>
+                                  {item.timing && (
+                                    <>
+                                      <span className="text-[var(--border)]">•</span>
+                                      <span className="flex items-center gap-1">
+                                        <Clock className="w-3 h-3" />
+                                        {item.timing}
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
                               </button>
-                            )}
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </SwipeableCard>
-                </div>
-              ))}
+
+                              {/* Action buttons */}
+                              <div className="flex items-center gap-2">
+                                {item.status === 'pending' ? (
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleStatusChange(item, 'skipped')}
+                                      className="w-9 h-9 p-0"
+                                    >
+                                      <X className="w-5 h-5" />
+                                    </Button>
+                                    <AnimatedCheckButton
+                                      isCompleted={false}
+                                      justCompleted={false}
+                                      onComplete={() => handleStatusChange(item, 'completed')}
+                                      onUndo={() => handleStatusChange(item, 'pending')}
+                                    />
+                                  </>
+                                ) : item.status === 'completed' ? (
+                                  <AnimatedCheckButton
+                                    isCompleted={true}
+                                    justCompleted={justCompleted.has(item.id)}
+                                    onComplete={() => handleStatusChange(item, 'completed')}
+                                    onUndo={() => handleStatusChange(item, 'pending')}
+                                  />
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStatusChange(item, 'pending')}
+                                    className="px-3 py-1.5 rounded-lg bg-[var(--muted)] hover:bg-[var(--border)] text-[var(--muted-foreground)] text-sm font-medium transition-colors active:scale-95"
+                                  >
+                                    Skipped
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </SwipeableCard>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           ) : (
             <Card className="mt-4">

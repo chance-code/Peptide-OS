@@ -22,9 +22,10 @@ function PeptideCard({ peptide }: { peptide: PeptideReference }) {
   const CategoryIcon = categoryInfo.icon
 
   return (
-    <Card className="overflow-hidden">
+    <Card className="overflow-hidden" interactive>
       <button
-        className="w-full text-left"
+        type="button"
+        className="w-full text-left cursor-pointer"
         onClick={() => setIsExpanded(!isExpanded)}
       >
         <CardContent className="p-4">
@@ -37,7 +38,7 @@ function PeptideCard({ peptide }: { peptide: PeptideReference }) {
                   {categoryInfo.label}
                 </Badge>
               </div>
-              {peptide.description && (
+              {peptide.description && !isExpanded && (
                 <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-1">{peptide.description}</p>
               )}
             </div>
@@ -50,7 +51,13 @@ function PeptideCard({ peptide }: { peptide: PeptideReference }) {
 
       {isExpanded && (
         <div className="px-4 pb-4 pt-0 border-t border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/50">
-          <div className="grid grid-cols-2 gap-3 pt-3">
+          {/* Full description */}
+          {peptide.description && (
+            <p className="text-sm text-slate-600 dark:text-slate-300 pt-3 pb-2">
+              {peptide.description}
+            </p>
+          )}
+          <div className="grid grid-cols-2 gap-3 pt-2">
             <div>
               <div className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Typical Dose</div>
               <div className="font-medium text-slate-900 dark:text-white">

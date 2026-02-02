@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { startOfDay, endOfDay, isSameDay, getDay } from 'date-fns'
-import type { TodayDoseItem, DayOfWeek } from '@/types'
+import type { TodayDoseItem, DayOfWeek, ItemType } from '@/types'
 
 // Map day of week index to our DayOfWeek type (0 = Sunday)
 const DAY_INDEX_MAP: Record<number, DayOfWeek> = {
@@ -25,6 +25,13 @@ function isDoseDay(
   switch (frequency) {
     case 'daily':
       return true
+    case 'every_other_day': {
+      // Calculate days since start date, dose on even days (0, 2, 4, ...)
+      const start = startOfDay(startDate)
+      const target = startOfDay(date)
+      const daysDiff = Math.floor((target.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+      return daysDiff >= 0 && daysDiff % 2 === 0
+    }
     case 'weekly':
       return getDay(date) === getDay(startDate)
     case 'custom':
@@ -62,45 +69,49 @@ export async function GET(request: NextRequest) {
     const dayStart = startOfDay(targetDate)
     const dayEnd = endOfDay(targetDate)
 
-    // Get all active protocols for user
-    const protocols = await prisma.protocol.findMany({
-      where: {
-        userId,
-        status: 'active',
-        startDate: { lte: dayEnd },
-        OR: [
-          { endDate: null },
-          { endDate: { gte: dayStart } },
-        ],
-      },
-      include: {
-        peptide: true,
-      },
-    })
-
-    // Get existing dose logs for today
-    const existingLogs = await prisma.doseLog.findMany({
-      where: {
-        userId,
-        scheduledDate: {
-          gte: dayStart,
-          lte: dayEnd,
-        },
-      },
-    })
-
-    const logsByProtocol = new Map(existingLogs.map((log) => [log.protocolId, log]))
-
-    // Batch load all inventory status in one query (fixes N+1)
+    // Run all database queries in parallel for better performance
     const today = new Date()
-    const allInventory = await prisma.inventoryVial.findMany({
-      where: { userId },
-      select: {
-        peptideId: true,
-        expirationDate: true,
-        isExhausted: true,
-      },
-    })
+    const [protocols, existingLogs, allInventory] = await Promise.all([
+      // Get all active protocols for user
+      prisma.protocol.findMany({
+        where: {
+          userId,
+          status: 'active',
+          startDate: { lte: dayEnd },
+          OR: [
+            { endDate: null },
+            { endDate: { gte: dayStart } },
+          ],
+        },
+        include: {
+          peptide: true,
+        },
+      }),
+      // Get existing dose logs for today
+      prisma.doseLog.findMany({
+        where: {
+          userId,
+          scheduledDate: {
+            gte: dayStart,
+            lte: dayEnd,
+          },
+        },
+      }),
+      // Batch load all inventory status
+      prisma.inventoryVial.findMany({
+        where: { userId },
+        select: {
+          peptideId: true,
+          expirationDate: true,
+          isExhausted: true,
+        },
+      }),
+    ])
+
+    // Map logs by protocol ID + timing for multi-timing support
+    const logsByProtocolAndTiming = new Map(
+      existingLogs.map((log) => [`${log.protocolId}-${log.timing || ''}`, log])
+    )
 
     // Build lookup maps
     const expiredPeptideIds = new Set<string>()
@@ -124,7 +135,6 @@ export async function GET(request: NextRequest) {
         continue
       }
 
-      const existingLog = logsByProtocol.get(protocol.id)
       const hasExpiredVial = expiredPeptideIds.has(protocol.peptideId)
       const hasValidInventory = validPeptideIds.has(protocol.peptideId)
 
@@ -148,20 +158,42 @@ export async function GET(request: NextRequest) {
         penUnits = Math.round(volumeMl * 100)
       }
 
-      todayItems.push({
-        id: existingLog?.id || `temp-${protocol.id}`,
-        protocolId: protocol.id,
-        scheduleId: existingLog?.scheduleId || undefined,
-        peptideName: protocol.peptide.name,
-        doseAmount: protocol.doseAmount,
-        doseUnit: protocol.doseUnit,
-        timing: protocol.timing,
-        status: existingLog?.status as TodayDoseItem['status'] || 'pending',
-        notes: existingLog?.notes,
-        vialExpired: !hasValidInventory && hasExpiredVial,
-        penUnits,
-        concentration,
-      })
+      // Get timings - either from new timings array or legacy single timing
+      let timingsToProcess: (string | null)[] = [protocol.timing]
+      if (protocol.timings) {
+        try {
+          const parsedTimings = JSON.parse(protocol.timings) as string[]
+          if (parsedTimings.length > 0) {
+            timingsToProcess = parsedTimings
+          }
+        } catch {
+          // Fall back to single timing
+        }
+      }
+
+      // Create one item per timing
+      for (const timing of timingsToProcess) {
+        const logKey = `${protocol.id}-${timing || ''}`
+        const existingLog = logsByProtocolAndTiming.get(logKey)
+
+        todayItems.push({
+          id: existingLog?.id || `temp-${protocol.id}-${timing || 'default'}`,
+          protocolId: protocol.id,
+          scheduleId: existingLog?.scheduleId || undefined,
+          peptideName: protocol.peptide.name,
+          itemType: (protocol.peptide.type || 'peptide') as ItemType,
+          doseAmount: protocol.doseAmount,
+          doseUnit: protocol.doseUnit,
+          timing: timing,
+          status: existingLog?.status as TodayDoseItem['status'] || 'pending',
+          notes: existingLog?.notes,
+          vialExpired: !hasValidInventory && hasExpiredVial,
+          penUnits,
+          concentration,
+          servingSize: protocol.servingSize,
+          servingUnit: protocol.servingUnit,
+        })
+      }
     }
 
     // Sort by timing (morning first, then afternoon, evening, etc.)
@@ -180,6 +212,11 @@ export async function GET(request: NextRequest) {
     }
 
     todayItems.sort((a, b) => {
+      // Sort by type first (peptides before supplements)
+      if (a.itemType !== b.itemType) {
+        return a.itemType === 'peptide' ? -1 : 1
+      }
+      // Then by timing
       const aOrder = a.timing ? timingOrder[a.timing.toLowerCase()] || 50 : 50
       const bOrder = b.timing ? timingOrder[b.timing.toLowerCase()] || 50 : 50
       return aOrder - bOrder
@@ -193,6 +230,10 @@ export async function GET(request: NextRequest) {
         completed: todayItems.filter((i) => i.status === 'completed').length,
         pending: todayItems.filter((i) => i.status === 'pending').length,
         skipped: todayItems.filter((i) => i.status === 'skipped').length,
+      },
+    }, {
+      headers: {
+        'Cache-Control': 'private, max-age=30', // 30 second cache
       },
     })
   } catch (error) {

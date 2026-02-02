@@ -1,0 +1,22 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Concept 1: Premium gradient with depth -->
+  <defs>
+    <linearGradient id="bg1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e"/>
+      <stop offset="50%" style="stop-color:#16213e"/>
+      <stop offset="100%" style="stop-color:#0f0f1a"/>
+    </linearGradient>
+    <linearGradient id="p1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea"/>
+      <stop offset="50%" style="stop-color:#764ba2"/>
+      <stop offset="100%" style="stop-color:#f093fb"/>
+    </linearGradient>
+    <filter id="shadow1">
+      <feDropShadow dx="0" dy="8" stdDeviation="20" flood-color="#764ba2" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+  <rect width="1024" height="1024" rx="220" fill="url(#bg1)"/>
+  <g filter="url(#shadow1)">
+    <path d="M 280 180 L 280 844 L 420 844 L 420 620 L 560 620 C 780 620 780 180 560 180 Z M 420 320 L 520 320 C 620 320 620 480 520 480 L 420 480 Z" fill="url(#p1)" fill-rule="evenodd"/>
+  </g>
+</svg>

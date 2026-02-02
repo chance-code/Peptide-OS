@@ -1,0 +1,11 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Concept 4: Fresh green health vibe -->
+  <defs>
+    <linearGradient id="bg4" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#059669"/>
+      <stop offset="100%" style="stop-color:#10b981"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="220" fill="url(#bg4)"/>
+  <path d="M 280 180 L 280 844 L 420 844 L 420 620 L 560 620 C 780 620 780 180 560 180 Z M 420 320 L 520 320 C 620 320 620 480 520 480 L 420 480 Z" fill="white" fill-rule="evenodd"/>
+</svg>

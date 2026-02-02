@@ -4,23 +4,26 @@ import { useState, useCallback } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
 import { format, differenceInDays } from 'date-fns'
-import { Plus, Play, Pause, Infinity } from 'lucide-react'
+import { Plus, Play, Pause, Infinity, Syringe, Pill } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { PullToRefresh } from '@/components/pull-to-refresh'
 import { cn } from '@/lib/utils'
-import type { Protocol, Peptide } from '@/types'
+import type { Protocol, Peptide, ItemType } from '@/types'
 
 interface ProtocolWithPeptide extends Protocol {
-  peptide: Peptide
+  peptide: Peptide & { type?: string }
 }
+
+type TypeFilter = 'all' | ItemType
 
 export default function ProtocolsPage() {
   const { currentUserId } = useAppStore()
   const queryClient = useQueryClient()
   const [filter, setFilter] = useState<'all' | 'active' | 'paused' | 'completed'>('all')
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
 
   const { data: protocols = [], isLoading, refetch } = useQuery<ProtocolWithPeptide[]>({
     queryKey: ['protocols', currentUserId, filter],
@@ -62,6 +65,10 @@ export default function ProtocolsPage() {
   function formatDays(protocol: ProtocolWithPeptide): string | null {
     if (protocol.frequency === 'daily') {
       return 'Every day'
+    }
+
+    if (protocol.frequency === 'every_other_day') {
+      return 'Every other day'
     }
 
     if (protocol.frequency === 'custom' && protocol.customDays) {
@@ -118,8 +125,11 @@ export default function ProtocolsPage() {
   }
 
   const filteredProtocols = protocols.filter((p) => {
-    if (filter === 'all') return true
-    return p.status === filter
+    // Filter by status
+    if (filter !== 'all' && p.status !== filter) return false
+    // Filter by type
+    if (typeFilter !== 'all' && (p.peptide.type || 'peptide') !== typeFilter) return false
+    return true
   })
 
   return (
@@ -136,7 +146,46 @@ export default function ProtocolsPage() {
           </Link>
         </div>
 
-        {/* Filter Tabs */}
+        {/* Type Filter Tabs */}
+        <div className="flex gap-2 mb-3">
+          <button
+            type="button"
+            onClick={() => setTypeFilter('all')}
+            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+              typeFilter === 'all'
+                ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
+                : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+            }`}
+          >
+            All
+          </button>
+          <button
+            type="button"
+            onClick={() => setTypeFilter('peptide')}
+            className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+              typeFilter === 'peptide'
+                ? 'bg-[var(--accent)] text-white'
+                : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+            }`}
+          >
+            <Syringe className="w-3.5 h-3.5" />
+            Peptides
+          </button>
+          <button
+            type="button"
+            onClick={() => setTypeFilter('supplement')}
+            className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+              typeFilter === 'supplement'
+                ? 'bg-[var(--success)] text-white'
+                : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+            }`}
+          >
+            <Pill className="w-3.5 h-3.5" />
+            Supplements
+          </button>
+        </div>
+
+        {/* Status Filter Tabs */}
         <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
           {(['all', 'active', 'paused', 'completed'] as const).map((f) => (
             <button
@@ -180,14 +229,14 @@ export default function ProtocolsPage() {
                             )}
                           </div>
                           <div className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-                            {protocol.doseAmount} {protocol.doseUnit} • {protocol.frequency}
+                            {protocol.servingSize
+                              ? `${protocol.servingSize} ${protocol.servingUnit || 'serving'}${protocol.servingSize > 1 ? 's' : ''}`
+                              : `${protocol.doseAmount} ${protocol.doseUnit}`}
                             {protocol.timing && ` • ${protocol.timing}`}
                           </div>
-                          {formatDays(protocol) && (
-                            <div className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
-                              {formatDays(protocol)}
-                            </div>
-                          )}
+                          <div className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+                            {formatDays(protocol) || (protocol.frequency === 'weekly' ? 'Weekly' : protocol.frequency)}
+                          </div>
                         </div>
                         <div className="flex items-center gap-2">
                           <Badge

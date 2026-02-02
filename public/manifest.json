@@ -1,6 +1,6 @@
 {
-  "name": "Peptide OS",
-  "short_name": "Peptide OS",
+  "name": "PepTrack",
+  "short_name": "PepTrack",
   "description": "Personal peptide protocol tracker",
   "start_url": "/today",
   "display": "standalone",

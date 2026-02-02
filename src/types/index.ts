@@ -23,6 +23,12 @@ export type DoseLogStatus = 'pending' | 'completed' | 'skipped' | 'missed'
 // Unit options
 export type DoseUnit = 'mcg' | 'mg' | 'IU'
 
+// Item type (peptide or supplement)
+export type ItemType = 'peptide' | 'supplement'
+
+// Serving unit options for supplements
+export type ServingUnit = 'capsule' | 'tablet' | 'softgel' | 'scoop' | 'drop' | 'spray'
+
 // Day of week for custom schedules
 export type DayOfWeek = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun'
 
@@ -32,15 +38,19 @@ export interface TodayDoseItem {
   protocolId: string
   scheduleId?: string
   peptideName: string
+  itemType: ItemType
   doseAmount: number
   doseUnit: string
   timing?: string | null
   status: DoseLogStatus
   notes?: string | null
   vialExpired?: boolean
-  // Pen units to draw (calculated from reconstitution info)
+  // Pen units to draw (calculated from reconstitution info) - peptides only
   penUnits?: number | null
   concentration?: string | null
+  // Serving info - supplements only
+  servingSize?: number | null
+  servingUnit?: string | null
 }
 
 // Adherence stats

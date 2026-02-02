@@ -65,17 +65,19 @@ export async function POST(request: NextRequest) {
       actualDose,
       actualUnit,
       notes,
+      timing, // For multi-timing protocols
     } = body
 
     if (!userId || !protocolId || !scheduledDate || !status) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    // Check if a dose log already exists for this protocol and date
+    // Check if a dose log already exists for this protocol, date, and timing
     const existingLog = await prisma.doseLog.findFirst({
       where: {
         userId,
         protocolId,
+        timing: timing || null,
         scheduledDate: {
           gte: startOfDay(new Date(scheduledDate)),
           lte: endOfDay(new Date(scheduledDate)),
@@ -110,6 +112,7 @@ export async function POST(request: NextRequest) {
           protocolId,
           scheduleId,
           scheduledDate: new Date(scheduledDate),
+          timing: timing || null,
           status,
           completedAt: status === 'completed' ? new Date() : null,
           actualDose,

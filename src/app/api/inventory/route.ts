@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/inventory - Create a new inventory vial
+// POST /api/inventory - Create a new inventory vial or supplement
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -62,13 +62,16 @@ export async function POST(request: NextRequest) {
       dateReconstituted,
       expirationDate,
       notes,
+      // Supplement-specific fields
+      itemCount,
+      remainingCount,
     } = body
 
     if (!userId || !peptideId || !totalAmount || !totalUnit) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    // Calculate concentration if diluent volume is provided
+    // Calculate concentration if diluent volume is provided (peptides only)
     let concentration: number | null = null
     let concentrationUnit: string | null = null
     if (diluentVolume) {
@@ -91,6 +94,9 @@ export async function POST(request: NextRequest) {
         expirationDate: expirationDate ? new Date(expirationDate) : null,
         remainingAmount: totalAmount,
         notes,
+        // Supplement count fields
+        itemCount: itemCount ?? null,
+        remainingCount: remainingCount ?? null,
       },
       include: {
         peptide: true,

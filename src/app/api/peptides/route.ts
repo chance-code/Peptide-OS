@@ -14,11 +14,11 @@ export async function GET() {
   }
 }
 
-// POST /api/peptides - Create a new peptide
+// POST /api/peptides - Create a new peptide or supplement
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { name, category, description, storageNotes } = body
+    const { name, type, category, description, storageNotes } = body
 
     if (!name || typeof name !== 'string') {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 })
@@ -27,6 +27,7 @@ export async function POST(request: NextRequest) {
     const peptide = await prisma.peptide.create({
       data: {
         name,
+        type: type || 'peptide', // 'peptide' | 'supplement'
         category,
         description,
         storageNotes,

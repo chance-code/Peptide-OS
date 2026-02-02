@@ -3,23 +3,26 @@
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { format, differenceInDays } from 'date-fns'
-import { Plus, Package, AlertTriangle, Clock, Droplet } from 'lucide-react'
+import { Plus, Package, AlertTriangle, Clock, Droplet, Syringe, Pill } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
-import type { InventoryVial, Peptide } from '@/types'
+import type { InventoryVial, Peptide, ItemType } from '@/types'
 
 interface VialWithPeptide extends InventoryVial {
-  peptide: Peptide
+  peptide: Peptide & { type?: string }
 }
+
+type FilterType = 'all' | ItemType
 
 export default function InventoryPage() {
   const { currentUserId } = useAppStore()
   const [vials, setVials] = useState<VialWithPeptide[]>([])
   const [showExpired, setShowExpired] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [typeFilter, setTypeFilter] = useState<FilterType>('all')
 
   const fetchInventory = useCallback(async () => {
     if (!currentUserId) return
@@ -130,6 +133,45 @@ export default function InventoryPage() {
         </div>
       )}
 
+      {/* Type Filter Tabs */}
+      <div className="flex gap-2 mb-4">
+        <button
+          type="button"
+          onClick={() => setTypeFilter('all')}
+          className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+            typeFilter === 'all'
+              ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
+              : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+          }`}
+        >
+          All
+        </button>
+        <button
+          type="button"
+          onClick={() => setTypeFilter('peptide')}
+          className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+            typeFilter === 'peptide'
+              ? 'bg-[var(--accent)] text-white'
+              : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+          }`}
+        >
+          <Syringe className="w-3.5 h-3.5" />
+          Peptides
+        </button>
+        <button
+          type="button"
+          onClick={() => setTypeFilter('supplement')}
+          className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+            typeFilter === 'supplement'
+              ? 'bg-[var(--success)] text-white'
+              : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+          }`}
+        >
+          <Pill className="w-3.5 h-3.5" />
+          Supplements
+        </button>
+      </div>
+
       {/* Toggle Expired */}
       <div className="flex items-center gap-2 mb-4">
         <input
@@ -140,16 +182,21 @@ export default function InventoryPage() {
           className="rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700"
         />
         <label htmlFor="showExpired" className="text-sm text-slate-700 dark:text-slate-300">
-          Show expired vials
+          Show expired items
         </label>
       </div>
 
       {/* Vials List */}
-      {isLoading ? (
+      {(() => {
+        const filteredVials = typeFilter === 'all'
+          ? vials
+          : vials.filter(v => (v.peptide.type || 'peptide') === typeFilter)
+
+        return isLoading ? (
         <div className="text-center py-8 text-slate-500 dark:text-slate-400">Loading...</div>
-      ) : vials.length > 0 ? (
+      ) : filteredVials.length > 0 ? (
         <div className="space-y-3">
-          {vials.map((vial) => {
+          {filteredVials.map((vial) => {
             const status = getExpirationStatus(vial)
             const daysUntilExpiry = vial.expirationDate
               ? differenceInDays(new Date(vial.expirationDate), new Date())
@@ -227,13 +274,18 @@ export default function InventoryPage() {
         <Card>
           <CardContent className="py-8 text-center">
             <Package className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
-            <div className="text-slate-400 dark:text-slate-500 mb-2">No inventory</div>
+            <div className="text-slate-400 dark:text-slate-500 mb-2">
+              {typeFilter === 'all' ? 'No inventory' : `No ${typeFilter}s`}
+            </div>
             <div className="text-sm text-slate-500 dark:text-slate-400">
-              Add your first vial to track your inventory
+              {typeFilter === 'all'
+                ? 'Add your first item to track your inventory'
+                : `Add your first ${typeFilter} to track your inventory`}
             </div>
           </CardContent>
         </Card>
-      )}
+      )
+      })()}
     </div>
   )
 }

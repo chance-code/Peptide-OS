@@ -35,6 +35,7 @@ model UserProfile {
 model Peptide {
   id           String   @id @default(cuid())
   name         String   @unique
+  type         String   @default("peptide")  // 'peptide' | 'supplement'
   category     String?
   description  String?
   storageNotes String?
@@ -64,12 +65,17 @@ model Protocol {
   // Dosing
   doseAmount  Float
   doseUnit    String    // 'mcg', 'mg', 'IU'
-  timing      String?   // e.g., 'morning', 'evening', 'before bed'
+  timing      String?   // e.g., 'morning', 'evening', 'before bed' (single timing, legacy)
+  timings     String?   // JSON array for multiple times per day, e.g., '["morning", "night"]'
 
-  // Reconstitution info (for cheat sheet)
+  // Reconstitution info (for cheat sheet - peptides only)
   vialAmount    Float?    // Total peptide in vial (e.g., 10 for 10mg)
   vialUnit      String?   // 'mg', 'mcg', 'IU'
   diluentVolume Float?    // mL of BAC water added
+
+  // Serving info (for supplements)
+  servingSize   Int?      // Number of units per dose (e.g., 2 for "2 capsules")
+  servingUnit   String?   // 'capsule', 'tablet', 'softgel', 'scoop', 'drop', 'spray'
 
   // Status
   status      String    @default("active") // 'active', 'paused', 'completed'
@@ -119,6 +125,7 @@ model DoseLog {
 
   scheduledDate DateTime
   completedAt   DateTime?
+  timing        String?   // Which timing this dose is for (e.g., 'morning', 'night')
 
   status       String   // 'pending', 'completed', 'skipped', 'missed'
   actualDose   Float?   // If different from scheduled
@@ -157,10 +164,14 @@ model InventoryVial {
   dateReconstituted DateTime?
   expirationDate  DateTime?
 
-  // Usage tracking
+  // Usage tracking (peptides)
   remainingAmount Float?
   isExpired       Boolean   @default(false)
   isExhausted     Boolean   @default(false) // All doses used
+
+  // Count tracking (supplements)
+  itemCount       Int?      // Total items (e.g., 60 capsules)
+  remainingCount  Int?      // Remaining items
 
   notes           String?
   createdAt       DateTime  @default(now())
