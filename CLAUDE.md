@@ -1,6 +1,6 @@
-# Peptide-OS
+# Arc Protocol
 
-Peptide/supplement tracking app for iOS (Capacitor) and web (Next.js PWA).
+Precision tracking for peptides and supplements. iOS (Capacitor) and web (Next.js PWA).
 
 ## Tech Stack
 

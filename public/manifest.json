@@ -1,7 +1,7 @@
 {
-  "name": "PepTrack",
-  "short_name": "PepTrack",
-  "description": "Personal peptide protocol tracker",
+  "name": "Arc Protocol",
+  "short_name": "Arc Protocol",
+  "description": "Precision tracking for peptides and supplements",
   "start_url": "/today",
   "display": "standalone",
   "background_color": "#0f0f1a",

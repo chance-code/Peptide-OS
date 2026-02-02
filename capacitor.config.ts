@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.peptideos.app',
-  appName: 'Peptide OS',
+  appId: 'com.arcprotocol.app',
+  appName: 'Arc Protocol',
   webDir: 'out',
   server: {
     // Load from Vercel in production (your app has API routes that need a server)
@@ -12,7 +12,7 @@ const config: CapacitorConfig = {
   ios: {
     contentInset: 'automatic',
     preferredContentMode: 'mobile',
-    scheme: 'Peptide OS',
+    scheme: 'Arc Protocol',
   },
   plugins: {
     SplashScreen: {

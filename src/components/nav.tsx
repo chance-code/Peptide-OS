@@ -85,7 +85,7 @@ export function TopHeader({ title }: { title?: string }) {
     <header className="sticky top-0 z-40 glass border-b border-[var(--border)] pt-[env(safe-area-inset-top)]">
       <div className="flex items-center justify-between h-12 px-4 max-w-lg mx-auto">
         <h1 className="text-lg font-semibold tracking-tight text-[var(--foreground)]">
-          {title || 'PepTrack'}
+          {title || 'Arc Protocol'}
         </h1>
         <Link
           href="/settings"

@@ -9,8 +9,8 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: 'PepTrack',
-  description: 'Personal protocol management for peptide tracking',
+  title: 'Arc Protocol',
+  description: 'Precision tracking for peptides and supplements',
   manifest: '/manifest.json',
   icons: {
     icon: [
@@ -24,7 +24,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'PepTrack',
+    title: 'Arc Protocol',
   },
 }
 

@@ -100,7 +100,7 @@ ${protocols
 `
     }
 
-    const systemPrompt = `You are a knowledgeable assistant specializing in peptides, supplements, and wellness optimization. You're integrated into a tracking app called "PepTrack".
+    const systemPrompt = `You are a knowledgeable assistant specializing in peptides, supplements, and wellness optimization. You're integrated into a tracking app called "Arc Protocol".
 
 ${userContext ? `Here is the user's current data:\n${userContext}` : 'The user has not set up any protocols yet.'}
 
