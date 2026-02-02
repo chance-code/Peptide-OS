@@ -428,7 +428,7 @@ export default function CalendarPage() {
                     'relative aspect-square rounded-2xl flex flex-col items-center justify-center transition-all duration-200',
                     dayData.isCurrentMonth
                       ? 'text-[var(--foreground)]'
-                      : 'text-[var(--muted-foreground)] opacity-30',
+                      : 'text-[var(--muted-foreground)] opacity-50',
                     dayData.isToday && 'ring-2 ring-[var(--foreground)] ring-offset-2 ring-offset-[var(--background)]',
                     hasProtocols && !isFuture && 'hover:scale-110 active:scale-95 cursor-pointer',
                     !hasProtocols && 'cursor-default'
@@ -437,8 +437,7 @@ export default function CalendarPage() {
                 >
                   <span className={cn(
                     'text-sm',
-                    dayData.isToday ? 'font-bold' : 'font-semibold',
-                    allCompleted && !isFuture && 'text-green-700 dark:text-green-300'
+                    dayData.isToday ? 'font-bold' : 'font-semibold'
                   )}>
                     {format(dayData.date, 'd')}
                   </span>
