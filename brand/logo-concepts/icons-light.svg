@@ -1,0 +1,43 @@
+<svg width="600" height="150" viewBox="0 0 600 150" xmlns="http://www.w3.org/2000/svg">
+  <!-- 5 app icons side by side on light background -->
+  <rect width="600" height="150" fill="#E8E8E8"/>
+
+  <!-- 1. Convergence -->
+  <g transform="translate(10, 15)">
+    <rect width="120" height="120" rx="26" fill="#FFFFFF"/>
+    <path d="M 25 45 Q 70 45, 95 60" stroke="#0A0A0A" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+    <path d="M 25 60 Q 70 60, 95 60" stroke="#0A0A0A" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+    <path d="M 25 75 Q 70 75, 95 60" stroke="#0A0A0A" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+  </g>
+
+  <!-- 2. Threshold -->
+  <g transform="translate(130, 15)">
+    <rect width="120" height="120" rx="26" fill="#FFFFFF"/>
+    <path d="M 52 95
+             Q 52 60, 60 30
+             Q 68 60, 68 95
+             Q 60 93, 52 95 Z"
+          fill="#0A0A0A"/>
+  </g>
+
+  <!-- 3. Lens -->
+  <g transform="translate(250, 15)">
+    <rect width="120" height="120" rx="26" fill="#FFFFFF"/>
+    <path d="M 85 38 A 32 32 0 1 0 68 28" stroke="#0A0A0A" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <path d="M 48 75 A 18 18 0 1 0 38 60" stroke="#0A0A0A" stroke-width="4" fill="none" stroke-linecap="round"/>
+  </g>
+
+  <!-- 4. Equilibrium -->
+  <g transform="translate(370, 15)">
+    <rect width="120" height="120" rx="26" fill="#FFFFFF"/>
+    <rect x="30" y="50" width="60" height="10" rx="5" fill="#0A0A0A"/>
+    <rect x="30" y="66" width="60" height="8" rx="4" fill="#0A0A0A"/>
+  </g>
+
+  <!-- 5. Pulse Window -->
+  <g transform="translate(490, 15)">
+    <rect width="120" height="120" rx="26" fill="#FFFFFF"/>
+    <rect x="25" y="32" width="70" height="56" rx="8" stroke="#0A0A0A" stroke-width="3.5" fill="none"/>
+    <path d="M 32 60 Q 47 48, 60 60 Q 73 72, 88 60" stroke="#0A0A0A" stroke-width="3" fill="none" stroke-linecap="round"/>
+  </g>
+</svg>

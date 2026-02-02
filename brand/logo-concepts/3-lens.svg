@@ -1,0 +1,19 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <rect width="200" height="200" fill="#FAFAFA"/>
+
+  <!-- Outer arc (270 degrees, gap at top-right) -->
+  <path d="M 145 80
+           A 55 55 0 1 0 120 45"
+        stroke="#0A0A0A"
+        stroke-width="5"
+        fill="none"
+        stroke-linecap="round"/>
+
+  <!-- Inner arc (270 degrees, gap at bottom-left, rotated) -->
+  <path d="M 75 125
+           A 30 30 0 1 0 60 90"
+        stroke="#0A0A0A"
+        stroke-width="5"
+        fill="none"
+        stroke-linecap="round"/>
+</svg>

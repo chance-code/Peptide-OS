@@ -1,0 +1,97 @@
+<svg width="600" height="280" viewBox="0 0 600 280" xmlns="http://www.w3.org/2000/svg">
+  <rect width="600" height="280" fill="#E8E8E8"/>
+
+  <!-- Row 1: Dark icons -->
+
+  <!-- A. Sharp squares (no rounding) -->
+  <g transform="translate(10, 15)">
+    <rect width="120" height="120" rx="26" fill="#0A0A0A"/>
+    <rect x="22" y="22" width="76" height="76" rx="0" stroke="#FAF8F5" stroke-width="3" fill="none"/>
+    <rect x="36" y="36" width="48" height="48" rx="0" stroke="#FAF8F5" stroke-width="3" fill="none"/>
+    <rect x="50" y="50" width="20" height="20" rx="0" stroke="#FAF8F5" stroke-width="3" fill="none"/>
+    <text x="60" y="145" fill="#666" font-family="system-ui" font-size="11" text-anchor="middle">A. Sharp</text>
+  </g>
+
+  <!-- B. Rotated (diamonds) -->
+  <g transform="translate(130, 15)">
+    <rect width="120" height="120" rx="26" fill="#0A0A0A"/>
+    <g transform="translate(60, 60) rotate(45)">
+      <rect x="-38" y="-38" width="76" height="76" rx="4" stroke="#FAF8F5" stroke-width="3" fill="none"/>
+      <rect x="-24" y="-24" width="48" height="48" rx="3" stroke="#FAF8F5" stroke-width="3" fill="none"/>
+      <rect x="-10" y="-10" width="20" height="20" rx="2" stroke="#FAF8F5" stroke-width="3" fill="none"/>
+    </g>
+    <text x="60" y="145" fill="#666" font-family="system-ui" font-size="11" text-anchor="middle">B. Diamond</text>
+  </g>
+
+  <!-- C. Two squares, inner filled -->
+  <g transform="translate(250, 15)">
+    <rect width="120" height="120" rx="26" fill="#0A0A0A"/>
+    <rect x="24" y="24" width="72" height="72" rx="12" stroke="#FAF8F5" stroke-width="3.5" fill="none"/>
+    <rect x="44" y="44" width="32" height="32" rx="6" fill="#FAF8F5"/>
+    <text x="60" y="145" fill="#666" font-family="system-ui" font-size="11" text-anchor="middle">C. Solid core</text>
+  </g>
+
+  <!-- D. Offset/staggered -->
+  <g transform="translate(370, 15)">
+    <rect width="120" height="120" rx="26" fill="#0A0A0A"/>
+    <rect x="20" y="28" width="68" height="68" rx="12" stroke="#FAF8F5" stroke-width="3.5" fill="none"/>
+    <rect x="32" y="24" width="68" height="68" rx="12" stroke="#FAF8F5" stroke-width="3.5" fill="none"/>
+    <text x="60" y="145" fill="#666" font-family="system-ui" font-size="11" text-anchor="middle">D. Offset</text>
+  </g>
+
+  <!-- E. Broken outer square -->
+  <g transform="translate(490, 15)">
+    <rect width="120" height="120" rx="26" fill="#0A0A0A"/>
+    <!-- Outer broken square (3 sides) -->
+    <path d="M 30 24 L 24 24 L 24 96 L 96 96 L 96 24 L 70 24" stroke="#FAF8F5" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+    <rect x="38" y="38" width="44" height="44" rx="8" stroke="#FAF8F5" stroke-width="3.5" fill="none"/>
+    <text x="60" y="145" fill="#666" font-family="system-ui" font-size="11" text-anchor="middle">E. Broken</text>
+  </g>
+
+  <!-- Row 2: More variations -->
+
+  <!-- F. Circle inside square -->
+  <g transform="translate(10, 155)">
+    <rect width="120" height="120" rx="26" fill="#0A0A0A"/>
+    <rect x="24" y="24" width="72" height="72" rx="10" stroke="#FAF8F5" stroke-width="3.5" fill="none"/>
+    <circle cx="60" cy="60" r="22" stroke="#FAF8F5" stroke-width="3.5" fill="none"/>
+    <text x="60" y="145" fill="#666" font-family="system-ui" font-size="11" text-anchor="middle">F. Circle in</text>
+  </g>
+
+  <!-- G. Square with dot -->
+  <g transform="translate(130, 155)">
+    <rect width="120" height="120" rx="26" fill="#0A0A0A"/>
+    <rect x="24" y="24" width="72" height="72" rx="10" stroke="#FAF8F5" stroke-width="4" fill="none"/>
+    <circle cx="60" cy="60" r="8" fill="#FAF8F5"/>
+    <text x="60" y="145" fill="#666" font-family="system-ui" font-size="11" text-anchor="middle">G. Dot core</text>
+  </g>
+
+  <!-- H. Thick/thin contrast -->
+  <g transform="translate(250, 155)">
+    <rect width="120" height="120" rx="26" fill="#0A0A0A"/>
+    <rect x="22" y="22" width="76" height="76" rx="14" stroke="#FAF8F5" stroke-width="6" fill="none"/>
+    <rect x="40" y="40" width="40" height="40" rx="8" stroke="#FAF8F5" stroke-width="2" fill="none"/>
+    <text x="60" y="145" fill="#666" font-family="system-ui" font-size="11" text-anchor="middle">H. Weight</text>
+  </g>
+
+  <!-- I. Corners only -->
+  <g transform="translate(370, 155)">
+    <rect width="120" height="120" rx="26" fill="#0A0A0A"/>
+    <!-- Four corners -->
+    <path d="M 24 40 L 24 24 L 40 24" stroke="#FAF8F5" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <path d="M 80 24 L 96 24 L 96 40" stroke="#FAF8F5" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <path d="M 96 80 L 96 96 L 80 96" stroke="#FAF8F5" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <path d="M 40 96 L 24 96 L 24 80" stroke="#FAF8F5" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <!-- Inner solid square -->
+    <rect x="44" y="44" width="32" height="32" rx="4" fill="#FAF8F5"/>
+    <text x="60" y="145" fill="#666" font-family="system-ui" font-size="11" text-anchor="middle">I. Corners</text>
+  </g>
+
+  <!-- J. Single square, offset line -->
+  <g transform="translate(490, 155)">
+    <rect width="120" height="120" rx="26" fill="#0A0A0A"/>
+    <rect x="28" y="28" width="64" height="64" rx="10" stroke="#FAF8F5" stroke-width="4" fill="none"/>
+    <line x1="50" y1="60" x2="70" y2="60" stroke="#FAF8F5" stroke-width="4" stroke-linecap="round"/>
+    <text x="60" y="145" fill="#666" font-family="system-ui" font-size="11" text-anchor="middle">J. Line in</text>
+  </g>
+</svg>

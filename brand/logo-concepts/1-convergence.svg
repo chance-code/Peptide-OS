@@ -1,0 +1,8 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <rect width="200" height="200" fill="#FAFAFA"/>
+
+  <!-- Three lines converging from left to right -->
+  <path d="M 40 70 Q 120 70, 160 100" stroke="#0A0A0A" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <path d="M 40 100 Q 120 100, 160 100" stroke="#0A0A0A" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <path d="M 40 130 Q 120 130, 160 100" stroke="#0A0A0A" stroke-width="4" fill="none" stroke-linecap="round"/>
+</svg>

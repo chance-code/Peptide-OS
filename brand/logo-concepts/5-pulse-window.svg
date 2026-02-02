@@ -1,0 +1,16 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <rect width="200" height="200" fill="#FAFAFA"/>
+
+  <!-- Rounded rectangle container -->
+  <rect x="45" y="55" width="110" height="90" rx="12"
+        stroke="#0A0A0A" stroke-width="5" fill="none"/>
+
+  <!-- Gentle wave through center -->
+  <path d="M 55 100
+           Q 75 85, 100 100
+           Q 125 115, 145 100"
+        stroke="#0A0A0A"
+        stroke-width="4"
+        fill="none"
+        stroke-linecap="round"/>
+</svg>

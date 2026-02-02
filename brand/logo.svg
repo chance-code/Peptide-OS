@@ -1,6 +1,6 @@
 <svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
-  <!-- The Core - Golden Ratio variant -->
-  <!-- Outer: 307, Inner: 307/1.618=190, Core: 190/1.618=117 -->
+  <!-- The Core - Golden Ratio -->
+  <!-- Proportions: Outer/Inner/Core = 1.618 ratio -->
   <rect width="1024" height="1024" fill="#0A0A0A"/>
 
   <!-- Outer ring -->
