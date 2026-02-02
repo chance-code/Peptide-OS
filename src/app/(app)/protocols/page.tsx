@@ -13,6 +13,17 @@ import { PullToRefresh } from '@/components/pull-to-refresh'
 import { StackAssessmentCard } from '@/components/stack-assessment-card'
 import { cn } from '@/lib/utils'
 import type { Protocol, Peptide, ItemType } from '@/types'
+import { PEPTIDE_REFERENCE } from '@/lib/peptide-reference'
+
+// Look up category from reference database by peptide name
+function getCategoryForPeptide(peptideName: string, dbCategory?: string | null): string {
+  if (dbCategory) return dbCategory
+  const ref = PEPTIDE_REFERENCE.find(p =>
+    p.name.toLowerCase() === peptideName.toLowerCase() ||
+    p.aliases?.some(a => a.toLowerCase() === peptideName.toLowerCase())
+  )
+  return ref?.category || 'other'
+}
 
 const CATEGORY_INFO: Record<string, { label: string; icon: typeof Pill; color: string }> = {
   healing: { label: 'Healing', icon: Heart, color: 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300' },
@@ -235,7 +246,8 @@ export default function ProtocolsPage() {
             {filteredProtocols.map((protocol, index) => {
               const stats = getProgressStats(protocol)
               const penUnits = getPenUnits(protocol)
-              const categoryInfo = CATEGORY_INFO[protocol.peptide.category || 'other'] || CATEGORY_INFO.other
+              const category = getCategoryForPeptide(protocol.peptide.name, protocol.peptide.category)
+              const categoryInfo = CATEGORY_INFO[category] || CATEGORY_INFO.other
               const CategoryIcon = categoryInfo.icon
 
               return (
