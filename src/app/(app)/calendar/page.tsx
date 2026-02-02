@@ -425,12 +425,12 @@ export default function CalendarPage() {
                   onClick={() => hasProtocols && setSelectedDay(dayData.date)}
                   disabled={!hasProtocols}
                   className={cn(
-                    'relative aspect-square rounded-2xl flex flex-col items-center justify-center transition-all duration-200',
+                    'relative aspect-square rounded-2xl flex flex-col items-center justify-center transition-all duration-200 overflow-hidden',
                     dayData.isCurrentMonth
                       ? 'text-[var(--foreground)]'
                       : 'text-[var(--muted-foreground)] opacity-50',
                     dayData.isToday && 'ring-2 ring-[var(--foreground)] ring-offset-2 ring-offset-[var(--background)]',
-                    hasProtocols && !isFuture && 'hover:scale-110 active:scale-95 cursor-pointer',
+                    hasProtocols && !isFuture && 'hover:scale-105 active:scale-95 cursor-pointer',
                     !hasProtocols && 'cursor-default'
                   )}
                   style={getBgStyle()}
@@ -442,14 +442,14 @@ export default function CalendarPage() {
                     {format(dayData.date, 'd')}
                   </span>
 
-                  {/* Completion indicator */}
+                  {/* Completion indicator - limit to 4 dots max */}
                   {hasProtocols && dayData.isCurrentMonth && !isFuture && (
-                    <div className="mt-0.5 flex gap-0.5">
-                      {dayData.protocols.map((p, i) => (
+                    <div className="mt-0.5 flex gap-0.5 max-w-full px-1">
+                      {dayData.protocols.slice(0, 4).map((p, i) => (
                         <div
                           key={i}
                           className={cn(
-                            'w-1.5 h-1.5 rounded-full transition-all',
+                            'w-1 h-1 rounded-full flex-shrink-0',
                             p.status === 'completed' && 'bg-[var(--success)]',
                             p.status === 'missed' && 'bg-[var(--error)]',
                             p.status === 'skipped' && 'bg-[var(--muted-foreground)]',
@@ -457,6 +457,9 @@ export default function CalendarPage() {
                           )}
                         />
                       ))}
+                      {dayData.protocols.length > 4 && (
+                        <span className="text-[8px] text-[var(--muted-foreground)]">+</span>
+                      )}
                     </div>
                   )}
 

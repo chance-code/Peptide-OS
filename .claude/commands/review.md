@@ -25,10 +25,21 @@ Review the code changes for this project. Check for:
 - [ ] No setState in effects without cleanup
 - [ ] Components handle loading/error states
 
-## iOS/Mobile
+## iOS/Mobile UI
 - [ ] Bottom nav spacing uses `pb-[env(safe-area-inset-bottom)]`
 - [ ] Touch targets are at least 44px
-- [ ] Tested on mobile viewport
+- [ ] Tested on mobile viewport (375px width)
+- [ ] Text is readable (sufficient contrast, appropriate size)
+- [ ] Containers have `overflow-hidden` where needed to prevent bleed
+- [ ] Flex/grid children use `flex-shrink-0` or `min-w-0` to prevent overflow
+- [ ] Dynamic content (lists, dots, badges) is limited or truncated
+- [ ] No horizontal scroll on mobile unless intentional
+
+## Visual/Brand
+- [ ] Colors use CSS variables (`var(--foreground)`, `var(--muted)`, etc.)
+- [ ] No hardcoded colors that break dark mode
+- [ ] Spacing is consistent (use Tailwind scale)
+- [ ] Rounded corners are consistent (`rounded-xl`, `rounded-2xl`)
 
 If reviewing specific files: $ARGUMENTS
 
