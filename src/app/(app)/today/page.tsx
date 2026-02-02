@@ -133,7 +133,7 @@ export default function TodayPage() {
       return res.json()
     },
     enabled: !!currentUserId,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: 1000 * 30, // 30 seconds - doses need fresh data
   })
 
   const handleRefresh = useCallback(async () => {
@@ -210,20 +210,26 @@ export default function TodayPage() {
     })
 
     const dateStr = format(selectedDate, 'yyyy-MM-dd') + 'T12:00:00.000Z'
-    fetch('/api/doses', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        userId: currentUserId,
-        protocolId: item.protocolId,
-        scheduledDate: dateStr,
-        status,
-        timing: item.timing,
-      }),
-    }).catch((error) => {
+    try {
+      const res = await fetch('/api/doses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: currentUserId,
+          protocolId: item.protocolId,
+          scheduledDate: dateStr,
+          status,
+          timing: item.timing,
+        }),
+      })
+      if (!res.ok) {
+        console.error('Failed to save dose:', await res.text())
+        refetch() // Revert optimistic update
+      }
+    } catch (error) {
       console.error('Error updating dose:', error)
-      refetch()
-    })
+      refetch() // Revert optimistic update
+    }
   }
 
   async function handleMarkAllDone() {
