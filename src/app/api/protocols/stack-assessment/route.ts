@@ -103,7 +103,11 @@ Respond with valid JSON only (no markdown):
       return NextResponse.json({ error: 'Failed to parse AI response' }, { status: 500 })
     }
 
-    return NextResponse.json(assessment)
+    return NextResponse.json(assessment, {
+      headers: {
+        'Cache-Control': 'private, max-age=3600', // 1 hour cache
+      },
+    })
   } catch (error) {
     console.error('Stack assessment error:', error)
     return NextResponse.json({ error: 'Failed to generate assessment' }, { status: 500 })

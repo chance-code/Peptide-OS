@@ -19,10 +19,7 @@ export async function GET(request: NextRequest) {
       },
       include: {
         peptide: true,
-        doseLogs: {
-          orderBy: { scheduledDate: 'desc' },
-          take: 30,
-        },
+        // Note: doseLogs removed - fetch separately when needed for specific protocol
       },
       orderBy: { createdAt: 'desc' },
     })

@@ -45,7 +45,11 @@ export async function GET(request: NextRequest) {
       orderBy: { scheduledDate: 'desc' },
     })
 
-    return NextResponse.json(doses)
+    return NextResponse.json(doses, {
+      headers: {
+        'Cache-Control': 'private, max-age=30', // 30 second cache
+      },
+    })
   } catch (error) {
     console.error('Error fetching doses:', error)
     return NextResponse.json({ error: 'Failed to fetch doses' }, { status: 500 })

@@ -94,6 +94,8 @@ export const SUPPLEMENT_REFERENCE: SupplementReference[] = [
   { name: 'Green Tea Extract', aliases: ['EGCG'], benefit: 'Metabolism & Antioxidant' },
 
   // Hormones/Hormone Support
+  { name: 'Enclomiphene', aliases: ['Enclomiphene Citrate', 'Androxal'], benefit: 'Testosterone & Fertility' },
+  { name: 'Clomiphene', aliases: ['Clomid', 'Clomiphene Citrate'], benefit: 'Testosterone & Fertility' },
   { name: 'DHEA', aliases: ['Dehydroepiandrosterone'], benefit: 'Hormone Balance' },
   { name: 'Pregnenolone', aliases: [], benefit: 'Hormone & Brain' },
   { name: 'Melatonin', aliases: [], benefit: 'Sleep' },

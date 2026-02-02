@@ -138,7 +138,11 @@ export async function GET(
       )
     }
 
-    return NextResponse.json(insights)
+    return NextResponse.json(insights, {
+      headers: {
+        'Cache-Control': 'private, max-age=3600', // 1 hour cache - insights don't change often
+      },
+    })
   } catch (error) {
     console.error('Insights error:', error)
     return NextResponse.json(

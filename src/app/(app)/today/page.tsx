@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { format } from 'date-fns'
-import confetti from 'canvas-confetti'
+import type { CreateTypes } from 'canvas-confetti'
 import {
   Check,
   CheckCheck,
@@ -84,8 +84,9 @@ interface TodayResponse {
   }
 }
 
-// Trigger confetti celebration
-function triggerConfetti() {
+// Trigger confetti celebration (dynamic import for smaller bundle)
+async function triggerConfetti() {
+  const confetti = (await import('canvas-confetti')).default as CreateTypes
   const colors = ['#22c55e', '#6366f1', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4']
 
   confetti({
