@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
 import { format, differenceInDays } from 'date-fns'
-import { Plus, Play, Pause, Infinity, Syringe, Pill, Heart, Zap, Scale, Sparkles } from 'lucide-react'
+import { Plus, Play, Pause, Infinity, Syringe, Pill } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -14,57 +14,59 @@ import { StackAssessmentCard } from '@/components/stack-assessment-card'
 import { cn } from '@/lib/utils'
 import type { Protocol, Peptide, ItemType } from '@/types'
 import { PEPTIDE_REFERENCE } from '@/lib/peptide-reference'
-import { getSupplementCategory } from '@/lib/supplement-reference'
+import { getSupplementBenefit } from '@/lib/supplement-reference'
 
-// Look up category from reference database by peptide name
-function getCategoryForItem(name: string, itemType?: string | null, dbCategory?: string | null): string {
-  // Use database category if set
-  if (dbCategory) return dbCategory
+// Peptide benefit descriptions
+const PEPTIDE_BENEFITS: Record<string, string> = {
+  'healing': 'Tissue Repair',
+  'growth-hormone': 'GH & Recovery',
+  'weight-loss': 'Fat Loss',
+  'cosmetic': 'Skin & Hair',
+  'other': 'Peptide',
+}
 
-  // If it's a supplement, look up in supplement reference
+// Get label for an item (peptide or supplement)
+function getItemLabel(name: string, itemType?: string | null): { label: string; color: string } {
+  // For supplements, look up benefit
   if (itemType === 'supplement') {
-    return getSupplementCategory(name)
+    const benefit = getSupplementBenefit(name)
+    if (benefit) {
+      return { label: benefit, color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300' }
+    }
+    return { label: 'Supplement', color: 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300' }
   }
 
-  // For peptides, look up in peptide reference
+  // For peptides, look up in reference
   const normalizedName = name.toLowerCase().trim()
   const ref = PEPTIDE_REFERENCE.find(p => {
     const peptideName = p.name.toLowerCase()
-    // Exact match
     if (peptideName === normalizedName) return true
-    // Alias match
     if (p.aliases?.some(a => a.toLowerCase() === normalizedName)) return true
-    // Partial/fuzzy match - name contains or is contained
+    // More aggressive partial matching
     if (normalizedName.includes(peptideName) || peptideName.includes(normalizedName)) return true
-    // Alias partial match
     if (p.aliases?.some(a =>
       normalizedName.includes(a.toLowerCase()) ||
       a.toLowerCase().includes(normalizedName)
     )) return true
+    // Match without hyphens/spaces
+    const cleanName = normalizedName.replace(/[-\s]/g, '')
+    const cleanPeptide = peptideName.replace(/[-\s]/g, '')
+    if (cleanName.includes(cleanPeptide) || cleanPeptide.includes(cleanName)) return true
     return false
   })
 
-  return ref?.category || 'other'
-}
+  const category = ref?.category || 'other'
+  const label = PEPTIDE_BENEFITS[category] || 'Peptide'
 
-const CATEGORY_INFO: Record<string, { label: string; icon: typeof Pill; color: string }> = {
-  // Peptide categories
-  healing: { label: 'Healing', icon: Heart, color: 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300' },
-  'growth-hormone': { label: 'GH', icon: Zap, color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300' },
-  'weight-loss': { label: 'Weight Loss', icon: Scale, color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300' },
-  cosmetic: { label: 'Cosmetic', icon: Sparkles, color: 'bg-pink-100 text-pink-800 dark:bg-pink-900/50 dark:text-pink-300' },
-  // Supplement categories
-  vitamin: { label: 'Vitamin', icon: Pill, color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300' },
-  mineral: { label: 'Mineral', icon: Pill, color: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/50 dark:text-cyan-300' },
-  'amino-acid': { label: 'Amino Acid', icon: Pill, color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300' },
-  nootropic: { label: 'Nootropic', icon: Sparkles, color: 'bg-violet-100 text-violet-800 dark:bg-violet-900/50 dark:text-violet-300' },
-  adaptogen: { label: 'Adaptogen', icon: Heart, color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300' },
-  omega: { label: 'Omega', icon: Pill, color: 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300' },
-  probiotic: { label: 'Probiotic', icon: Pill, color: 'bg-lime-100 text-lime-800 dark:bg-lime-900/50 dark:text-lime-300' },
-  herb: { label: 'Herb', icon: Heart, color: 'bg-teal-100 text-teal-800 dark:bg-teal-900/50 dark:text-teal-300' },
-  hormone: { label: 'Hormone', icon: Zap, color: 'bg-rose-100 text-rose-800 dark:bg-rose-900/50 dark:text-rose-300' },
-  antioxidant: { label: 'Antioxidant', icon: Sparkles, color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-300' },
-  other: { label: 'Other', icon: Pill, color: 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300' },
+  const colors: Record<string, string> = {
+    'healing': 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300',
+    'growth-hormone': 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300',
+    'weight-loss': 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300',
+    'cosmetic': 'bg-pink-100 text-pink-800 dark:bg-pink-900/50 dark:text-pink-300',
+    'other': 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300',
+  }
+
+  return { label, color: colors[category] || colors.other }
 }
 
 interface ProtocolWithPeptide extends Protocol {
@@ -280,9 +282,7 @@ export default function ProtocolsPage() {
             {filteredProtocols.map((protocol, index) => {
               const stats = getProgressStats(protocol)
               const penUnits = getPenUnits(protocol)
-              const category = getCategoryForItem(protocol.peptide.name, protocol.peptide.type, protocol.peptide.category)
-              const categoryInfo = CATEGORY_INFO[category] || CATEGORY_INFO.other
-              const CategoryIcon = categoryInfo.icon
+              const { label, color } = getItemLabel(protocol.peptide.name, protocol.peptide.type)
 
               return (
                 <Link key={protocol.id} href={`/protocols/${protocol.id}`}>
@@ -294,9 +294,8 @@ export default function ProtocolsPage() {
                             <span className="font-medium text-slate-900 dark:text-white">
                               {protocol.peptide.name}
                             </span>
-                            <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1', categoryInfo.color)}>
-                              <CategoryIcon className="w-3 h-3" />
-                              {categoryInfo.label}
+                            <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full', color)}>
+                              {label}
                             </span>
                             {penUnits && (
                               <span className="bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 text-xs font-semibold px-2 py-0.5 rounded-full">
