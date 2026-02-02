@@ -68,6 +68,11 @@ if (!res.ok) {
 - `prisma/schema.prisma` - Requires migration
 - `ios/` - Native iOS project files
 
+## Git Workflow
+
+- Always push to origin immediately after committing
+- Deploy with `vercel --prod` after pushing
+
 ## Common Mistakes to Avoid
 
 1. **fetch() doesn't throw on 4xx/5xx** - must check `res.ok`
