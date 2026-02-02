@@ -16,13 +16,48 @@ import type { Protocol, Peptide, ItemType } from '@/types'
 import { PEPTIDE_REFERENCE } from '@/lib/peptide-reference'
 import { getSupplementBenefit } from '@/lib/supplement-reference'
 
-// Peptide benefit descriptions
-const PEPTIDE_BENEFITS: Record<string, string> = {
+// Peptide benefit descriptions by category
+const CATEGORY_BENEFITS: Record<string, string> = {
   'healing': 'Tissue Repair',
   'growth-hormone': 'GH & Recovery',
   'weight-loss': 'Fat Loss',
   'cosmetic': 'Skin & Hair',
-  'other': 'Peptide',
+}
+
+// Specific benefit labels for peptides in "other" category
+const SPECIFIC_PEPTIDE_BENEFITS: Record<string, string> = {
+  'pt-141': 'Libido & Function',
+  'bremelanotide': 'Libido & Function',
+  'epithalon': 'Longevity & Telomeres',
+  'epitalon': 'Longevity & Telomeres',
+  'thymosin alpha-1': 'Immune Support',
+  'ta1': 'Immune Support',
+  'll-37': 'Immune & Antimicrobial',
+  'cathelicidin': 'Immune & Antimicrobial',
+  'selank': 'Anxiety & Cognition',
+  'semax': 'Focus & Cognition',
+  'nad+': 'Energy & Longevity',
+  'nad': 'Energy & Longevity',
+  'glutathione': 'Detox & Antioxidant',
+  'gsh': 'Detox & Antioxidant',
+  'dsip': 'Sleep & Recovery',
+  'dihexa': 'Brain & Memory',
+  'p21': 'Cognition & BDNF',
+  'p-21': 'Cognition & BDNF',
+  'fgl': 'Brain & Nerves',
+  'cerebrolysin': 'Brain & Neuroprotection',
+  'cortexin': 'Brain & Neuroprotection',
+  'na-selank': 'Calm & Focus',
+  'na-semax': 'Focus & Energy',
+  'thymalin': 'Immune & Thymus',
+  'humanin': 'Longevity & Mitochondria',
+  'ss-31': 'Energy & Mitochondria',
+  'elamipretide': 'Energy & Mitochondria',
+  'kisspeptin': 'Hormones & Fertility',
+  'kisspeptin-10': 'Hormones & Fertility',
+  'gonadorelin': 'Testosterone Support',
+  'gnrh': 'Testosterone Support',
+  'vip': 'Immune & Neuro',
 }
 
 // Get label for an item (peptide or supplement)
@@ -56,14 +91,26 @@ function getItemLabel(name: string, itemType?: string | null): { label: string; 
   })
 
   const category = ref?.category || 'other'
-  const label = PEPTIDE_BENEFITS[category] || 'Peptide'
+
+  // For "other" category, check for specific benefit labels
+  let label: string
+  if (category === 'other') {
+    // Try to find a specific benefit for this peptide
+    const specificBenefit = SPECIFIC_PEPTIDE_BENEFITS[normalizedName] ||
+      Object.entries(SPECIFIC_PEPTIDE_BENEFITS).find(([key]) =>
+        normalizedName.includes(key) || key.includes(normalizedName)
+      )?.[1]
+    label = specificBenefit || 'Peptide'
+  } else {
+    label = CATEGORY_BENEFITS[category] || 'Peptide'
+  }
 
   const colors: Record<string, string> = {
     'healing': 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300',
     'growth-hormone': 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300',
     'weight-loss': 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300',
     'cosmetic': 'bg-pink-100 text-pink-800 dark:bg-pink-900/50 dark:text-pink-300',
-    'other': 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300',
+    'other': 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300',
   }
 
   return { label, color: colors[category] || colors.other }
