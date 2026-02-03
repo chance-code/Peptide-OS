@@ -514,7 +514,7 @@ export default function NewProtocolPage() {
 
   return (
     <div className="p-4 pb-24">
-      <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-4">New Protocol</h2>
+      <h2 className="text-xl font-semibold text-[var(--foreground)] mb-4">New Protocol</h2>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Type Selector */}
@@ -569,7 +569,7 @@ export default function NewProtocolPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <p className="text-sm text-slate-500 dark:text-slate-400">
+              <p className="text-sm text-[var(--muted-foreground)]">
                 Take a photo of your peptide vial to auto-fill peptide name and vial size.
               </p>
 
@@ -615,16 +615,16 @@ export default function NewProtocolPage() {
                       <AlertCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0" />
                     )}
                     <div className="flex-1 text-sm">
-                      <div className="font-medium text-slate-900 dark:text-white">
+                      <div className="font-medium text-[var(--foreground)]">
                         {peptideScanResult.peptideName || 'Unknown peptide'}
                       </div>
                       {peptideScanResult.amount && (
-                        <div className="text-slate-600 dark:text-slate-300">
+                        <div className="text-[var(--muted-foreground)]">
                           {peptideScanResult.amount} {peptideScanResult.unit || 'mg'} vial
                         </div>
                       )}
                       {peptideScanResult.confidence !== 'high' && (
-                        <div className="text-xs mt-1 text-slate-500 dark:text-slate-400">
+                        <div className="text-xs mt-1 text-[var(--muted-foreground)]">
                           Review and edit the details below if needed
                         </div>
                       )}
@@ -652,7 +652,7 @@ export default function NewProtocolPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <p className="text-sm text-slate-500 dark:text-slate-400">
+              <p className="text-sm text-[var(--muted-foreground)]">
                 Take photos of your supplement bottle to auto-fill the form. Add front and back for best results.
               </p>
 
@@ -674,7 +674,7 @@ export default function NewProtocolPage() {
                       <img
                         src={img}
                         alt={`Scan ${index + 1}`}
-                        className="w-20 h-20 object-cover rounded-lg border border-slate-200 dark:border-slate-600"
+                        className="w-20 h-20 object-cover rounded-lg border border-[var(--border)]"
                       />
                       <button
                         type="button"
@@ -749,20 +749,20 @@ export default function NewProtocolPage() {
                       }`} />
                     )}
                     <div className="flex-1 text-sm">
-                      <div className="font-medium text-slate-900 dark:text-white">
+                      <div className="font-medium text-[var(--foreground)]">
                         {scanResult.name || 'Unknown supplement'}
-                        {scanResult.brand && <span className="text-slate-500 dark:text-slate-400"> by {scanResult.brand}</span>}
+                        {scanResult.brand && <span className="text-[var(--muted-foreground)]"> by {scanResult.brand}</span>}
                       </div>
                       {scanResult.servingSize && scanResult.servingUnit && (
-                        <div className="text-slate-600 dark:text-slate-300">
+                        <div className="text-[var(--muted-foreground)]">
                           {scanResult.servingSize} {scanResult.servingUnit}{scanResult.servingSize > 1 ? 's' : ''} per serving
                         </div>
                       )}
                       {scanResult.dosage && (
-                        <div className="text-slate-500 dark:text-slate-400">{scanResult.dosage}</div>
+                        <div className="text-[var(--muted-foreground)]">{scanResult.dosage}</div>
                       )}
                       {scanResult.confidence !== 'high' && (
-                        <div className="text-xs mt-1 text-slate-500 dark:text-slate-400">
+                        <div className="text-xs mt-1 text-[var(--muted-foreground)]">
                           Review and edit the details below if needed
                         </div>
                       )}
@@ -940,7 +940,7 @@ export default function NewProtocolPage() {
               />
             ) : (
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
                   When to take
                 </label>
                 <div className="flex gap-2 mb-3">
@@ -1005,14 +1005,14 @@ export default function NewProtocolPage() {
               <CardTitle className="text-base">
                 Reconstitution Info {!showReconstitution && '(optional)'}
               </CardTitle>
-              <span className="text-slate-400 text-sm">
+              <span className="text-[var(--muted-foreground)] text-sm">
                 {showReconstitution ? '−' : '+'}
               </span>
             </button>
           </CardHeader>
           {showReconstitution && (
             <CardContent className="space-y-3">
-              <p className="text-sm text-slate-500 dark:text-slate-400">Enter your vial size - BAC water will be suggested automatically</p>
+              <p className="text-sm text-[var(--muted-foreground)]">Enter your vial size - BAC water will be suggested automatically</p>
               <div className="flex gap-3">
                 <div className="flex-1">
                   <Input
@@ -1063,13 +1063,13 @@ export default function NewProtocolPage() {
 
                       {/* Key Info */}
                       <div className="grid grid-cols-2 gap-3 text-sm">
-                        <div className="bg-white dark:bg-slate-800 rounded-lg p-2 text-center">
-                          <div className="text-slate-500 dark:text-slate-400 text-xs">Concentration</div>
-                          <div className="font-semibold text-slate-900 dark:text-white">{concentrationStr}</div>
+                        <div className="bg-[var(--background)] rounded-lg p-2 text-center">
+                          <div className="text-[var(--muted-foreground)] text-xs">Concentration</div>
+                          <div className="font-semibold text-[var(--foreground)]">{concentrationStr}</div>
                         </div>
-                        <div className="bg-white dark:bg-slate-800 rounded-lg p-2 text-center">
-                          <div className="text-slate-500 dark:text-slate-400 text-xs">Doses per vial</div>
-                          <div className="font-semibold text-slate-900 dark:text-white">~{dosesPerVial}</div>
+                        <div className="bg-[var(--background)] rounded-lg p-2 text-center">
+                          <div className="text-[var(--muted-foreground)] text-xs">Doses per vial</div>
+                          <div className="font-semibold text-[var(--foreground)]">~{dosesPerVial}</div>
                         </div>
                       </div>
 
@@ -1132,7 +1132,7 @@ export default function NewProtocolPage() {
 
             {frequency === 'custom' && (
               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
                   Select Days
                 </label>
                 <div className="flex flex-wrap gap-2">
@@ -1143,8 +1143,8 @@ export default function NewProtocolPage() {
                       onClick={() => toggleCustomDay(day.value)}
                       className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                         customDays.includes(day.value)
-                          ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900'
-                          : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                          ? 'bg-[var(--foreground)] text-[var(--background)]'
+                          : 'bg-[var(--muted)] text-[var(--muted-foreground)] hover:bg-[var(--border)]'
                       }`}
                     >
                       {day.label}
@@ -1165,7 +1165,7 @@ export default function NewProtocolPage() {
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 dark:focus:ring-slate-400 min-h-[80px] placeholder:text-slate-400 dark:placeholder:text-slate-500"
+              className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)] min-h-[80px] placeholder:text-[var(--muted-foreground)]"
               placeholder="Any additional notes..."
             />
           </CardContent>
