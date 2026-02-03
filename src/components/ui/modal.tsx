@@ -54,7 +54,7 @@ export function Modal({ isOpen, onClose, title, children, className }: ModalProp
             </Button>
           </div>
         )}
-        <div className="p-4">{children}</div>
+        <div className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">{children}</div>
       </div>
     </div>
   )

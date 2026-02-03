@@ -317,7 +317,7 @@ export default function CalendarPage() {
 
   return (
     <PullToRefresh onRefresh={handleRefresh} className="h-full">
-      <div className="px-4 pb-24">
+      <div className="px-4 pb-24 pt-[env(safe-area-inset-top)]">
         {/* Header with month navigation */}
         <div className="flex items-center justify-between py-4">
           <button

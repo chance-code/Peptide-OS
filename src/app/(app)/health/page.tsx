@@ -241,7 +241,7 @@ export default function HealthDashboardNew() {
   }
 
   // Fetch real health metrics (60 days)
-  const { data: realMetricsData } = useQuery({
+  const { data: realMetricsData, isLoading: isLoadingMetrics } = useQuery({
     queryKey: ['health-metrics-raw', currentUserId],
     queryFn: async () => {
       if (!currentUserId) return null
@@ -480,11 +480,61 @@ export default function HealthDashboardNew() {
     }
   }, [useDemoData, realMetrics, realProtocols])
 
+  // Loading state: queries still in flight and user has connected integrations
+  if (!processedData && isLoadingMetrics && hasConnectedIntegrations) {
+    return (
+      <div className="min-h-screen bg-[var(--background)] pb-24">
+        <div className="sticky top-0 z-10 glass border-b border-[var(--border)] pt-[env(safe-area-inset-top)]">
+          <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
+            <h1 className="text-lg font-semibold text-[var(--foreground)]">Health</h1>
+            <Loader2 className="w-4 h-4 animate-spin text-[var(--muted-foreground)]" />
+          </div>
+        </div>
+        <div className="max-w-lg mx-auto px-4 py-6 space-y-6">
+          {/* Trajectory skeleton */}
+          <div className="rounded-2xl bg-[var(--card)] border border-[var(--border)] p-6 space-y-4">
+            <div className="h-4 w-40 bg-[var(--muted)] rounded animate-pulse" />
+            <div className="h-8 w-32 bg-[var(--muted)] rounded animate-pulse" />
+            <div className="h-4 w-64 bg-[var(--muted)] rounded animate-pulse" />
+            <div className="flex gap-3 mt-4">
+              <div className="h-10 flex-1 bg-[var(--muted)] rounded-lg animate-pulse" />
+              <div className="h-10 flex-1 bg-[var(--muted)] rounded-lg animate-pulse" />
+              <div className="h-10 flex-1 bg-[var(--muted)] rounded-lg animate-pulse" />
+            </div>
+          </div>
+          {/* Category cards skeleton */}
+          <div className="grid grid-cols-3 gap-3">
+            {[0, 1, 2].map(i => (
+              <div key={i} className="rounded-xl bg-[var(--card)] border border-[var(--border)] p-3 space-y-2">
+                <div className="h-3 w-12 bg-[var(--muted)] rounded animate-pulse" />
+                <div className="h-5 w-16 bg-[var(--muted)] rounded animate-pulse" />
+              </div>
+            ))}
+          </div>
+          {/* What matters skeleton */}
+          <div className="rounded-xl bg-[var(--card)] border border-[var(--border)] p-5 space-y-3">
+            <div className="h-3 w-32 bg-[var(--muted)] rounded animate-pulse" />
+            {[0, 1, 2].map(i => (
+              <div key={i} className="flex items-center gap-4 py-2">
+                <div className="w-8 h-8 bg-[var(--muted)] rounded-full animate-pulse" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 w-24 bg-[var(--muted)] rounded animate-pulse" />
+                  <div className="h-3 w-48 bg-[var(--muted)] rounded animate-pulse" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // No data state: queries resolved but no connected integrations or insufficient data
   if (!processedData) {
     const appleHealthIntegration = integrations?.find((i: Integration) => i.provider === 'apple_health')
 
     return (
-      <div className="min-h-screen bg-[var(--background)] p-4">
+      <div className="min-h-screen bg-[var(--background)] p-4 pt-[env(safe-area-inset-top)]">
         <div className="max-w-lg mx-auto pt-8">
           <div className="text-center mb-8">
             <Activity className="w-12 h-12 text-[var(--muted-foreground)] mx-auto mb-4" />
@@ -557,7 +607,7 @@ export default function HealthDashboardNew() {
   return (
     <div className="min-h-screen bg-[var(--background)] pb-24">
       {/* Header */}
-      <div className="sticky top-0 z-10 glass border-b border-[var(--border)]">
+      <div className="sticky top-0 z-10 glass border-b border-[var(--border)] pt-[env(safe-area-inset-top)]">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
           <h1 className="text-lg font-semibold text-[var(--foreground)]">Health</h1>
           <div className="flex items-center gap-2">
@@ -882,6 +932,32 @@ export default function HealthDashboardNew() {
           </div>
         )}
       </div>
+
+      {/* Permission-denied banner — shown above fold */}
+      {(() => {
+        if (useDemoData) return null
+        const connectedWithState = integrations?.find((i: Integration) => i.isConnected && i.metricSyncState)
+        const syncState = connectedWithState?.metricSyncState
+        const deniedList = syncState
+          ? Object.entries(syncState).filter(([, s]) => s.status === 'permission_denied')
+          : []
+        if (deniedList.length === 0) return null
+        return (
+          <div className="max-w-lg mx-auto px-4 pt-4">
+            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium text-[var(--foreground)]">
+                  {deniedList.length} metric{deniedList.length > 1 ? 's' : ''} need{deniedList.length === 1 ? 's' : ''} permission
+                </div>
+                <p className="text-xs text-[var(--muted-foreground)] mt-0.5">
+                  Open Settings &gt; Privacy &gt; Health &gt; Arc Protocol to enable: {deniedList.map(([mt]) => getMetricDisplayName(mt)).join(', ')}
+                </p>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       <div className="max-w-lg mx-auto px-4 py-6 space-y-6">
         {/* ═══════════════ TODAY TAB ═══════════════ */}
