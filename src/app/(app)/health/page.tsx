@@ -535,7 +535,7 @@ export default function HealthDashboardNew() {
   if (!processedData && isLoadingMetrics && hasConnectedIntegrations) {
     return (
       <div className="min-h-screen bg-[var(--background)] pb-24">
-        <div className="sticky top-0 z-10 glass border-b border-[var(--border)] pt-[env(safe-area-inset-top)]">
+        <div className="glass border-b border-[var(--border)]">
           <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
             <h1 className="text-lg font-semibold text-[var(--foreground)]">Health</h1>
             <Loader2 className="w-4 h-4 animate-spin text-[var(--muted-foreground)]" />
@@ -658,7 +658,7 @@ export default function HealthDashboardNew() {
   return (
     <div className="min-h-full bg-[var(--background)] pb-4">
       {/* Header */}
-      <div className="sticky top-0 z-10 glass border-b border-[var(--border)]">
+      <div className="glass border-b border-[var(--border)]">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
           <h1 className="text-lg font-semibold text-[var(--foreground)]">Health</h1>
           <div className="flex items-center gap-2">

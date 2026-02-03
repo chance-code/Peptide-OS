@@ -281,7 +281,7 @@ export default function TodayPage() {
   const hasExpiredVials = data?.items.some(item => item.vialExpired) || false
 
   return (
-    <div className="pt-[env(safe-area-inset-top)]">
+    <div>
       <AlertsBanner />
 
       <PullToRefresh onRefresh={handleRefresh} className="h-full">
