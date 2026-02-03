@@ -32,17 +32,17 @@ function PeptideCard({ peptide }: { peptide: PeptideReference }) {
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
-                <span className="font-semibold text-slate-900 dark:text-white">{peptide.name}</span>
+                <span className="font-semibold text-[var(--foreground)]">{peptide.name}</span>
                 <Badge className={cn('text-xs', categoryInfo.color)}>
                   <CategoryIcon className="w-3 h-3 mr-1" />
                   {categoryInfo.label}
                 </Badge>
               </div>
               {peptide.description && !isExpanded && (
-                <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-1">{peptide.description}</p>
+                <p className="text-sm text-[var(--muted-foreground)] line-clamp-1">{peptide.description}</p>
               )}
             </div>
-            <div className="ml-2 text-slate-400">
+            <div className="ml-2 text-[var(--muted-foreground)]">
               {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
             </div>
           </div>
@@ -50,36 +50,36 @@ function PeptideCard({ peptide }: { peptide: PeptideReference }) {
       </button>
 
       {isExpanded && (
-        <div className="px-4 pb-4 pt-0 border-t border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/50">
+        <div className="px-4 pb-4 pt-0 border-t border-[var(--border)] bg-[var(--muted)]/50">
           {/* Full description */}
           {peptide.description && (
-            <p className="text-sm text-slate-600 dark:text-slate-300 pt-3 pb-2">
+            <p className="text-sm text-[var(--muted-foreground)] pt-3 pb-2">
               {peptide.description}
             </p>
           )}
           <div className="grid grid-cols-2 gap-3 pt-2">
             <div>
-              <div className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Typical Dose</div>
-              <div className="font-medium text-slate-900 dark:text-white">
+              <div className="text-xs text-[var(--muted-foreground)] uppercase tracking-wide mb-1">Typical Dose</div>
+              <div className="font-medium text-[var(--foreground)]">
                 {peptide.typicalDose.min === peptide.typicalDose.max
                   ? `${peptide.typicalDose.min} ${peptide.typicalDose.unit}`
                   : `${peptide.typicalDose.min}-${peptide.typicalDose.max} ${peptide.typicalDose.unit}`}
               </div>
             </div>
             <div>
-              <div className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Vial Sizes</div>
-              <div className="font-medium text-slate-900 dark:text-white">
+              <div className="text-xs text-[var(--muted-foreground)] uppercase tracking-wide mb-1">Vial Sizes</div>
+              <div className="font-medium text-[var(--foreground)]">
                 {peptide.typicalVialSizes.map(v => `${v.amount}${v.unit}`).join(', ')}
               </div>
             </div>
             <div>
-              <div className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">BAC Water</div>
-              <div className="font-medium text-slate-900 dark:text-white">{peptide.recommendedDiluentMl} mL</div>
+              <div className="text-xs text-[var(--muted-foreground)] uppercase tracking-wide mb-1">BAC Water</div>
+              <div className="font-medium text-[var(--foreground)]">{peptide.recommendedDiluentMl} mL</div>
             </div>
             {peptide.aliases && peptide.aliases.length > 0 && (
               <div>
-                <div className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Also Known As</div>
-                <div className="font-medium text-slate-900 dark:text-white text-sm">
+                <div className="text-xs text-[var(--muted-foreground)] uppercase tracking-wide mb-1">Also Known As</div>
+                <div className="font-medium text-[var(--foreground)] text-sm">
                   {peptide.aliases.slice(0, 2).join(', ')}
                 </div>
               </div>
@@ -119,11 +119,11 @@ export default function LibraryPage() {
 
   return (
     <div className="p-4 pb-20">
-      <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-4">Peptide Library</h2>
+      <h2 className="text-xl font-semibold text-[var(--foreground)] mb-4">Peptide Library</h2>
 
       {/* Search */}
       <div className="relative mb-4">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted-foreground)]" />
         <Input
           placeholder="Search peptides..."
           value={search}
@@ -139,8 +139,8 @@ export default function LibraryPage() {
           className={cn(
             'px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors',
             selectedCategory === null
-              ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
-              : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+              ? 'bg-[var(--foreground)] text-[var(--background)]'
+              : 'bg-[var(--muted)] text-[var(--muted-foreground)] hover:bg-[var(--border)]'
           )}
         >
           All
@@ -152,8 +152,8 @@ export default function LibraryPage() {
             className={cn(
               'px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors',
               selectedCategory === key
-                ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
-                : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                ? 'bg-[var(--foreground)] text-[var(--background)]'
+                : 'bg-[var(--muted)] text-[var(--muted-foreground)] hover:bg-[var(--border)]'
             )}
           >
             {label}
@@ -162,7 +162,7 @@ export default function LibraryPage() {
       </div>
 
       {/* Results count */}
-      <div className="text-sm text-slate-500 dark:text-slate-400 mb-3">
+      <div className="text-sm text-[var(--muted-foreground)] mb-3">
         {filteredPeptides.length} peptide{filteredPeptides.length !== 1 ? 's' : ''}
       </div>
 
@@ -177,15 +177,15 @@ export default function LibraryPage() {
         {filteredPeptides.length === 0 && (
           <Card>
             <CardContent className="py-8 text-center">
-              <p className="text-slate-500 dark:text-slate-400">No peptides found</p>
-              <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">Try a different search term</p>
+              <p className="text-[var(--muted-foreground)]">No peptides found</p>
+              <p className="text-sm text-[var(--muted-foreground)] mt-1">Try a different search term</p>
             </CardContent>
           </Card>
         )}
       </div>
 
       {/* Info note */}
-      <div className="mt-6 text-center text-xs text-slate-400 dark:text-slate-500">
+      <div className="mt-6 text-center text-xs text-[var(--muted-foreground)]">
         Tap a peptide for dosing details
       </div>
     </div>

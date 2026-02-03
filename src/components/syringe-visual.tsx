@@ -21,19 +21,19 @@ export function SyringeVisual({ units, dose, concentration, maxUnits = 20 }: Syr
 
   return (
     <div className="mt-3">
-      <div className="text-sm font-medium text-slate-700 mb-2">Draw to {units} units</div>
+      <div className="text-sm font-medium text-[var(--foreground)] mb-2">Draw to {units} units</div>
 
       {/* Syringe Container */}
-      <div className="relative bg-slate-100 rounded-lg p-3">
+      <div className="relative bg-[var(--muted)] rounded-lg p-3">
         {/* Syringe Body */}
         <div className="flex items-center gap-2">
           {/* Plunger */}
-          <div className="w-3 h-10 bg-slate-300 rounded-l-sm" />
+          <div className="w-3 h-10 bg-[var(--border)] rounded-l-sm" />
 
           {/* Barrel */}
           <div className="flex-1 relative">
             {/* Barrel outline */}
-            <div className="h-10 bg-white border-2 border-slate-300 rounded-r relative overflow-hidden">
+            <div className="h-10 bg-[var(--background)] border-2 border-[var(--border)] rounded-r relative overflow-hidden">
               {/* Fill level */}
               <div
                 className="absolute left-0 top-0 bottom-0 bg-blue-300 transition-all duration-300"
@@ -45,7 +45,7 @@ export function SyringeVisual({ units, dose, concentration, maxUnits = 20 }: Syr
                 {ticks.map((tick) => (
                   <div
                     key={tick}
-                    className={`w-px ${tick === 0 || tick === maxUnits || tick === maxUnits / 2 ? 'h-full bg-slate-400' : 'h-1/2 bg-slate-300'}`}
+                    className={`w-px ${tick === 0 || tick === maxUnits || tick === maxUnits / 2 ? 'h-full bg-[var(--muted-foreground)]' : 'h-1/2 bg-[var(--border)]'}`}
                   />
                 ))}
               </div>
@@ -60,7 +60,7 @@ export function SyringeVisual({ units, dose, concentration, maxUnits = 20 }: Syr
             </div>
 
             {/* Unit labels */}
-            <div className="flex justify-between text-xs text-slate-500 mt-1">
+            <div className="flex justify-between text-xs text-[var(--muted-foreground)] mt-1">
               <span>0</span>
               <span>{maxUnits / 2}</span>
               <span>{maxUnits}</span>
@@ -68,19 +68,19 @@ export function SyringeVisual({ units, dose, concentration, maxUnits = 20 }: Syr
           </div>
 
           {/* Needle */}
-          <div className="w-6 h-0.5 bg-slate-400 rounded-r-full" />
+          <div className="w-6 h-0.5 bg-[var(--muted-foreground)] rounded-r-full" />
         </div>
 
         {/* Annotation */}
         <div className="mt-3 text-center">
-          <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-800 px-3 py-1.5 rounded-full text-sm font-medium">
+          <div className="inline-flex items-center gap-2 bg-[var(--accent)]/10 text-[var(--accent)] px-3 py-1.5 rounded-full text-sm font-medium">
             <span className="w-3 h-3 bg-blue-500 rounded-full" />
             {dose} = {units} units
           </div>
         </div>
 
         {/* mL conversion */}
-        <div className="mt-2 text-xs text-slate-500 text-center">
+        <div className="mt-2 text-xs text-[var(--muted-foreground)] text-center">
           {units} units = {(units * 0.01).toFixed(2)} mL
         </div>
       </div>
