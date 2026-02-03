@@ -447,7 +447,7 @@ export default function CalendarPage() {
                         <div
                           key={i}
                           className={cn(
-                            'w-1 h-1 rounded-full flex-shrink-0',
+                            'w-1.5 h-1.5 rounded-full flex-shrink-0',
                             p.status === 'completed' && 'bg-[var(--success)]',
                             p.status === 'missed' && 'bg-[var(--error)]',
                             p.status === 'skipped' && 'bg-[var(--muted-foreground)]',

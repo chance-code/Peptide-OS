@@ -134,7 +134,7 @@ export default function SettingsPage() {
                 key={value}
                 onClick={() => setTheme(value)}
                 className={cn(
-                  'flex-1 flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all duration-200',
+                  'flex-1 flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)]',
                   theme === value
                     ? 'bg-[var(--accent)] text-[var(--accent-foreground)] border-[var(--accent)] shadow-lg'
                     : 'bg-[var(--muted)] text-[var(--muted-foreground)] border-transparent hover:border-[var(--border)]'

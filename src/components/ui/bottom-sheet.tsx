@@ -16,6 +16,7 @@ export function BottomSheet({ isOpen, onClose, title, children }: BottomSheetPro
   const [isDragging, setIsDragging] = useState(false)
   const [dragY, setDragY] = useState(0)
   const startY = useRef(0)
+  const startTime = useRef(0)
 
   // Handle escape key
   useEffect(() => {
@@ -35,6 +36,7 @@ export function BottomSheet({ isOpen, onClose, title, children }: BottomSheetPro
   // Touch handlers for drag to dismiss
   function handleTouchStart(e: React.TouchEvent) {
     startY.current = e.touches[0].clientY
+    startTime.current = Date.now()
     setIsDragging(true)
   }
 
@@ -50,8 +52,10 @@ export function BottomSheet({ isOpen, onClose, title, children }: BottomSheetPro
 
   function handleTouchEnd() {
     setIsDragging(false)
-    // If dragged more than 100px, close the sheet
-    if (dragY > 100) {
+    const elapsed = Date.now() - startTime.current
+    const velocity = dragY / Math.max(elapsed, 1) // px/ms
+    // Close if dragged far enough OR flicked fast enough
+    if (dragY > 100 || (dragY > 20 && velocity > 0.5)) {
       onClose()
     }
     setDragY(0)
