@@ -61,7 +61,7 @@ export function AlertsBanner() {
       case 'info':
         return 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-300'
       default:
-        return 'bg-slate-50 dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200'
+        return 'bg-[var(--muted)] border-[var(--border)] text-[var(--foreground)]'
     }
   }
 
@@ -124,7 +124,7 @@ export function AlertsBanner() {
       {visibleAlerts.length > 1 && (
         <button
           onClick={() => setIsExpanded(false)}
-          className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 w-full text-center py-1"
+          className="text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)] w-full text-center py-1"
         >
           Collapse
         </button>

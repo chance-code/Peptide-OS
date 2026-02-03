@@ -62,7 +62,7 @@ export default function InventoryPage() {
     <div className="p-4 pb-20">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Inventory</h2>
+        <h2 className="text-xl font-semibold text-[var(--foreground)]">Inventory</h2>
         <Link href="/inventory/new">
           <Button size="sm">
             <Plus className="w-4 h-4 mr-1" />
@@ -111,9 +111,9 @@ export default function InventoryPage() {
       {/* Summary */}
       {!isLoading && (
         <div className="grid grid-cols-3 gap-3 mb-6">
-          <div className="bg-white dark:bg-slate-800 rounded-lg p-3 text-center border border-slate-100 dark:border-slate-700">
-            <div className="text-2xl font-bold text-slate-900 dark:text-white">{activeVials.length}</div>
-            <div className="text-xs text-slate-500 dark:text-slate-400">Active</div>
+          <div className="bg-[var(--background)] rounded-lg p-3 text-center border border-[var(--border)]">
+            <div className="text-2xl font-bold text-[var(--foreground)]">{activeVials.length}</div>
+            <div className="text-xs text-[var(--muted-foreground)]">Active</div>
           </div>
           <div className="bg-amber-50 dark:bg-amber-900/30 rounded-lg p-3 text-center border border-amber-100 dark:border-amber-800">
             <div className="text-2xl font-bold text-amber-700 dark:text-amber-400">
@@ -135,8 +135,8 @@ export default function InventoryPage() {
           onClick={() => setTypeFilter('all')}
           className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
             typeFilter === 'all'
-              ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
-              : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+              ? 'bg-[var(--foreground)] text-[var(--background)]'
+              : 'bg-[var(--muted)] text-[var(--muted-foreground)] hover:bg-[var(--border)]'
           }`}
         >
           All
@@ -147,7 +147,7 @@ export default function InventoryPage() {
           className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
             typeFilter === 'peptide'
               ? 'bg-[var(--accent)] text-white'
-              : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+              : 'bg-[var(--muted)] text-[var(--muted-foreground)] hover:bg-[var(--border)]'
           }`}
         >
           <Syringe className="w-3.5 h-3.5" />
@@ -159,7 +159,7 @@ export default function InventoryPage() {
           className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
             typeFilter === 'supplement'
               ? 'bg-[var(--success)] text-white'
-              : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+              : 'bg-[var(--muted)] text-[var(--muted-foreground)] hover:bg-[var(--border)]'
           }`}
         >
           <Pill className="w-3.5 h-3.5" />
@@ -174,16 +174,16 @@ export default function InventoryPage() {
           id="showExpired"
           checked={showExpired}
           onChange={(e) => setShowExpired(e.target.checked)}
-          className="rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700"
+          className="rounded border-[var(--border)]"
         />
-        <label htmlFor="showExpired" className="text-sm text-slate-700 dark:text-slate-300">
+        <label htmlFor="showExpired" className="text-sm text-[var(--foreground)]">
           Show expired items
         </label>
       </div>
 
       {/* Vials List */}
       {isLoading ? (
-        <div className="text-center py-8 text-slate-500 dark:text-slate-400">Loading...</div>
+        <div className="text-center py-8 text-[var(--muted-foreground)]">Loading...</div>
       ) : filteredVials.length > 0 ? (
         <div className="space-y-3">
           {filteredVials.map((vial) => {
@@ -207,16 +207,16 @@ export default function InventoryPage() {
                       <div className="flex items-start justify-between mb-2">
                         <div>
                           <div className="flex items-center gap-2">
-                            <span className="font-medium text-slate-900 dark:text-white">
+                            <span className="font-medium text-[var(--foreground)]">
                               {vial.peptide.name}
                             </span>
                             {vial.identifier && (
-                              <span className="text-xs text-slate-500 dark:text-slate-400">
+                              <span className="text-xs text-[var(--muted-foreground)]">
                                 ({vial.identifier})
                               </span>
                             )}
                           </div>
-                          <div className="text-sm text-slate-500 dark:text-slate-400">
+                          <div className="text-sm text-[var(--muted-foreground)]">
                             {vial.totalAmount} {vial.totalUnit}
                           </div>
                         </div>
@@ -240,7 +240,7 @@ export default function InventoryPage() {
                       </div>
 
                       {vial.diluentVolume && vial.concentration && (
-                        <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400 mt-2 pt-2 border-t border-slate-100 dark:border-slate-700">
+                        <div className="flex items-center gap-4 text-xs text-[var(--muted-foreground)] mt-2 pt-2 border-t border-[var(--border)]">
                           <span className="flex items-center gap-1">
                             <Droplet className="w-3 h-3" />
                             {vial.diluentVolume} ml diluent
@@ -252,7 +252,7 @@ export default function InventoryPage() {
                       )}
 
                       {vial.dateReconstituted && (
-                        <div className="text-xs text-slate-400 dark:text-slate-500 mt-2">
+                        <div className="text-xs text-[var(--muted-foreground)] mt-2">
                           Reconstituted: {format(new Date(vial.dateReconstituted), 'MMM d, yyyy')}
                         </div>
                       )}
@@ -268,11 +268,11 @@ export default function InventoryPage() {
       ) : (
         <Card>
           <CardContent className="py-8 text-center">
-            <Package className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
-            <div className="text-slate-400 dark:text-slate-500 mb-2">
+            <Package className="w-12 h-12 mx-auto text-[var(--border)] mb-3" />
+            <div className="text-[var(--muted-foreground)] mb-2">
               {typeFilter === 'all' ? 'No inventory' : `No ${typeFilter}s`}
             </div>
-            <div className="text-sm text-slate-500 dark:text-slate-400">
+            <div className="text-sm text-[var(--muted-foreground)]">
               {typeFilter === 'all'
                 ? 'Add your first item to track your inventory'
                 : `Add your first ${typeFilter} to track your inventory`}
