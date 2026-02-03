@@ -125,7 +125,7 @@ export default function TodayPage() {
 
   const dateParam = format(selectedDate, 'yyyy-MM-dd')
 
-  const { data, isLoading, refetch } = useQuery<TodayResponse>({
+  const { data, isLoading, isError, refetch } = useQuery<TodayResponse>({
     queryKey: ['today', currentUserId, dateParam],
     queryFn: async () => {
       const res = await fetch(`/api/today?userId=${currentUserId}&date=${dateParam}`)
@@ -285,7 +285,7 @@ export default function TodayPage() {
       <AlertsBanner />
 
       <PullToRefresh onRefresh={handleRefresh} className="h-full">
-        <div className="p-4 pb-20">
+        <div className="p-4 pb-24">
           {/* Date Navigation */}
           <div className="flex items-center justify-between mb-4">
             <Button
@@ -316,6 +316,20 @@ export default function TodayPage() {
               <ChevronRight className="w-5 h-5" />
             </Button>
           </div>
+
+          {/* Error State */}
+          {isError && !data && (
+            <Card className="mb-6">
+              <CardContent className="py-8 text-center">
+                <AlertTriangle className="w-8 h-8 text-[var(--warning)] mx-auto mb-3" />
+                <div className="text-[var(--foreground)] font-medium mb-1">Couldn&apos;t load doses</div>
+                <div className="text-sm text-[var(--muted-foreground)] mb-4">Pull down to refresh or tap below to retry.</div>
+                <Button variant="secondary" size="sm" onClick={() => refetch()}>
+                  Try again
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Hero Card */}
           {isLoading ? (
@@ -473,7 +487,7 @@ export default function TodayPage() {
                                       size="sm"
                                       variant="ghost"
                                       onClick={() => handleStatusChange(item, 'skipped')}
-                                      className="w-9 h-9 p-0"
+                                      className="w-11 h-11 p-0"
                                     >
                                       <X className="w-5 h-5" />
                                     </Button>
