@@ -78,6 +78,9 @@ export async function registerNativePush(
   }
 
   try {
+    // Clean up any existing listeners to prevent duplicates
+    await PushNotifications.removeAllListeners()
+
     // Request permission
     const permResult = await PushNotifications.requestPermissions()
 
@@ -88,10 +91,15 @@ export async function registerNativePush(
     // Register with APNs/FCM
     await PushNotifications.register()
 
-    // Wait for registration token
+    // Wait for registration token with timeout
     return new Promise((resolve) => {
+      const timeout = setTimeout(() => {
+        resolve({ success: false, error: 'Registration timed out — APNs did not respond' })
+      }, 15000)
+
       // Set up listeners
       PushNotifications.addListener('registration', async (token: PushNotificationToken) => {
+        clearTimeout(timeout)
         console.log('Push registration token:', token.value)
 
         // Send token to server
@@ -120,6 +128,7 @@ export async function registerNativePush(
       })
 
       PushNotifications.addListener('registrationError', (error: { error: string }) => {
+        clearTimeout(timeout)
         console.error('Push registration error:', error)
         resolve({ success: false, error: error.error })
       })
