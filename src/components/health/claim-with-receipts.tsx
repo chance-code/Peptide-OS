@@ -15,7 +15,7 @@ import {
   Shield
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { Claim, EffectSize, ConfidenceLevel } from '@/lib/health-claims'
+import type { Claim, EffectSize, ConfidenceLevel, InsightTheme, InsightThemeType } from '@/lib/health-claims'
 
 interface ClaimWithReceiptsProps {
   claim: Claim
@@ -320,6 +320,130 @@ export function ClaimList({
           </div>
         </button>
       ))}
+    </div>
+  )
+}
+
+// ─── Insight Theme Card ──────────────────────────────────────────────
+
+const THEME_ICONS: Record<InsightThemeType, typeof AlertTriangle> = {
+  recovery_state: Activity,
+  sleep_architecture: Activity,
+  body_composition: Activity,
+  training_response: Activity,
+  protocol_evidence: Activity,
+  lifestyle_impact: Lightbulb,
+  risk_alert: AlertTriangle,
+}
+
+const THEME_COLORS: Record<InsightThemeType, { icon: string; border: string }> = {
+  recovery_state: { icon: 'text-cyan-400 bg-cyan-500/20', border: 'border-cyan-500/30' },
+  sleep_architecture: { icon: 'text-indigo-400 bg-indigo-500/20', border: 'border-indigo-500/30' },
+  body_composition: { icon: 'text-amber-400 bg-amber-500/20', border: 'border-amber-500/30' },
+  training_response: { icon: 'text-orange-400 bg-orange-500/20', border: 'border-orange-500/30' },
+  protocol_evidence: { icon: 'text-violet-400 bg-violet-500/20', border: 'border-violet-500/30' },
+  lifestyle_impact: { icon: 'text-emerald-400 bg-emerald-500/20', border: 'border-emerald-500/30' },
+  risk_alert: { icon: 'text-rose-400 bg-rose-500/20', border: 'border-rose-500/30' },
+}
+
+interface InsightThemeCardProps {
+  theme: InsightTheme
+  onClaimClick?: (claim: Claim) => void
+  className?: string
+}
+
+export function InsightThemeCard({ theme, onClaimClick, className }: InsightThemeCardProps) {
+  const [isExpanded, setIsExpanded] = useState(false)
+  const Icon = THEME_ICONS[theme.type]
+  const colors = THEME_COLORS[theme.type]
+
+  const priorityColors = {
+    high: 'border-l-rose-400',
+    medium: 'border-l-amber-400',
+    low: 'border-l-[var(--border)]',
+  }
+
+  return (
+    <div className={cn(
+      'rounded-xl overflow-hidden border-l-4',
+      'bg-[var(--card)]/70 border border-[var(--border)]',
+      priorityColors[theme.priority],
+      className
+    )}>
+      {/* Header */}
+      <div className="px-5 py-4">
+        <div className="flex items-start gap-3">
+          <div className={cn(
+            'w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5',
+            colors.icon
+          )}>
+            <Icon className="w-4 h-4" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <h3 className="text-base font-medium text-[var(--foreground)]">
+                {theme.title}
+              </h3>
+              <span className="text-xs text-[var(--muted-foreground)]">
+                ({theme.timespan})
+              </span>
+            </div>
+            <p className="text-sm text-[var(--muted-foreground)] mt-1 leading-relaxed">
+              {theme.summary}
+            </p>
+            {theme.actionable && (
+              <p className="text-sm text-[var(--accent)] font-medium mt-2">
+                → {theme.actionable}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Expandable claims */}
+      {theme.claims.length > 0 && (
+        <div className="border-t border-[var(--border)]">
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="w-full px-5 py-2.5 flex items-center justify-between text-left hover:bg-[var(--border)]/30 transition-colors"
+          >
+            <span className="text-xs text-[var(--muted-foreground)]">
+              {theme.claims.length} related insight{theme.claims.length > 1 ? 's' : ''}
+            </span>
+            <ChevronDown className={cn(
+              'w-4 h-4 text-[var(--muted-foreground)] transition-transform',
+              isExpanded && 'rotate-180'
+            )} />
+          </button>
+
+          {isExpanded && (
+            <div className="px-5 pb-4 space-y-2">
+              {theme.claims.slice(0, 3).map((claim) => (
+                <button
+                  key={claim.id}
+                  onClick={() => onClaimClick?.(claim)}
+                  className={cn(
+                    'w-full p-3 rounded-lg bg-[var(--border)]/50 border border-[var(--border)]/50',
+                    'hover:bg-[var(--border)] transition-colors text-left'
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm text-[var(--foreground)] font-medium truncate">
+                      {claim.headline}
+                    </span>
+                    <ConfidenceBadge confidence={claim.confidence} />
+                  </div>
+                </button>
+              ))}
+              {theme.claims.length > 3 && (
+                <div className="text-xs text-[var(--muted-foreground)] text-center pt-1">
+                  +{theme.claims.length - 3} more
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

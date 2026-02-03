@@ -1299,3 +1299,154 @@ export function getProtocolImpactClaims(claims: Claim[], interventionId: string)
     (c.type === 'improvement' || c.type === 'decline')
   )
 }
+
+// ─── Insight Themes ─────────────────────────────────────────────────
+
+export type InsightThemeType =
+  | 'recovery_state' | 'sleep_architecture' | 'body_composition'
+  | 'training_response' | 'protocol_evidence' | 'lifestyle_impact' | 'risk_alert'
+
+export interface InsightTheme {
+  id: string
+  type: InsightThemeType
+  title: string
+  summary: string
+  timespan: string
+  priority: 'high' | 'medium' | 'low'
+  claims: Claim[]
+  metricTypes: string[]
+  actionable: string | null
+}
+
+const THEME_METRIC_MAP: Record<InsightThemeType, string[]> = {
+  recovery_state: ['hrv', 'rhr', 'readiness_score', 'respiratory_rate', 'blood_oxygen'],
+  sleep_architecture: ['sleep_duration', 'deep_sleep', 'rem_sleep', 'sleep_efficiency', 'sleep_score', 'waso', 'sleep_latency'],
+  body_composition: ['weight', 'body_fat_percentage', 'lean_body_mass', 'muscle_mass', 'bmi', 'bone_mass', 'body_water'],
+  training_response: ['steps', 'active_calories', 'exercise_minutes', 'walking_running_distance', 'vo2_max', 'stand_hours'],
+  protocol_evidence: [], // Matched by interventionId, not metricType
+  lifestyle_impact: [], // Matched by correlation type
+  risk_alert: [], // Matched by warning type
+}
+
+/**
+ * Groups existing claims into themed insight groups.
+ * Each claim appears in at most one theme. Max 5 themes, max 3 claims initially visible.
+ */
+export function groupClaimsIntoThemes(claims: Claim[]): InsightTheme[] {
+  const usedClaimIds = new Set<string>()
+  const themes: InsightTheme[] = []
+
+  // 1. Risk alerts (warnings)
+  const warnings = claims.filter(c => c.type === 'warning' && !usedClaimIds.has(c.id))
+  if (warnings.length > 0) {
+    for (const c of warnings) usedClaimIds.add(c.id)
+    themes.push({
+      id: 'theme_risk_alert',
+      type: 'risk_alert',
+      title: 'Needs Attention',
+      summary: warnings.length === 1
+        ? warnings[0].headline
+        : `${warnings.length} metrics declining — review recommended`,
+      timespan: '7 days',
+      priority: 'high',
+      claims: warnings.slice(0, 5),
+      metricTypes: [...new Set(warnings.map(c => c.metricType).filter(Boolean) as string[])],
+      actionable: warnings[0]?.actionable || null,
+    })
+  }
+
+  // 2. Protocol evidence themes (group by intervention)
+  const interventionIds = [...new Set(claims.filter(c => c.interventionId).map(c => c.interventionId!))]
+  for (const interventionId of interventionIds) {
+    const protocolClaims = claims.filter(c =>
+      c.interventionId === interventionId && !usedClaimIds.has(c.id)
+    )
+    if (protocolClaims.length === 0) continue
+
+    for (const c of protocolClaims) usedClaimIds.add(c.id)
+    const name = protocolClaims[0].interventionName || 'Protocol'
+    const improvements = protocolClaims.filter(c => c.type === 'improvement')
+    const declines = protocolClaims.filter(c => c.type === 'decline')
+
+    themes.push({
+      id: `theme_protocol_${interventionId}`,
+      type: 'protocol_evidence',
+      title: `${name} Effects`,
+      summary: improvements.length > 0
+        ? `${improvements.length} metric${improvements.length > 1 ? 's' : ''} improving since starting ${name}`
+        : declines.length > 0
+        ? `${declines.length} metric${declines.length > 1 ? 's' : ''} changed since starting ${name}`
+        : `Tracking effects of ${name}`,
+      timespan: 'Since start',
+      priority: improvements.length > 0 || declines.length > 0 ? 'medium' : 'low',
+      claims: protocolClaims.slice(0, 5),
+      metricTypes: [...new Set(protocolClaims.map(c => c.metricType).filter(Boolean) as string[])],
+      actionable: protocolClaims.find(c => c.actionable)?.actionable || null,
+    })
+
+    if (themes.length >= 5) break
+  }
+
+  // 3. Category-based themes
+  const categoryThemes: Array<{ type: InsightThemeType; title: string }> = [
+    { type: 'recovery_state', title: 'Recovery' },
+    { type: 'sleep_architecture', title: 'Sleep' },
+    { type: 'body_composition', title: 'Body Composition' },
+    { type: 'training_response', title: 'Training & Activity' },
+  ]
+
+  for (const { type, title } of categoryThemes) {
+    if (themes.length >= 5) break
+
+    const metricSet = new Set(THEME_METRIC_MAP[type])
+    const matchedClaims = claims.filter(c =>
+      !usedClaimIds.has(c.id) && c.metricType && metricSet.has(c.metricType)
+    )
+
+    if (matchedClaims.length === 0) continue
+    for (const c of matchedClaims) usedClaimIds.add(c.id)
+
+    const topClaim = matchedClaims[0]
+    const improvements = matchedClaims.filter(c => c.type === 'improvement')
+    const observations = matchedClaims.filter(c => c.type === 'observation' || c.type === 'correlation')
+
+    themes.push({
+      id: `theme_${type}`,
+      type,
+      title,
+      summary: topClaim.headline,
+      timespan: topClaim.receipt.timeWindow.start && topClaim.receipt.timeWindow.end
+        ? `${topClaim.receipt.timeWindow.start} — ${topClaim.receipt.timeWindow.end}`
+        : 'Recent',
+      priority: matchedClaims.some(c => c.priority === 'high') ? 'high' : 'medium',
+      claims: matchedClaims.slice(0, 5),
+      metricTypes: [...new Set(matchedClaims.map(c => c.metricType).filter(Boolean) as string[])],
+      actionable: matchedClaims.find(c => c.actionable)?.actionable || null,
+    })
+  }
+
+  // 4. Lifestyle impact (correlations not yet claimed)
+  if (themes.length < 5) {
+    const correlations = claims.filter(c => c.type === 'correlation' && !usedClaimIds.has(c.id))
+    if (correlations.length > 0) {
+      for (const c of correlations) usedClaimIds.add(c.id)
+      themes.push({
+        id: 'theme_lifestyle',
+        type: 'lifestyle_impact',
+        title: 'Lifestyle Patterns',
+        summary: correlations[0].headline,
+        timespan: 'Recent',
+        priority: 'medium',
+        claims: correlations.slice(0, 5),
+        metricTypes: [...new Set(correlations.map(c => c.metricType).filter(Boolean) as string[])],
+        actionable: correlations.find(c => c.actionable)?.actionable || null,
+      })
+    }
+  }
+
+  // Sort by priority
+  const priorityOrder = { high: 0, medium: 1, low: 2 }
+  themes.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority])
+
+  return themes.slice(0, 5)
+}

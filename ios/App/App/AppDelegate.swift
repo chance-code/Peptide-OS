@@ -23,6 +23,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     }
 
     func applicationDidBecomeActive(_ application: UIApplication) {
+        // Disable WKWebView bounce so JS pull-to-refresh works correctly
+        if let vc = window?.rootViewController as? CAPBridgeViewController {
+            vc.webView?.scrollView.bounces = false
+        }
     }
 
     func applicationWillTerminate(_ application: UIApplication) {

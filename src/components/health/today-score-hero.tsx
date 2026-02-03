@@ -1,55 +1,53 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronRight, Info, TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { ChevronRight, Info, TrendingUp, TrendingDown, Minus, ArrowUpRight, ArrowDownRight, ArrowRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import type { HealthTrajectory, CategoryTrajectory, TrajectoryDirection, TrajectoryConfidence } from '@/lib/health-trajectory'
 
-interface ScoreDriver {
-  label: string
-  value: string
-  delta: string
-  direction: 'up' | 'down' | 'neutral'
-  isGood: boolean
-}
+// ─── Trajectory Hero (new primary component) ─────────────────────────
 
-interface TodayScoreHeroProps {
-  score: number
-  previousScore?: number
-  headline: string
-  drivers: ScoreDriver[]
+interface TrajectoryHeroProps {
+  trajectory: HealthTrajectory
   onExplain?: () => void
   className?: string
 }
 
-export function TodayScoreHero({
-  score,
-  previousScore,
-  headline,
-  drivers,
+export function TrajectoryHero({
+  trajectory,
   onExplain,
   className
-}: TodayScoreHeroProps) {
-  const [expanded, setExpanded] = useState(false)
-
-  // Calculate score change
-  const scoreChange = previousScore ? score - previousScore : 0
-  const scoreDirection = scoreChange > 0 ? 'up' : scoreChange < 0 ? 'down' : 'neutral'
-
-  // Score ring calculations
-  const radius = 70
-  const circumference = 2 * Math.PI * radius
-  const progress = (score / 100) * circumference
-  const offset = circumference - progress
-
-  // Score color gradient based on value
-  const getScoreColor = (s: number) => {
-    if (s >= 80) return { from: '#10b981', to: '#22d3ee' }  // Excellent
-    if (s >= 65) return { from: '#6366f1', to: '#8b5cf6' }  // Good
-    if (s >= 50) return { from: '#f59e0b', to: '#fbbf24' }  // Moderate
-    return { from: '#ef4444', to: '#f87171' }               // Poor
+}: TrajectoryHeroProps) {
+  const directionConfig = {
+    improving: {
+      icon: ArrowUpRight,
+      label: 'IMPROVING',
+      color: 'text-emerald-400',
+      bgGlow: '#10b981',
+    },
+    stable: {
+      icon: ArrowRight,
+      label: 'STABLE',
+      color: 'text-[var(--accent)]',
+      bgGlow: '#6366f1',
+    },
+    declining: {
+      icon: ArrowDownRight,
+      label: 'DECLINING',
+      color: 'text-amber-400',
+      bgGlow: '#f59e0b',
+    },
   }
 
-  const colors = getScoreColor(score)
+  const config = directionConfig[trajectory.direction]
+  const DirIcon = config.icon
+
+  const confidenceLabel = {
+    high: 'High confidence',
+    moderate: 'Moderate confidence',
+    low: 'Low confidence',
+    insufficient: 'Insufficient data',
+  }[trajectory.confidence]
 
   return (
     <div
@@ -67,114 +65,67 @@ export function TodayScoreHero({
       <div
         className="absolute -top-20 -right-20 w-64 h-64 rounded-full opacity-30 dark:opacity-20 blur-3xl"
         style={{
-          background: `radial-gradient(circle, ${colors.from}, transparent 70%)`
+          background: `radial-gradient(circle, ${config.bgGlow}, transparent 70%)`
         }}
       />
 
       <div className="relative z-10">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-4">
           <h2 className="text-sm font-medium text-[var(--muted-foreground)] uppercase tracking-wider">
-            Today's Recovery
+            Your Health Trajectory
           </h2>
-          {scoreChange !== 0 && (
-            <div className={cn(
-              'flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium',
-              scoreDirection === 'up' ? 'bg-[var(--success-muted)] text-[var(--success)]' :
-              scoreDirection === 'down' ? 'bg-[var(--error-muted)] text-[var(--error)]' :
-              'bg-[var(--muted)] text-[var(--muted-foreground)]'
+          {trajectory.confidence !== 'insufficient' && (
+            <span className={cn(
+              'px-2 py-0.5 rounded-full text-xs font-medium',
+              trajectory.confidence === 'high' ? 'bg-emerald-500/20 text-emerald-400' :
+              trajectory.confidence === 'moderate' ? 'bg-[var(--accent-muted)] text-[var(--accent)]' :
+              'bg-[var(--muted-foreground)]/20 text-[var(--muted-foreground)]'
             )}>
-              {scoreDirection === 'up' ? <TrendingUp className="w-3 h-3" /> :
-               scoreDirection === 'down' ? <TrendingDown className="w-3 h-3" /> :
-               <Minus className="w-3 h-3" />}
-              {scoreChange > 0 ? '+' : ''}{scoreChange}
-            </div>
+              {confidenceLabel}
+            </span>
           )}
         </div>
 
-        {/* Score Ring */}
-        <div className="flex items-center gap-8">
-          <div className="relative w-40 h-40 flex-shrink-0">
-            <svg className="w-full h-full -rotate-90" viewBox="0 0 160 160">
-              {/* Background ring */}
-              <circle
-                cx="80"
-                cy="80"
-                r={radius}
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="8"
-                className="text-[var(--border)]"
-              />
-              {/* Progress ring */}
-              <circle
-                cx="80"
-                cy="80"
-                r={radius}
-                fill="none"
-                stroke={`url(#scoreGradient-${score})`}
-                strokeWidth="8"
-                strokeLinecap="round"
-                strokeDasharray={circumference}
-                strokeDashoffset={offset}
-                className="transition-all duration-1000 ease-out"
-              />
-              <defs>
-                <linearGradient id={`scoreGradient-${score}`} x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor={colors.from} />
-                  <stop offset="100%" stopColor={colors.to} />
-                </linearGradient>
-              </defs>
-            </svg>
-            {/* Score number */}
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-5xl font-bold text-[var(--foreground)] tabular-nums">
-                {score}
-              </span>
-              <span className="text-xs text-[var(--muted-foreground)] mt-1">out of 100</span>
+        {/* Direction + Label */}
+        <div className="flex items-center gap-3 mb-3">
+          <DirIcon className={cn('w-8 h-8', config.color)} />
+          <div>
+            <div className={cn('text-2xl font-bold', config.color)}>
+              {config.label}
+            </div>
+            <div className="text-sm text-[var(--muted-foreground)]">
+              Over {trajectory.window} days
+              {trajectory.confidence !== 'insufficient' && ` · ${confidenceLabel}`}
             </div>
           </div>
+        </div>
 
-          {/* Headline and drivers */}
-          <div className="flex-1 min-w-0">
-            <p className="text-lg font-medium text-[var(--foreground)] mb-4 leading-snug">
-              {headline}
-            </p>
+        {/* Headline */}
+        <p className="text-base text-[var(--foreground)] mb-5 leading-snug">
+          {trajectory.headline}
+        </p>
 
-            {/* Top drivers */}
-            <div className="flex flex-wrap gap-2">
-              {drivers.slice(0, expanded ? drivers.length : 3).map((driver, i) => (
-                <div
-                  key={i}
-                  className={cn(
-                    'flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm',
-                    'bg-[var(--muted)] border border-[var(--border)]',
-                    'transition-all duration-200'
-                  )}
-                >
-                  <span className={cn(
-                    'font-medium tabular-nums',
-                    driver.isGood ? 'text-[var(--success)]' : 'text-[var(--warning)]'
-                  )}>
-                    {driver.delta}
-                  </span>
-                  <span className="text-[var(--foreground)]">{driver.label}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+        {/* Category chips */}
+        <div className="flex flex-wrap gap-2 mb-4">
+          <CategoryChip label="Sleep" category={trajectory.sleep} />
+          <CategoryChip label="Recovery" category={trajectory.recovery} />
+          <CategoryChip label="Activity" category={trajectory.activity} />
+          {trajectory.bodyComp && (
+            <CategoryChip label="Body Comp" category={trajectory.bodyComp} />
+          )}
         </div>
 
         {/* Explain button */}
         <button
           onClick={onExplain}
           className={cn(
-            'mt-6 flex items-center gap-2 text-sm font-medium',
+            'flex items-center gap-2 text-sm font-medium',
             'text-[var(--accent)] hover:opacity-80 transition-colors'
           )}
         >
           <Info className="w-4 h-4" />
-          Explain Score
+          How is this calculated?
           <ChevronRight className="w-4 h-4" />
         </button>
       </div>
@@ -182,7 +133,32 @@ export function TodayScoreHero({
   )
 }
 
-// Compact version for secondary display
+function CategoryChip({ label, category }: { label: string; category: CategoryTrajectory }) {
+  const dirIcon = category.direction === 'improving'
+    ? <TrendingUp className="w-3.5 h-3.5" />
+    : category.direction === 'declining'
+    ? <TrendingDown className="w-3.5 h-3.5" />
+    : <Minus className="w-3.5 h-3.5" />
+
+  const colorClass = category.direction === 'improving'
+    ? 'text-emerald-400'
+    : category.direction === 'declining'
+    ? 'text-amber-400'
+    : 'text-[var(--muted-foreground)]'
+
+  return (
+    <div className={cn(
+      'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm',
+      'bg-[var(--muted)] border border-[var(--border)]',
+    )}>
+      <span className={colorClass}>{dirIcon}</span>
+      <span className="text-[var(--foreground)] font-medium">{label}</span>
+    </div>
+  )
+}
+
+// ─── Compact version (kept for backward compat) ──────────────────────
+
 export function TodayScoreCompact({
   score,
   label,
@@ -237,3 +213,7 @@ export function TodayScoreCompact({
     </div>
   )
 }
+
+// ─── Legacy export alias ─────────────────────────────────────────────
+// TodayScoreHero removed — TrajectoryHero is the replacement.
+// Keeping TodayScoreCompact as-is since it's used outside the health page.

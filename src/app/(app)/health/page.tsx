@@ -2,7 +2,6 @@
 
 import { useState, useMemo, useCallback } from 'react'
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
-import Link from 'next/link'
 import {
   Activity,
   ChevronRight,
@@ -17,42 +16,55 @@ import {
   CheckCircle2,
   Watch,
   Brain,
-  X,
   Info,
   ChevronDown,
-  AlertTriangle
+  AlertTriangle,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  Scale
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store'
 import { BottomSheet } from '@/components/ui/bottom-sheet'
 
 // Components
-import { TodayScoreHero, TodayScoreCompact } from '@/components/health/today-score-hero'
+import { TrajectoryHero } from '@/components/health/today-score-hero'
 import { WhatChangedCard, type DeltaItem } from '@/components/health/what-changed-card'
-import { DoThisNextCard, type Recommendation } from '@/components/health/do-this-next-card'
-import { ClaimWithReceipts, ClaimList } from '@/components/health/claim-with-receipts'
-import { ProtocolImpactCard } from '@/components/health/protocol-impact-report'
+import { ClaimWithReceipts, InsightThemeCard } from '@/components/health/claim-with-receipts'
+import { ProtocolEvidenceCard } from '@/components/health/protocol-impact-report'
 
 // Data
 import {
   SEED_DATA,
   SEED_INTERVENTIONS,
   SEED_CONTEXT_EVENTS,
-  shouldUseDemoData,
   type SeedMetric
 } from '@/lib/demo-data/seed-metrics'
 import {
   computeBaseline,
   compareToBaseline,
+  classifySignal,
   METRIC_POLARITY,
-  type MetricBaseline
+  type MetricBaseline,
+  type SignalClass
 } from '@/lib/health-baselines'
 import {
   generateClaims,
-  getTodaysClaims,
-  getTopRecommendation,
-  type Claim
+  groupClaimsIntoThemes,
+  type Claim,
+  type InsightTheme
 } from '@/lib/health-claims'
+import {
+  computeTrajectory,
+  computeBodyCompState,
+  type HealthTrajectory,
+  type BodyCompState
+} from '@/lib/health-trajectory'
+import {
+  computeProtocolEvidence,
+  type ProtocolEvidence
+} from '@/lib/health-protocol-evidence'
 import { fetchAppleHealthWithStatus } from '@/lib/health-providers/apple-health'
 import { format, subDays, parseISO } from 'date-fns'
 
@@ -91,7 +103,7 @@ interface ApiIntegrationResponse {
 export default function HealthDashboardNew() {
   const { currentUserId } = useAppStore()
   const queryClient = useQueryClient()
-  const [selectedSection, setSelectedSection] = useState<'overview' | 'protocols' | 'insights'>('overview')
+  const [selectedSection, setSelectedSection] = useState<'overview' | 'evidence' | 'insights'>('overview')
   const [showIntegrations, setShowIntegrations] = useState(false)
   const [syncingProvider, setSyncingProvider] = useState<string | null>(null)
   const [showExplainModal, setShowExplainModal] = useState(false)
@@ -106,7 +118,6 @@ export default function HealthDashboardNew() {
       const res = await fetch(`/api/health/integrations?userId=${currentUserId}`)
       if (!res.ok) return []
       const data = await res.json() as ApiIntegrationResponse[]
-      // Transform API response to expected format
       return data.map(item => ({
         id: item.integration?.id || item.name,
         provider: item.name,
@@ -141,13 +152,12 @@ export default function HealthDashboardNew() {
 
   // Apple Health sync — runs client-side via Capacitor plugin, then POSTs to ingest API
   const syncAppleHealth = useCallback(async () => {
-    if (syncingProvider === 'apple_health') return // Already syncing
+    if (syncingProvider === 'apple_health') return
     setSyncingProvider('apple_health')
     try {
       const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
       const result = await fetchAppleHealthWithStatus('', since)
 
-      // POST fetched data to server for storage
       const res = await fetch('/api/health/ingest/apple-health', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -185,7 +195,6 @@ export default function HealthDashboardNew() {
       })
       if (res.ok) {
         refetchIntegrations()
-        // Trigger client-side sync after connecting
         syncAppleHealth()
       }
     } catch (error) {
@@ -204,7 +213,6 @@ export default function HealthDashboardNew() {
       if (res.ok) {
         const data = await res.json()
         if (data.authUrl) {
-          // Redirect to Oura OAuth
           window.location.href = data.authUrl
         }
       }
@@ -224,7 +232,6 @@ export default function HealthDashboardNew() {
       if (res.ok) {
         const data = await res.json()
         if (data.requiresCredentials && data.loginEndpoint) {
-          // Redirect to Eight Sleep login page
           window.location.href = '/settings?connectEightSleep=true'
         }
       }
@@ -238,13 +245,11 @@ export default function HealthDashboardNew() {
     queryKey: ['health-metrics-raw', currentUserId],
     queryFn: async () => {
       if (!currentUserId) return null
-      // Calculate date range for last 60 days
       const endDate = new Date().toISOString()
       const startDate = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString()
       const res = await fetch(`/api/health/metrics?startDate=${startDate}&endDate=${endDate}`)
       if (!res.ok) return null
       const data = await res.json()
-      // Flatten the grouped metrics into an array
       const flatMetrics: SeedMetric[] = []
       if (data.metrics) {
         for (const [metricType, values] of Object.entries(data.metrics)) {
@@ -262,7 +267,7 @@ export default function HealthDashboardNew() {
       return { metrics: flatMetrics, stats: data.stats }
     },
     enabled: !!currentUserId && !FORCE_DEMO_MODE,
-    staleTime: 5 * 60 * 1000 // 5 minutes
+    staleTime: 5 * 60 * 1000
   })
 
   const realMetrics = realMetricsData?.metrics || []
@@ -283,21 +288,17 @@ export default function HealthDashboardNew() {
   // Determine if we have enough real data or should use demo
   const hasConnectedIntegrations = integrations?.some((i: { isConnected: boolean }) => i.isConnected)
   const hasEnoughData = realMetrics && realMetrics.length >= 14
-  // Only use demo data if forced OR if no integration is connected and data is insufficient.
-  // When an integration IS connected, always use real data (even if sparse) — never mask with demo.
   const useDemoData = FORCE_DEMO_MODE || (!hasConnectedIntegrations && !hasEnoughData)
 
-  // Handle explain score
+  // Handle explain trajectory
   const handleExplainScore = useCallback(() => {
     setShowExplainModal(true)
   }, [])
 
-  // Handle "why might this be?" for delta items
   const handleWhyClick = useCallback(() => {
     setShowWhyModal(true)
   }, [])
 
-  // Handle delta item click
   const handleDeltaClick = useCallback((item: DeltaItem) => {
     setSelectedDelta(item)
     setShowWhyModal(true)
@@ -305,20 +306,16 @@ export default function HealthDashboardNew() {
 
   // Process health data (real or demo)
   const processedData = useMemo(() => {
-    // Choose data source
     let metrics: SeedMetric[]
     let interventions: typeof SEED_INTERVENTIONS
     let contextEvents: typeof SEED_CONTEXT_EVENTS
 
     if (useDemoData) {
-      // Use demo data
       metrics = SEED_DATA.metrics
       interventions = SEED_INTERVENTIONS
       contextEvents = SEED_CONTEXT_EVENTS
     } else if (realMetrics && realMetrics.length > 0) {
-      // Use real data - already in correct format from query
       metrics = realMetrics
-      // Transform real protocols to intervention format
       interventions = (realProtocols || []).map((p: { id: string; peptide?: { name: string; type?: string }; startDate: string; doseAmount?: number; doseUnit?: string; frequency: string; timing?: string }) => ({
         id: p.id,
         name: p.peptide?.name || 'Unknown',
@@ -328,7 +325,7 @@ export default function HealthDashboardNew() {
         frequency: p.frequency,
         timing: p.timing || ''
       }))
-      contextEvents = [] // TODO: Add context events tracking
+      contextEvents = []
     } else {
       return null
     }
@@ -358,8 +355,13 @@ export default function HealthDashboardNew() {
       }
     }
 
-    // Get today's values and compare to baseline
-    const todayDeltas: DeltaItem[] = []
+    // ── NEW: Compute trajectory ──
+    const trajectory = computeTrajectory(metrics, baselines)
+
+    // ── NEW: Compute body composition state ──
+    const bodyCompState = computeBodyCompState(metrics)
+
+    // ── NEW: Classify signals for today's deltas ──
     const keyMetrics = [
       'hrv', 'deep_sleep', 'sleep_efficiency', 'rhr', 'waso', 'sleep_score',
       'weight', 'body_fat_percentage', 'lean_body_mass', 'muscle_mass',
@@ -367,11 +369,12 @@ export default function HealthDashboardNew() {
       'respiratory_rate', 'blood_oxygen',
     ]
 
+    const todayDeltas: DeltaItem[] = []
+
     for (const metricType of keyMetrics) {
       const baseline = baselines.get(metricType)
       if (!baseline) continue
 
-      // Get most recent value (use yesterday if today not available)
       const todayValue = metrics.find(m => m.date === today && m.metricType === metricType)
       const yesterdayValue = metrics.find(m => m.date === yesterday && m.metricType === metricType)
       const currentValue = todayValue || yesterdayValue
@@ -380,58 +383,35 @@ export default function HealthDashboardNew() {
       const polarity = METRIC_POLARITY[metricType] || 'higher_better'
       const delta = compareToBaseline(currentValue.value, baseline, polarity)
 
-      if (delta.significance !== 'none') {
-        const isGood = (polarity === 'higher_better' && delta.direction === 'above') ||
-                       (polarity === 'lower_better' && delta.direction === 'below')
+      if (delta.significance === 'none') continue
 
-        todayDeltas.push({
-          id: metricType,
-          metric: getMetricDisplayName(metricType),
-          metricType,
-          delta: formatDelta(delta.absoluteDelta, metricType),
-          vsBaseline: delta.description,
-          direction: delta.direction === 'above' ? 'up' : 'down',
-          isGood,
-          zScore: delta.zScore
-        })
-      }
+      // Classify signal
+      const recentValues = metrics
+        .filter(m => m.metricType === metricType)
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .slice(0, 7)
+        .map(m => ({ date: m.date, value: m.value }))
+
+      const signal = classifySignal(metricType, recentValues, baseline, polarity)
+
+      const isGood = (polarity === 'higher_better' && delta.direction === 'above') ||
+                     (polarity === 'lower_better' && delta.direction === 'below')
+
+      todayDeltas.push({
+        id: metricType,
+        metric: getMetricDisplayName(metricType),
+        metricType,
+        delta: formatDelta(delta.absoluteDelta, metricType),
+        vsBaseline: delta.description,
+        direction: delta.direction === 'above' ? 'up' : 'down',
+        isGood,
+        zScore: delta.zScore,
+        signalClass: signal?.signalClass,
+        narrative: signal?.narrative,
+      })
     }
 
-    // Sort by significance
     todayDeltas.sort((a, b) => Math.abs(b.zScore || 0) - Math.abs(a.zScore || 0))
-
-    // Calculate overall score (weighted)
-    const sleepScore = metrics.find(m => m.date === yesterday && m.metricType === 'sleep_score')?.value || 75
-    const hrvValue = metrics.find(m => m.date === yesterday && m.metricType === 'hrv')?.value || 50
-    const hrvBaseline = baselines.get('hrv')
-    const hrvScore = hrvBaseline
-      ? Math.min(100, Math.max(0, 50 + ((hrvValue - hrvBaseline.mean) / hrvBaseline.stdDev) * 15))
-      : 70
-
-    // Compute activity score from steps and active calories
-    const stepsBaseline = baselines.get('steps')
-    const stepsValue = metrics.find(m => m.date === yesterday && m.metricType === 'steps')?.value
-    const activeCalBaseline = baselines.get('active_calories')
-    const activeCalValue = metrics.find(m => m.date === yesterday && m.metricType === 'active_calories')?.value
-
-    let activityScore = 70 // default fallback
-    if (stepsBaseline && stepsValue) {
-      const stepsNorm = Math.min(100, Math.max(0, 50 + ((stepsValue - stepsBaseline.mean) / stepsBaseline.stdDev) * 15))
-      if (activeCalBaseline && activeCalValue) {
-        const calNorm = Math.min(100, Math.max(0, 50 + ((activeCalValue - activeCalBaseline.mean) / activeCalBaseline.stdDev) * 15))
-        activityScore = stepsNorm * 0.5 + calNorm * 0.5
-      } else {
-        activityScore = stepsNorm
-      }
-    }
-
-    const overallScore = Math.round(sleepScore * 0.5 + hrvScore * 0.3 + activityScore * 0.2)
-
-    // Generate headline
-    const topDrivers = todayDeltas.filter(d => d.isGood).slice(0, 2)
-    const headline = topDrivers.length > 0
-      ? `${topDrivers.map(d => d.metric).join(' + ')} drove recovery`
-      : 'Recovery metrics within normal range'
 
     // Generate claims
     const allClaims = generateClaims({
@@ -441,7 +421,6 @@ export default function HealthDashboardNew() {
       baselines
     })
 
-    // Filter out claims for metrics with zero data (keep availability observations)
     const availableMetrics = new Set(metricsByType.keys())
     const claims = allClaims.filter(c => {
       if (!c.metricType) return true
@@ -449,11 +428,16 @@ export default function HealthDashboardNew() {
       return availableMetrics.has(c.metricType)
     })
 
-    // Separate availability observations for the Data Status section
     const availabilityClaims = claims.filter(c => c.id.startsWith('availability_'))
     const insightClaims = claims.filter(c => !c.id.startsWith('availability_'))
 
-    // Data status: count metrics per category
+    // ── NEW: Group claims into themes ──
+    const themes = groupClaimsIntoThemes(insightClaims)
+
+    // ── NEW: Compute protocol evidence ──
+    const protocolEvidence = computeProtocolEvidence(interventions, metrics, contextEvents, baselines)
+
+    // Data status
     const dataStatus = {
       sleep: { tracked: 0, total: 3, metrics: ['sleep_duration', 'rem_sleep', 'hrv'] },
       body: { tracked: 0, total: 5, metrics: ['weight', 'body_fat_percentage', 'lean_body_mass', 'muscle_mass', 'bmi'] },
@@ -461,55 +445,38 @@ export default function HealthDashboardNew() {
       vitals: { tracked: 0, total: 3, metrics: ['rhr', 'respiratory_rate', 'blood_oxygen'] },
       fitness: { tracked: 0, total: 1, metrics: ['vo2_max'] },
     }
-
-    for (const [category, info] of Object.entries(dataStatus)) {
+    for (const [, info] of Object.entries(dataStatus)) {
       info.tracked = info.metrics.filter(m => availableMetrics.has(m)).length
     }
 
-    // Derive recommendation from claims (use highest-priority actionable claim)
-    const actionableClaim = claims
+    // Top recommendation from claims
+    const actionableClaim = insightClaims
       .filter(c => c.type === 'warning' || c.priority === 'high')
       .sort((a, b) => {
         const priorityOrder = { high: 0, medium: 1, low: 2 }
         return (priorityOrder[a.priority] || 2) - (priorityOrder[b.priority] || 2)
       })[0]
 
-    const topRecommendation: Recommendation | null = actionableClaim
+    const topRecommendation = actionableClaim
       ? {
-          id: `rec_${actionableClaim.id}`,
-          icon: actionableClaim.type === 'warning' ? 'general' : 'supplement',
           action: actionableClaim.actionable || actionableClaim.headline,
           reason: actionableClaim.evidence || 'Based on your recent health data trends.',
-          evidence: actionableClaim.evidence || '',
-          confidence: actionableClaim.confidence?.level || 'medium'
+          confidence: actionableClaim.confidence?.level || 'medium' as const,
         }
       : null
 
-    // Sub-scores
-    const sleepSubScore = Math.round(sleepScore * 0.95)
-    const recoverySubScore = Math.round(hrvScore)
-    const activitySubScore = Math.round(activityScore)
-
     return {
-      overallScore,
-      sleepSubScore,
-      recoverySubScore,
-      activitySubScore,
-      headline,
-      drivers: todayDeltas.slice(0, 3).map(d => ({
-        label: d.metric,
-        value: d.delta,
-        delta: d.delta,
-        direction: d.direction,
-        isGood: d.isGood
-      })),
+      trajectory,
+      bodyCompState,
       deltas: todayDeltas,
       claims: insightClaims,
       availabilityClaims,
+      themes,
+      protocolEvidence,
       dataStatus,
       recommendation: topRecommendation,
       baselines,
-      interventions
+      interventions,
     }
   }, [useDemoData, realMetrics, realProtocols])
 
@@ -527,9 +494,7 @@ export default function HealthDashboardNew() {
             </p>
           </div>
 
-          {/* Integration cards */}
           <div className="space-y-3 mb-6">
-            {/* Apple Health */}
             <div className="p-4 rounded-xl bg-[var(--card)] border border-[var(--border)]">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -559,9 +524,7 @@ export default function HealthDashboardNew() {
                   >
                     {syncingProvider === 'apple_health' ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      'Sync'
-                    )}
+                    ) : 'Sync'}
                   </button>
                 ) : (
                   <button
@@ -580,7 +543,6 @@ export default function HealthDashboardNew() {
             </div>
           </div>
 
-          {/* Debug info */}
           <div className="text-xs text-[var(--muted-foreground)] p-3 bg-[var(--muted)] rounded-lg">
             <div>User ID: {currentUserId || 'Not logged in'}</div>
             <div>Integrations: {integrations?.length || 0}</div>
@@ -599,7 +561,6 @@ export default function HealthDashboardNew() {
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
           <h1 className="text-lg font-semibold text-[var(--foreground)]">Health</h1>
           <div className="flex items-center gap-2">
-            {/* Data freshness / source status */}
             {(() => {
               if (useDemoData) {
                 return (
@@ -618,7 +579,6 @@ export default function HealthDashboardNew() {
               if (lastSync) {
                 const hoursAgo = Math.round((Date.now() - lastSync) / (1000 * 60 * 60))
                 const isStale = hoursAgo > 24
-                // Check for per-metric freshness from sync state
                 const connectedWithState = integrations?.find((i: Integration) => i.isConnected && i.metricSyncState)
                 const syncState = connectedWithState?.metricSyncState
                 const totalMetrics = syncState ? Object.keys(syncState).length : 0
@@ -659,7 +619,6 @@ export default function HealthDashboardNew() {
             })()}
             <button
               onClick={() => {
-                // Sync all connected integrations
                 const connected = integrations?.filter((i: Integration) => i.isConnected) || []
                 for (const integration of connected) {
                   if (integration.provider === 'apple_health') {
@@ -677,11 +636,11 @@ export default function HealthDashboardNew() {
           </div>
         </div>
 
-        {/* Section tabs */}
+        {/* Section tabs — renamed */}
         <div className="max-w-lg mx-auto px-4 pb-2 flex gap-1">
           {[
             { id: 'overview', label: 'Today' },
-            { id: 'protocols', label: 'Protocols' },
+            { id: 'evidence', label: 'Evidence' },
             { id: 'insights', label: 'Insights' }
           ].map((tab) => (
             <button
@@ -925,118 +884,138 @@ export default function HealthDashboardNew() {
       </div>
 
       <div className="max-w-lg mx-auto px-4 py-6 space-y-6">
+        {/* ═══════════════ TODAY TAB ═══════════════ */}
         {selectedSection === 'overview' && (
           <>
-            {/* Top Insight — hero position */}
-            {processedData.claims.length > 0 && (
-              <div className="rounded-xl overflow-hidden bg-gradient-to-br from-[var(--card)] to-[var(--accent-muted)] border border-[var(--border)] p-5">
-                <div className="text-xs text-[var(--muted-foreground)] uppercase tracking-wider mb-2">
-                  Top Insight
-                </div>
-                <h3 className="text-lg font-semibold text-[var(--foreground)] leading-snug mb-2">
-                  {processedData.claims[0].headline}
-                </h3>
-                <p className="text-sm text-[var(--muted-foreground)] mb-3">
-                  {processedData.claims[0].evidence}
-                </p>
-                {processedData.claims[0].actionable && (
-                  <p className="text-sm text-[var(--accent)] font-medium">
-                    → {processedData.claims[0].actionable}
-                  </p>
-                )}
-                <button
-                  onClick={() => setSelectedSection('insights')}
-                  className="mt-3 text-sm text-[var(--accent)] hover:opacity-80 flex items-center gap-1"
-                >
-                  See all insights <ChevronRight className="w-3 h-3" />
-                </button>
-              </div>
-            )}
-
-            {/* Today's Score Hero */}
-            <TodayScoreHero
-              score={processedData.overallScore}
-              previousScore={processedData.overallScore - 3}
-              headline={processedData.headline}
-              drivers={processedData.drivers}
+            {/* 1. Trajectory Hero */}
+            <TrajectoryHero
+              trajectory={processedData.trajectory}
               onExplain={handleExplainScore}
             />
 
-            {/* Sub-scores */}
+            {/* 2. Category Cards */}
             <div className="grid grid-cols-3 gap-3">
-              <SubScoreCard
+              <CategoryCard
                 icon={Moon}
                 label="Sleep"
-                score={processedData.sleepSubScore}
+                direction={processedData.trajectory.sleep.direction}
+                topMetric={processedData.trajectory.sleep.topMetric}
+                topMetricChange={processedData.trajectory.sleep.topMetricChange}
                 color="indigo"
               />
-              <SubScoreCard
+              <CategoryCard
                 icon={Heart}
                 label="Recovery"
-                score={processedData.recoverySubScore}
+                direction={processedData.trajectory.recovery.direction}
+                topMetric={processedData.trajectory.recovery.topMetric}
+                topMetricChange={processedData.trajectory.recovery.topMetricChange}
                 color="emerald"
               />
-              <SubScoreCard
+              <CategoryCard
                 icon={Footprints}
                 label="Activity"
-                score={processedData.activitySubScore}
+                direction={processedData.trajectory.activity.direction}
+                topMetric={processedData.trajectory.activity.topMetric}
+                topMetricChange={processedData.trajectory.activity.topMetricChange}
                 color="amber"
               />
             </div>
 
-            {/* Body Composition (only if data exists) */}
-            {(() => {
-              const bodyMetrics = processedData.deltas.filter(d =>
-                ['weight', 'body_fat_percentage', 'lean_body_mass', 'muscle_mass', 'bmi'].includes(d.metricType || d.id)
-              )
-              if (bodyMetrics.length === 0) return null
-              return (
-                <div className="rounded-xl bg-[var(--card)] border border-[var(--border)] p-4">
-                  <h3 className="text-sm font-medium text-[var(--muted-foreground)] uppercase tracking-wider mb-3">
+            {/* 3. Body Composition Card */}
+            {processedData.bodyCompState.recompStatus !== 'insufficient_data' && (
+              <div className="rounded-xl bg-[var(--card)] border border-[var(--border)] p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Scale className="w-4 h-4 text-[var(--muted-foreground)]" />
+                  <h3 className="text-sm font-medium text-[var(--muted-foreground)] uppercase tracking-wider">
                     Body Composition
                   </h3>
-                  <div className="space-y-2">
-                    {bodyMetrics.slice(0, 3).map(metric => (
-                      <div
-                        key={metric.id}
-                        className="flex items-center justify-between py-1"
-                        onClick={() => handleDeltaClick(metric)}
-                      >
-                        <span className="text-sm text-[var(--foreground)]">{metric.metric}</span>
-                        <div className="flex items-center gap-2">
-                          <span className={cn(
-                            "text-sm font-medium tabular-nums",
-                            metric.isGood ? "text-[var(--success)]" : "text-[var(--warning)]"
-                          )}>
-                            {metric.delta}
-                          </span>
-                          <span className="text-xs text-[var(--muted-foreground)]">
-                            {metric.vsBaseline}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                  <span className={cn(
+                    'text-xs px-1.5 py-0.5 rounded',
+                    processedData.bodyCompState.confidence === 'high' ? 'bg-emerald-500/20 text-emerald-400' :
+                    processedData.bodyCompState.confidence === 'medium' ? 'bg-amber-500/20 text-amber-400' :
+                    'bg-[var(--muted-foreground)]/20 text-[var(--muted-foreground)]'
+                  )}>
+                    {processedData.bodyCompState.confidence}
+                  </span>
                 </div>
-              )
-            })()}
+                <p className="text-base font-medium text-[var(--foreground)] mb-1">
+                  {processedData.bodyCompState.headline}
+                </p>
+                <p className="text-sm text-[var(--muted-foreground)] mb-3">
+                  {processedData.bodyCompState.detail}
+                </p>
+                <div className="flex gap-3">
+                  {processedData.bodyCompState.weight && (
+                    <TrendPill
+                      label="Weight"
+                      direction={processedData.bodyCompState.trend.weightDir}
+                    />
+                  )}
+                  {processedData.bodyCompState.bodyFatPct && (
+                    <TrendPill
+                      label="Body Fat"
+                      direction={processedData.bodyCompState.trend.fatDir}
+                    />
+                  )}
+                  {(processedData.bodyCompState.muscleMass || processedData.bodyCompState.leanMass) && (
+                    <TrendPill
+                      label={processedData.bodyCompState.muscleMass ? 'Muscle' : 'Lean Mass'}
+                      direction={processedData.bodyCompState.trend.massDir}
+                    />
+                  )}
+                </div>
+              </div>
+            )}
 
-            {/* Data Status — what's being tracked and what needs more data */}
+            {/* 4. What Matters Today (signal-classified + top recommendation integrated) */}
+            <WhatChangedCard
+              items={processedData.deltas.slice(0, 6)}
+              topRecommendation={processedData.recommendation}
+              onItemClick={handleDeltaClick}
+              onWhyClick={handleWhyClick}
+            />
+
+            {/* 5. Quick Protocol Status */}
+            {processedData.protocolEvidence.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-medium text-[var(--muted-foreground)] uppercase tracking-wider">
+                    Protocol Status
+                  </h2>
+                  <button
+                    onClick={() => setSelectedSection('evidence')}
+                    className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
+                  >
+                    View All <ChevronRight className="w-3 h-3" />
+                  </button>
+                </div>
+                {processedData.protocolEvidence.slice(0, 2).map((evidence) => (
+                  <QuickVerdictBadge
+                    key={evidence.protocolId}
+                    protocolName={evidence.protocolName}
+                    verdict={evidence.verdict}
+                    daysOnProtocol={evidence.daysOnProtocol}
+                    onClick={() => setSelectedSection('evidence')}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Data Status (collapsible) */}
             {(() => {
               const ds = processedData.dataStatus
               const categories = [
-                { key: 'sleep', label: 'Sleep', icon: '🌙' },
-                { key: 'body', label: 'Body', icon: '⚖️' },
-                { key: 'activity', label: 'Activity', icon: '🏃' },
-                { key: 'vitals', label: 'Vitals', icon: '❤️' },
-                { key: 'fitness', label: 'Fitness', icon: '💪' },
+                { key: 'sleep', label: 'Sleep' },
+                { key: 'body', label: 'Body' },
+                { key: 'activity', label: 'Activity' },
+                { key: 'vitals', label: 'Vitals' },
+                { key: 'fitness', label: 'Fitness' },
               ] as const
               const totalTracked = Object.values(ds).reduce((s, c) => s + c.tracked, 0)
               const totalAvailable = Object.values(ds).reduce((s, c) => s + c.total, 0)
               const growingClaims = processedData.availabilityClaims.filter(c => c.id.startsWith('availability_growing_'))
               const providerClaims = processedData.availabilityClaims.filter(c => !c.id.startsWith('availability_growing_'))
 
-              // Get per-metric sync state from connected Apple Health integration
               const appleHealth = integrations?.find((i: Integration) => i.provider === 'apple_health')
               const syncState = appleHealth?.metricSyncState
               const deniedMetrics = syncState
@@ -1069,7 +1048,6 @@ export default function HealthDashboardNew() {
                     <ChevronDown className="w-4 h-4 text-[var(--muted-foreground)] transition-transform group-open:rotate-180" />
                   </summary>
                   <div className="px-4 pb-4 space-y-3">
-                    {/* Permission denied warning */}
                     {deniedMetrics.length > 0 && (
                       <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30">
                         <div className="flex items-start gap-2">
@@ -1093,7 +1071,6 @@ export default function HealthDashboardNew() {
                       </div>
                     )}
 
-                    {/* Category grid */}
                     <div className="grid grid-cols-3 gap-2">
                       {categories.map(cat => {
                         const info = ds[cat.key]
@@ -1113,7 +1090,6 @@ export default function HealthDashboardNew() {
                       })}
                     </div>
 
-                    {/* Per-metric freshness (from sync state) */}
                     {syncState && Object.keys(syncState).length > 0 && (
                       <div className="space-y-1">
                         <div className="text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-wider">Metric Freshness</div>
@@ -1151,7 +1127,6 @@ export default function HealthDashboardNew() {
                       </div>
                     )}
 
-                    {/* Growing metrics — need more data */}
                     {growingClaims.length > 0 && (
                       <div className="space-y-1">
                         <div className="text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-wider">Accumulating Data</div>
@@ -1163,7 +1138,6 @@ export default function HealthDashboardNew() {
                       </div>
                     )}
 
-                    {/* Provider-exclusive metrics */}
                     {providerClaims.length > 0 && (
                       <div className="space-y-1">
                         <div className="text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-wider">Requires Additional Provider</div>
@@ -1178,114 +1152,82 @@ export default function HealthDashboardNew() {
                 </details>
               )
             })()}
-
-            {/* What Changed */}
-            <WhatChangedCard
-              items={processedData.deltas.slice(0, 4)}
-              onItemClick={handleDeltaClick}
-              onWhyClick={handleWhyClick}
-            />
-
-            {/* Do This Next */}
-            <DoThisNextCard
-              recommendation={processedData.recommendation}
-              onComplete={() => {}}
-              onDismiss={() => {}}
-            />
-
-            {/* Quick Protocol Impact */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-medium text-[var(--muted-foreground)] uppercase tracking-wider">
-                  Protocol Impact
-                </h2>
-                <Link
-                  href="/health/protocols"
-                  className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
-                >
-                  View All <ChevronRight className="w-3 h-3" />
-                </Link>
-              </div>
-              {processedData.interventions
-                .filter(i => i.type === 'peptide')
-                .slice(0, 2)
-                .map((intervention) => {
-                  const impactClaim = processedData.claims.find(
-                    c => c.interventionId === intervention.id && (c.type === 'improvement' || c.type === 'decline')
-                  )
-                  const daysSinceStart = intervention.startDate
-                    ? Math.max(0, Math.round((Date.now() - new Date(intervention.startDate).getTime()) / (1000 * 60 * 60 * 24)))
-                    : 0
-                  return (
-                    <ProtocolImpactCard
-                      key={intervention.id}
-                      protocolName={intervention.name}
-                      protocolType={intervention.type}
-                      topMetric={impactClaim?.metricType ? getMetricDisplayName(impactClaim.metricType) : 'Tracking...'}
-                      change={impactClaim ? Math.round(impactClaim.receipt.effectSize.percentChange) : 0}
-                      daysOfData={daysSinceStart}
-                      confidence={impactClaim?.confidence?.level || 'low'}
-                      onClick={() => {}}
-                    />
-                  )
-                })}
-            </div>
           </>
         )}
 
-        {selectedSection === 'protocols' && (
+        {/* ═══════════════ EVIDENCE TAB ═══════════════ */}
+        {selectedSection === 'evidence' && (
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-[var(--muted-foreground)] mb-2">
               <Beaker className="w-5 h-5" />
-              <span className="text-sm font-medium uppercase tracking-wider">Active Protocols</span>
+              <span className="text-sm font-medium uppercase tracking-wider">Protocol Evidence</span>
             </div>
 
-            {processedData.interventions.map((intervention) => {
-              const impactClaim = processedData.claims.find(
-                c => c.interventionId === intervention.id && (c.type === 'improvement' || c.type === 'decline')
-              )
-              const daysSinceStart = intervention.startDate
-                ? Math.max(0, Math.round((Date.now() - new Date(intervention.startDate).getTime()) / (1000 * 60 * 60 * 24)))
-                : 0
-              return (
-                <ProtocolImpactCard
-                  key={intervention.id}
-                  protocolName={intervention.name}
-                  protocolType={intervention.type}
-                  topMetric={impactClaim?.metricType ? getMetricDisplayName(impactClaim.metricType) : 'Tracking...'}
-                  change={impactClaim ? Math.round(impactClaim.receipt.effectSize.percentChange) : 0}
-                  daysOfData={daysSinceStart}
-                  confidence={impactClaim?.confidence?.level || 'low'}
-                  onClick={() => {}}
-                />
-              )
-            })}
-          </div>
-        )}
+            {processedData.protocolEvidence.length === 0 && (
+              <div className="text-center py-12">
+                <Beaker className="w-10 h-10 text-[var(--muted-foreground)] mx-auto mb-3" />
+                <p className="text-[var(--muted-foreground)]">No active protocols to evaluate</p>
+              </div>
+            )}
 
-        {selectedSection === 'insights' && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-[var(--muted-foreground)] mb-2">
-              <Sparkles className="w-5 h-5" />
-              <span className="text-sm font-medium uppercase tracking-wider">Claims with Receipts</span>
-            </div>
-
-            {processedData.claims.slice(0, 6).map((claim) => (
-              <ClaimWithReceipts
-                key={claim.id}
-                claim={claim}
-                onViewDays={() => {}}
+            {processedData.protocolEvidence.map((evidence) => (
+              <ProtocolEvidenceCard
+                key={evidence.protocolId}
+                evidence={evidence}
               />
             ))}
           </div>
         )}
+
+        {/* ═══════════════ INSIGHTS TAB ═══════════════ */}
+        {selectedSection === 'insights' && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-[var(--muted-foreground)] mb-2">
+              <Sparkles className="w-5 h-5" />
+              <span className="text-sm font-medium uppercase tracking-wider">Themed Insights</span>
+            </div>
+
+            {processedData.themes.length === 0 && (
+              <div className="text-center py-12">
+                <Sparkles className="w-10 h-10 text-[var(--muted-foreground)] mx-auto mb-3" />
+                <p className="text-[var(--muted-foreground)]">Not enough data for themed insights yet</p>
+              </div>
+            )}
+
+            {processedData.themes.map((theme) => (
+              <InsightThemeCard
+                key={theme.id}
+                theme={theme}
+              />
+            ))}
+
+            {/* Remaining claims not in themes */}
+            {processedData.claims.length > 0 && (
+              <details className="group">
+                <summary className="cursor-pointer flex items-center gap-2 text-xs text-[var(--muted-foreground)] uppercase tracking-wider py-2">
+                  <span>All Claims ({processedData.claims.length})</span>
+                  <ChevronDown className="w-3 h-3 transition-transform group-open:rotate-180" />
+                </summary>
+                <div className="space-y-3 pt-2">
+                  {processedData.claims.slice(0, 8).map((claim) => (
+                    <ClaimWithReceipts
+                      key={claim.id}
+                      claim={claim}
+                      onViewDays={() => {}}
+                    />
+                  ))}
+                </div>
+              </details>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Score Explanation Modal */}
+      {/* Trajectory Explanation Modal */}
       <BottomSheet
         isOpen={showExplainModal}
         onClose={() => setShowExplainModal(false)}
-        title="Understanding Your Score"
+        title="How Trajectory Works"
       >
         <div className="space-y-4">
           <div className="flex items-center gap-3 p-4 rounded-xl bg-[var(--accent-muted)]">
@@ -1293,58 +1235,67 @@ export default function HealthDashboardNew() {
               <Brain className="w-6 h-6 text-white" />
             </div>
             <div>
-              <div className="text-3xl font-bold text-[var(--foreground)]">{processedData.overallScore}</div>
-              <div className="text-sm text-[var(--muted-foreground)]">Today's Recovery Score</div>
+              <div className="text-lg font-bold text-[var(--foreground)]">
+                {processedData.trajectory.direction.charAt(0).toUpperCase() + processedData.trajectory.direction.slice(1)}
+              </div>
+              <div className="text-sm text-[var(--muted-foreground)]">
+                {processedData.trajectory.window}-day window · {processedData.trajectory.confidence} confidence
+              </div>
             </div>
           </div>
 
           <div className="space-y-3">
-            <h4 className="font-medium text-[var(--foreground)]">How your score is calculated:</h4>
+            <h4 className="font-medium text-[var(--foreground)]">What goes into your trajectory:</h4>
             <div className="space-y-2 text-sm text-[var(--muted-foreground)]">
               <div className="flex items-start gap-2">
                 <Moon className="w-4 h-4 mt-0.5 text-indigo-400" />
                 <div>
-                  <span className="text-[var(--foreground)] font-medium">Sleep Quality (50%)</span>
-                  <p>Based on your sleep score, deep sleep duration, and sleep efficiency.</p>
+                  <span className="text-[var(--foreground)] font-medium">Sleep (35%)</span>
+                  <p>Duration, deep sleep, efficiency, and sleep score trends.</p>
                 </div>
               </div>
               <div className="flex items-start gap-2">
                 <Heart className="w-4 h-4 mt-0.5 text-emerald-400" />
                 <div>
                   <span className="text-[var(--foreground)] font-medium">Recovery (30%)</span>
-                  <p>Heart rate variability compared to your personal baseline.</p>
+                  <p>HRV, resting heart rate, and readiness trends.</p>
                 </div>
               </div>
               <div className="flex items-start gap-2">
                 <Footprints className="w-4 h-4 mt-0.5 text-amber-400" />
                 <div>
-                  <span className="text-[var(--foreground)] font-medium">Activity Balance (20%)</span>
-                  <p>Activity levels balanced against recovery needs.</p>
+                  <span className="text-[var(--foreground)] font-medium">Activity (20%)</span>
+                  <p>Steps, exercise, and activity consistency.</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <Scale className="w-4 h-4 mt-0.5 text-cyan-400" />
+                <div>
+                  <span className="text-[var(--foreground)] font-medium">Body Comp (15%)</span>
+                  <p>Weight, body fat, and lean mass trends when available.</p>
                 </div>
               </div>
             </div>
           </div>
 
           <div className="p-4 rounded-xl bg-[var(--muted)] border border-[var(--border)]">
-            <h4 className="font-medium text-[var(--foreground)] mb-2">Today's Key Drivers</h4>
+            <h4 className="font-medium text-[var(--foreground)] mb-2">Why no score number?</h4>
             <p className="text-sm text-[var(--muted-foreground)]">
-              {processedData.headline}
+              A single 0-100 number causes overreaction to normal biological variation.
+              Direction labels (improving/stable/declining) are more honest — they tell you
+              where you're headed, not how to feel about today.
             </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {processedData.drivers.map((driver, i) => (
-                <span
-                  key={i}
-                  className={cn(
-                    "px-2 py-1 rounded-md text-xs font-medium",
-                    driver.isGood
-                      ? "bg-emerald-500/20 text-emerald-400"
-                      : "bg-amber-500/20 text-amber-400"
-                  )}
-                >
-                  {driver.delta} {driver.label}
-                </span>
-              ))}
-            </div>
+          </div>
+
+          <div className="p-4 rounded-xl bg-[var(--muted)] border border-[var(--border)]">
+            <h4 className="font-medium text-[var(--foreground)] mb-2">Data: {processedData.trajectory.daysOfData} days</h4>
+            <p className="text-sm text-[var(--muted-foreground)]">
+              Using a {processedData.trajectory.window}-day analysis window.
+              {processedData.trajectory.dataState === 'rich' ? ' Plenty of data for high confidence.' :
+               processedData.trajectory.dataState === 'adequate' ? ' Adequate data — confidence improves with more days.' :
+               processedData.trajectory.dataState === 'sparse' ? ' Limited data — results are directional, not definitive.' :
+               ' Need more data before trajectory is meaningful.'}
+            </p>
           </div>
         </div>
       </BottomSheet>
@@ -1373,7 +1324,7 @@ export default function HealthDashboardNew() {
                 </div>
                 <div>
                   <div className="font-medium text-[var(--foreground)]">{selectedDelta.metric}</div>
-                  <div className="text-sm text-[var(--muted-foreground)]">{selectedDelta.vsBaseline}</div>
+                  <div className="text-sm text-[var(--muted-foreground)]">{selectedDelta.narrative || selectedDelta.vsBaseline}</div>
                 </div>
               </div>
             </div>
@@ -1411,16 +1362,21 @@ export default function HealthDashboardNew() {
   )
 }
 
-// Sub-score card component
-function SubScoreCard({
+// ─── Helper Components ───────────────────────────────────────────────
+
+function CategoryCard({
   icon: Icon,
   label,
-  score,
+  direction,
+  topMetric,
+  topMetricChange,
   color
 }: {
   icon: typeof Moon
   label: string
-  score: number
+  direction: 'improving' | 'stable' | 'declining'
+  topMetric: string
+  topMetricChange: number
   color: 'indigo' | 'emerald' | 'amber'
 }) {
   const colors = {
@@ -1429,21 +1385,105 @@ function SubScoreCard({
     amber: 'bg-amber-500/20 text-amber-400'
   }
 
+  const DirIcon = direction === 'improving' ? TrendingUp :
+                  direction === 'declining' ? TrendingDown : Minus
+  const dirColor = direction === 'improving' ? 'text-emerald-400' :
+                   direction === 'declining' ? 'text-amber-400' : 'text-[var(--muted-foreground)]'
+
   return (
     <div className="rounded-xl bg-[var(--card)] border border-[var(--border)] p-3">
       <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center mb-2', colors[color])}>
         <Icon className="w-4 h-4" />
       </div>
-      <div className="text-2xl font-bold text-[var(--foreground)] tabular-nums">{score}</div>
+      <div className="flex items-center gap-1 mb-0.5">
+        <DirIcon className={cn('w-4 h-4', dirColor)} />
+        <span className={cn('text-sm font-semibold', dirColor)}>
+          {direction === 'improving' ? 'Up' : direction === 'declining' ? 'Down' : 'Steady'}
+        </span>
+      </div>
       <div className="text-xs text-[var(--muted-foreground)]">{label}</div>
+      {topMetric && topMetricChange !== 0 && (
+        <div className="text-[10px] text-[var(--muted-foreground)] mt-1 truncate">
+          {getMetricDisplayName(topMetric)} {topMetricChange > 0 ? '+' : ''}{topMetricChange.toFixed(0)}%
+        </div>
+      )}
     </div>
   )
 }
 
-// Helper functions
+function TrendPill({ label, direction }: { label: string; direction: 'up' | 'down' | 'stable' }) {
+  const icon = direction === 'up'
+    ? <TrendingUp className="w-3 h-3" />
+    : direction === 'down'
+    ? <TrendingDown className="w-3 h-3" />
+    : <Minus className="w-3 h-3" />
+
+  return (
+    <span className={cn(
+      'inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium',
+      'bg-[var(--muted)] border border-[var(--border)]',
+      direction === 'up' ? 'text-emerald-400' :
+      direction === 'down' ? 'text-amber-400' : 'text-[var(--muted-foreground)]'
+    )}>
+      {icon}
+      {label}
+    </span>
+  )
+}
+
+function QuickVerdictBadge({
+  protocolName,
+  verdict,
+  daysOnProtocol,
+  onClick
+}: {
+  protocolName: string
+  verdict: string
+  daysOnProtocol: number
+  onClick: () => void
+}) {
+  const verdictColors: Record<string, string> = {
+    too_early: 'text-[var(--muted-foreground)]',
+    accumulating: 'text-amber-400',
+    weak_positive: 'text-amber-400',
+    likely_positive: 'text-emerald-400',
+    strong_positive: 'text-emerald-400',
+    no_detectable_effect: 'text-[var(--muted-foreground)]',
+    possible_negative: 'text-rose-400',
+    confounded: 'text-[var(--muted-foreground)]',
+  }
+
+  const verdictLabels: Record<string, string> = {
+    too_early: 'Too early',
+    accumulating: 'Accumulating',
+    weak_positive: 'Weak +',
+    likely_positive: 'Likely +',
+    strong_positive: 'Strong +',
+    no_detectable_effect: 'No effect',
+    possible_negative: 'Possible -',
+    confounded: 'Confounded',
+  }
+
+  return (
+    <button
+      onClick={onClick}
+      className="w-full p-3 rounded-xl bg-[var(--card)] border border-[var(--border)] hover:bg-[var(--border)]/50 transition-colors text-left flex items-center justify-between"
+    >
+      <div>
+        <span className="text-sm font-medium text-[var(--foreground)]">{protocolName}</span>
+        <span className="text-xs text-[var(--muted-foreground)] ml-2">Day {daysOnProtocol}</span>
+      </div>
+      <span className={cn('text-sm font-semibold', verdictColors[verdict] || 'text-[var(--muted-foreground)]')}>
+        {verdictLabels[verdict] || verdict}
+      </span>
+    </button>
+  )
+}
+
+// ─── Helper functions ────────────────────────────────────────────────
+
 function getMetricDisplayName(metricType: string): string {
   const names: Record<string, string> = {
-    // Sleep
     hrv: 'HRV',
     rhr: 'Resting HR',
     deep_sleep: 'Deep Sleep',
@@ -1455,14 +1495,12 @@ function getMetricDisplayName(metricType: string): string {
     waso: 'Wake Time',
     sleep_latency: 'Sleep Latency',
     temp_deviation: 'Temp Deviation',
-    // Activity
     steps: 'Steps',
     active_calories: 'Active Calories',
     basal_calories: 'Basal Calories',
     exercise_minutes: 'Exercise',
     stand_hours: 'Stand Hours',
     walking_running_distance: 'Distance',
-    // Body Composition
     weight: 'Weight',
     body_fat_percentage: 'Body Fat',
     lean_body_mass: 'Lean Mass',
@@ -1470,7 +1508,6 @@ function getMetricDisplayName(metricType: string): string {
     bmi: 'BMI',
     bone_mass: 'Bone Mass',
     body_water: 'Body Water',
-    // Fitness & Vitals
     vo2_max: 'VO2 Max',
     respiratory_rate: 'Resp. Rate',
     blood_oxygen: 'Blood O2',
@@ -1489,19 +1526,16 @@ function formatDelta(value: number, metricType: string): string {
   if (metricType === 'temp_deviation') return `${sign}${value.toFixed(1)}°`
   if (metricType.includes('score')) return `${sign}${Math.round(value)}`
 
-  // Body composition
   if (['weight', 'lean_body_mass', 'muscle_mass', 'bone_mass'].includes(metricType))
     return `${sign}${value.toFixed(1)}kg`
   if (metricType === 'body_fat_percentage') return `${sign}${value.toFixed(1)}%`
   if (metricType === 'bmi') return `${sign}${value.toFixed(1)}`
 
-  // Fitness & Vitals
   if (metricType === 'vo2_max') return `${sign}${value.toFixed(1)}`
   if (metricType === 'blood_oxygen') return `${sign}${value.toFixed(1)}%`
   if (metricType === 'respiratory_rate') return `${sign}${value.toFixed(1)}`
   if (metricType === 'body_temperature') return `${sign}${value.toFixed(1)}°`
 
-  // Activity
   if (metricType === 'steps') return `${sign}${Math.round(value).toLocaleString()}`
   if (metricType === 'active_calories' || metricType === 'basal_calories')
     return `${sign}${Math.round(value)}kcal`

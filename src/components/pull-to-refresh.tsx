@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -17,67 +17,98 @@ export function PullToRefresh({ onRefresh, children, className }: PullToRefreshP
   const startY = useRef(0)
   const isPulling = useRef(false)
   const pullDistanceRef = useRef(0)
+  const isRefreshingRef = useRef(false)
+  const onRefreshRef = useRef(onRefresh)
 
   const THRESHOLD = 80
   const MAX_PULL = 120
 
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+  // Keep refs in sync with latest values
+  onRefreshRef.current = onRefresh
+  isRefreshingRef.current = isRefreshing
+
+  // Use native event listeners so we can set { passive: false }
+  // and call preventDefault() to stop iOS native scroll bounce
+  useEffect(() => {
     const container = containerRef.current
-    if (!container || isRefreshing) return
+    if (!container) return
 
-    // Only allow pull-to-refresh when scrolled to top
-    if (container.scrollTop <= 0) {
-      startY.current = e.touches[0].clientY
-      isPulling.current = true
+    function onTouchStart(e: TouchEvent) {
+      if (!container || isRefreshingRef.current) return
+      if (container.scrollTop <= 0) {
+        startY.current = e.touches[0].clientY
+        isPulling.current = true
+      }
     }
-  }, [isRefreshing])
 
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!isPulling.current || isRefreshing) return
+    function onTouchMove(e: TouchEvent) {
+      if (!isPulling.current || isRefreshingRef.current) return
 
-    const currentY = e.touches[0].clientY
-    const diff = currentY - startY.current
+      const currentY = e.touches[0].clientY
+      const diff = currentY - startY.current
 
-    if (diff > 0) {
-      // Apply resistance as we pull further
-      const resistance = 0.5
-      const adjustedDiff = Math.min(diff * resistance, MAX_PULL)
-      pullDistanceRef.current = adjustedDiff
-      setPullDistance(adjustedDiff)
-    }
-  }, [isRefreshing])
+      if (diff > 0) {
+        // Prevent native scroll bounce — this is why we need { passive: false }
+        e.preventDefault()
 
-  const handleTouchEnd = useCallback(async () => {
-    if (!isPulling.current) return
-    isPulling.current = false
-
-    // Use ref to avoid stale closure — React 18 batching means
-    // state from the last touchmove may not have rendered yet
-    const currentPull = pullDistanceRef.current
-    pullDistanceRef.current = 0
-
-    if (currentPull >= THRESHOLD && !isRefreshing) {
-      setIsRefreshing(true)
-      setPullDistance(60) // Hold at refresh position
-
-      try {
-        await onRefresh()
-      } finally {
-        setIsRefreshing(false)
+        const resistance = 0.5
+        const adjustedDiff = Math.min(diff * resistance, MAX_PULL)
+        pullDistanceRef.current = adjustedDiff
+        setPullDistance(adjustedDiff)
+      } else {
+        // User scrolling up — cancel pull and let native scroll handle it
+        isPulling.current = false
+        pullDistanceRef.current = 0
         setPullDistance(0)
       }
-    } else {
-      setPullDistance(0)
     }
-  }, [isRefreshing, onRefresh])
 
-  // Reset on touch cancel (iOS fires this during native scroll bounce)
-  const handleTouchCancel = useCallback(() => {
-    isPulling.current = false
-    pullDistanceRef.current = 0
-    if (!isRefreshing) {
-      setPullDistance(0)
+    async function onTouchEnd() {
+      if (!isPulling.current) return
+      isPulling.current = false
+
+      const currentPull = pullDistanceRef.current
+      pullDistanceRef.current = 0
+
+      if (currentPull >= THRESHOLD && !isRefreshingRef.current) {
+        isRefreshingRef.current = true
+        setPullDistance(60)
+
+        try {
+          await onRefreshRef.current()
+        } finally {
+          isRefreshingRef.current = false
+          setPullDistance(0)
+        }
+      } else {
+        setPullDistance(0)
+      }
     }
+
+    function onTouchCancel() {
+      isPulling.current = false
+      pullDistanceRef.current = 0
+      if (!isRefreshingRef.current) {
+        setPullDistance(0)
+      }
+    }
+
+    container.addEventListener('touchstart', onTouchStart, { passive: true })
+    container.addEventListener('touchmove', onTouchMove, { passive: false })
+    container.addEventListener('touchend', onTouchEnd)
+    container.addEventListener('touchcancel', onTouchCancel)
+
+    return () => {
+      container.removeEventListener('touchstart', onTouchStart)
+      container.removeEventListener('touchmove', onTouchMove)
+      container.removeEventListener('touchend', onTouchEnd)
+      container.removeEventListener('touchcancel', onTouchCancel)
+    }
+  }, []) // Stable — all mutable state accessed via refs
+
+  // Sync isRefreshing state to ref (for the spinner UI)
+  useEffect(() => {
+    isRefreshingRef.current = isRefreshing
   }, [isRefreshing])
 
   const progress = Math.min(pullDistance / THRESHOLD, 1)
@@ -87,10 +118,6 @@ export function PullToRefresh({ onRefresh, children, className }: PullToRefreshP
     <div
       ref={containerRef}
       className={cn('relative h-full overflow-auto overscroll-none', className)}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      onTouchCancel={handleTouchCancel}
     >
       {/* Pull indicator */}
       <div

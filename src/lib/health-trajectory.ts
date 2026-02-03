@@ -1,0 +1,527 @@
+// Health Trajectory Engine
+// Computes trajectory direction, confidence, and body composition state
+// Primary unit of analysis: recent trajectory, not today's score
+
+import { subDays, parseISO, differenceInDays, format } from 'date-fns'
+import { METRIC_POLARITY, computeBaseline, type MetricBaseline, type DailyMetricValue } from './health-baselines'
+import type { SeedMetric } from './demo-data/seed-metrics'
+
+// ─── Types ───────────────────────────────────────────────────────────
+
+export type TrajectoryDirection = 'improving' | 'stable' | 'declining'
+export type TrajectoryConfidence = 'high' | 'moderate' | 'low' | 'insufficient'
+
+export interface HealthTrajectory {
+  direction: TrajectoryDirection
+  confidence: TrajectoryConfidence
+  confidenceScore: number           // 0-100
+  window: 7 | 14 | 30              // days used
+  headline: string                  // "Sleep and recovery driving steady improvement"
+  signals: TrajectorySignal[]
+  sleep: CategoryTrajectory
+  recovery: CategoryTrajectory
+  activity: CategoryTrajectory
+  bodyComp: CategoryTrajectory | null
+  dataState: 'rich' | 'adequate' | 'sparse' | 'insufficient'
+  daysOfData: number
+}
+
+export interface CategoryTrajectory {
+  direction: TrajectoryDirection
+  weight: number
+  topMetric: string
+  topMetricChange: number           // percent
+  momentum: 'accelerating' | 'steady' | 'decelerating'
+}
+
+export interface TrajectorySignal {
+  metricType: string
+  direction: TrajectoryDirection
+  strength: number                  // 0-1
+  percentChange: number
+  consistency: number               // 0-1
+  category: 'sleep' | 'recovery' | 'activity' | 'bodyComp'
+}
+
+// ─── Body Composition ────────────────────────────────────────────────
+
+export interface BodyCompState {
+  weight?: { value: number; date: string }
+  bodyFatPct?: { value: number; date: string }
+  leanMass?: { value: number; date: string }
+  muscleMass?: { value: number; date: string }
+  trend: {
+    weightDir: 'up' | 'down' | 'stable'
+    fatDir: 'up' | 'down' | 'stable'
+    massDir: 'up' | 'down' | 'stable'
+  }
+  recompStatus: 'recomposing' | 'fat_loss' | 'muscle_gain' | 'stable' | 'regressing' | 'insufficient_data'
+  headline: string
+  detail: string
+  confidence: 'high' | 'medium' | 'low' | 'insufficient'
+}
+
+// ─── Constants ───────────────────────────────────────────────────────
+
+const METRIC_CATEGORIES: Record<string, 'sleep' | 'recovery' | 'activity' | 'bodyComp'> = {
+  sleep_duration: 'sleep',
+  deep_sleep: 'sleep',
+  rem_sleep: 'sleep',
+  sleep_efficiency: 'sleep',
+  sleep_score: 'sleep',
+  waso: 'sleep',
+  sleep_latency: 'sleep',
+  hrv: 'recovery',
+  rhr: 'recovery',
+  readiness_score: 'recovery',
+  respiratory_rate: 'recovery',
+  blood_oxygen: 'recovery',
+  steps: 'activity',
+  active_calories: 'activity',
+  exercise_minutes: 'activity',
+  walking_running_distance: 'activity',
+  vo2_max: 'activity',
+  stand_hours: 'activity',
+  weight: 'bodyComp',
+  body_fat_percentage: 'bodyComp',
+  lean_body_mass: 'bodyComp',
+  muscle_mass: 'bodyComp',
+  bmi: 'bodyComp',
+  bone_mass: 'bodyComp',
+  body_water: 'bodyComp',
+}
+
+const CATEGORY_WEIGHTS = {
+  sleep: 0.35,
+  recovery: 0.30,
+  activity: 0.20,
+  bodyComp: 0.15,
+}
+
+// ─── Main Functions ──────────────────────────────────────────────────
+
+export function computeTrajectory(
+  metrics: SeedMetric[],
+  baselines: Map<string, MetricBaseline>
+): HealthTrajectory {
+  // Step 1: Window selection
+  const { window, dataState, daysOfData } = selectWindow(metrics)
+
+  if (dataState === 'insufficient') {
+    return makeInsufficientTrajectory(daysOfData)
+  }
+
+  // Step 2: Per-metric trend signals
+  const signals = computePerMetricSignals(metrics, window)
+
+  // Step 3: Category aggregation
+  const sleep = aggregateCategory(signals, 'sleep')
+  const recovery = aggregateCategory(signals, 'recovery')
+  const activity = aggregateCategory(signals, 'activity')
+  const bodyCompSignals = signals.filter(s => s.category === 'bodyComp')
+  const bodyComp = bodyCompSignals.length >= 1 ? aggregateCategory(signals, 'bodyComp') : null
+
+  // Step 4: Overall direction (weighted vote)
+  const direction = computeOverallDirection(sleep, recovery, activity, bodyComp)
+
+  // Step 5: Confidence score
+  const confidenceScore = computeConfidenceScore(signals, window, sleep, recovery, activity, bodyComp)
+  const confidence: TrajectoryConfidence =
+    confidenceScore >= 70 ? 'high' :
+    confidenceScore >= 45 ? 'moderate' :
+    confidenceScore >= 25 ? 'low' : 'insufficient'
+
+  // Step 6: Headline
+  const headline = generateHeadline(direction, sleep, recovery, activity, bodyComp)
+
+  return {
+    direction,
+    confidence,
+    confidenceScore,
+    window,
+    headline,
+    signals,
+    sleep,
+    recovery,
+    activity,
+    bodyComp,
+    dataState,
+    daysOfData,
+  }
+}
+
+export function computeBodyCompState(metrics: SeedMetric[]): BodyCompState {
+  const today = new Date()
+  const windowStart = subDays(today, 30)
+
+  // Get latest values
+  const getLatest = (type: string) => {
+    const vals = metrics
+      .filter(m => m.metricType === type)
+      .sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime())
+    return vals[0] ? { value: vals[0].value, date: vals[0].date } : undefined
+  }
+
+  const weight = getLatest('weight')
+  const bodyFatPct = getLatest('body_fat_percentage')
+  const leanMass = getLatest('lean_body_mass')
+  const muscleMass = getLatest('muscle_mass')
+
+  // Compute trends using 14-30 day window
+  const computeDir = (type: string): 'up' | 'down' | 'stable' => {
+    const vals = metrics
+      .filter(m => m.metricType === type && parseISO(m.date) >= windowStart)
+      .sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime())
+    if (vals.length < 4) return 'stable'
+    const half = Math.floor(vals.length / 2)
+    const firstHalf = vals.slice(0, half)
+    const secondHalf = vals.slice(half)
+    const firstAvg = firstHalf.reduce((s, v) => s + v.value, 0) / firstHalf.length
+    const secondAvg = secondHalf.reduce((s, v) => s + v.value, 0) / secondHalf.length
+    const pctChange = ((secondAvg - firstAvg) / firstAvg) * 100
+    if (Math.abs(pctChange) < 1) return 'stable'
+    return pctChange > 0 ? 'up' : 'down'
+  }
+
+  const weightDir = computeDir('weight')
+  const fatDir = computeDir('body_fat_percentage')
+  const massDir = computeDir(muscleMass ? 'muscle_mass' : 'lean_body_mass')
+
+  // Count data points in window
+  const bodyCompTypes = ['weight', 'body_fat_percentage', 'lean_body_mass', 'muscle_mass']
+  const totalPoints = metrics.filter(m =>
+    bodyCompTypes.includes(m.metricType) && parseISO(m.date) >= windowStart
+  ).length
+
+  if (totalPoints < 4) {
+    return {
+      weight, bodyFatPct, leanMass, muscleMass,
+      trend: { weightDir: 'stable', fatDir: 'stable', massDir: 'stable' },
+      recompStatus: 'insufficient_data',
+      headline: 'Not enough body composition data yet',
+      detail: `Need at least 4 measurements. Have ${totalPoints} so far.`,
+      confidence: 'insufficient',
+    }
+  }
+
+  // Determine recomp status
+  let recompStatus: BodyCompState['recompStatus'] = 'stable'
+  let headline = ''
+  let detail = ''
+
+  if (fatDir === 'down' && massDir === 'up') {
+    recompStatus = 'recomposing'
+    headline = 'Body recomposition in progress'
+    detail = 'Body fat decreasing while muscle mass increasing. Optimal composition changes.'
+  } else if (fatDir === 'down' && (massDir === 'stable' || massDir === 'down')) {
+    recompStatus = 'fat_loss'
+    headline = 'Fat loss phase'
+    detail = fatDir === 'down' && massDir === 'stable'
+      ? 'Body fat decreasing with lean mass preserved.'
+      : 'Body fat decreasing. Monitor lean mass retention.'
+  } else if (massDir === 'up' && (fatDir === 'stable' || fatDir === 'up')) {
+    recompStatus = 'muscle_gain'
+    headline = 'Muscle building phase'
+    detail = fatDir === 'stable'
+      ? 'Gaining muscle with stable body fat.'
+      : 'Gaining muscle with some fat gain. Normal for a building phase.'
+  } else if (fatDir === 'up' && massDir === 'down') {
+    recompStatus = 'regressing'
+    headline = 'Composition shifting unfavorably'
+    detail = 'Body fat increasing while muscle mass decreasing. Review training and nutrition.'
+  } else {
+    recompStatus = 'stable'
+    headline = 'Body composition stable'
+    detail = 'No significant changes in body fat or muscle mass.'
+  }
+
+  const confidence: BodyCompState['confidence'] =
+    totalPoints >= 10 ? 'high' :
+    totalPoints >= 6 ? 'medium' : 'low'
+
+  return {
+    weight, bodyFatPct, leanMass, muscleMass,
+    trend: { weightDir, fatDir, massDir },
+    recompStatus,
+    headline,
+    detail,
+    confidence,
+  }
+}
+
+// ─── Internal helpers ────────────────────────────────────────────────
+
+function selectWindow(metrics: SeedMetric[]): {
+  window: 7 | 14 | 30
+  dataState: HealthTrajectory['dataState']
+  daysOfData: number
+} {
+  // Count unique dates
+  const uniqueDates = new Set(metrics.map(m => m.date))
+  const daysOfData = uniqueDates.size
+
+  if (daysOfData >= 21) return { window: 30, dataState: 'rich', daysOfData }
+  if (daysOfData >= 10) return { window: 14, dataState: 'adequate', daysOfData }
+  if (daysOfData >= 5) return { window: 7, dataState: 'sparse', daysOfData }
+  return { window: 7, dataState: 'insufficient', daysOfData }
+}
+
+function computePerMetricSignals(metrics: SeedMetric[], window: 7 | 14 | 30): TrajectorySignal[] {
+  const signals: TrajectorySignal[] = []
+  const today = new Date()
+  const windowStart = subDays(today, window)
+
+  // Group by metric type, filter to window
+  const byType = new Map<string, SeedMetric[]>()
+  for (const m of metrics) {
+    if (parseISO(m.date) < windowStart) continue
+    const category = METRIC_CATEGORIES[m.metricType]
+    if (!category) continue
+    if (!byType.has(m.metricType)) byType.set(m.metricType, [])
+    byType.get(m.metricType)!.push(m)
+  }
+
+  for (const [metricType, values] of byType) {
+    if (values.length < 3) continue
+
+    const sorted = [...values].sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime())
+
+    // Split into halves
+    const half = Math.floor(sorted.length / 2)
+    const firstHalf = sorted.slice(0, half)
+    const secondHalf = sorted.slice(half)
+
+    if (firstHalf.length === 0 || secondHalf.length === 0) continue
+
+    const firstAvg = firstHalf.reduce((s, v) => s + v.value, 0) / firstHalf.length
+    const secondAvg = secondHalf.reduce((s, v) => s + v.value, 0) / secondHalf.length
+
+    if (firstAvg === 0) continue
+
+    const percentChange = ((secondAvg - firstAvg) / firstAvg) * 100
+
+    // Consistency: fraction of day-over-day changes in same direction
+    let sameDir = 0
+    let totalChanges = 0
+    for (let i = 1; i < sorted.length; i++) {
+      const diff = sorted[i].value - sorted[i - 1].value
+      if (diff !== 0) {
+        totalChanges++
+        if ((percentChange > 0 && diff > 0) || (percentChange < 0 && diff < 0)) {
+          sameDir++
+        }
+      }
+    }
+    const consistency = totalChanges > 0 ? sameDir / totalChanges : 0.5
+
+    // Data point weight
+    const dataPointWeight = Math.min(1, values.length / (window * 0.7))
+
+    // Signal strength
+    const strength = Math.min(1, Math.abs(percentChange) / 10) * consistency * dataPointWeight
+
+    // Direction (polarity-aware)
+    const polarity = METRIC_POLARITY[metricType] || 'higher_better'
+    const rawDirection = percentChange > 0 ? 'up' : percentChange < 0 ? 'down' : 'neutral'
+    const isImproving =
+      (polarity === 'higher_better' && rawDirection === 'up') ||
+      (polarity === 'lower_better' && rawDirection === 'down')
+    const isDeclining =
+      (polarity === 'higher_better' && rawDirection === 'down') ||
+      (polarity === 'lower_better' && rawDirection === 'up')
+
+    const direction: TrajectoryDirection =
+      Math.abs(percentChange) < 2 ? 'stable' :
+      isImproving ? 'improving' : isDeclining ? 'declining' : 'stable'
+
+    const category = METRIC_CATEGORIES[metricType]!
+    signals.push({ metricType, direction, strength, percentChange, consistency, category })
+  }
+
+  return signals
+}
+
+function aggregateCategory(signals: TrajectorySignal[], category: 'sleep' | 'recovery' | 'activity' | 'bodyComp'): CategoryTrajectory {
+  const catSignals = signals.filter(s => s.category === category)
+
+  if (catSignals.length === 0) {
+    return {
+      direction: 'stable',
+      weight: CATEGORY_WEIGHTS[category],
+      topMetric: '',
+      topMetricChange: 0,
+      momentum: 'steady',
+    }
+  }
+
+  // Weighted vote
+  let improvingWeight = 0
+  let decliningWeight = 0
+  for (const s of catSignals) {
+    if (s.direction === 'improving') improvingWeight += s.strength
+    if (s.direction === 'declining') decliningWeight += s.strength
+  }
+
+  const net = improvingWeight - decliningWeight
+  const direction: TrajectoryDirection =
+    net > 0.15 ? 'improving' :
+    net < -0.15 ? 'declining' : 'stable'
+
+  // Top metric by strength
+  const sorted = [...catSignals].sort((a, b) => b.strength - a.strength)
+  const topMetric = sorted[0]?.metricType || ''
+  const topMetricChange = sorted[0]?.percentChange || 0
+
+  // Simple momentum: compare strength of recent signals
+  // Use consistency as a proxy for momentum
+  const avgConsistency = catSignals.reduce((s, v) => s + v.consistency, 0) / catSignals.length
+  const momentum: CategoryTrajectory['momentum'] =
+    avgConsistency > 0.7 ? 'accelerating' :
+    avgConsistency < 0.4 ? 'decelerating' : 'steady'
+
+  return {
+    direction,
+    weight: CATEGORY_WEIGHTS[category],
+    topMetric,
+    topMetricChange: Math.round(topMetricChange * 10) / 10,
+    momentum,
+  }
+}
+
+function computeOverallDirection(
+  sleep: CategoryTrajectory,
+  recovery: CategoryTrajectory,
+  activity: CategoryTrajectory,
+  bodyComp: CategoryTrajectory | null
+): TrajectoryDirection {
+  const dirScore = (d: TrajectoryDirection) =>
+    d === 'improving' ? 1 : d === 'declining' ? -1 : 0
+
+  let totalWeight: number
+  let weightedScore: number
+
+  if (bodyComp) {
+    totalWeight = CATEGORY_WEIGHTS.sleep + CATEGORY_WEIGHTS.recovery + CATEGORY_WEIGHTS.activity + CATEGORY_WEIGHTS.bodyComp
+    weightedScore =
+      dirScore(sleep.direction) * CATEGORY_WEIGHTS.sleep +
+      dirScore(recovery.direction) * CATEGORY_WEIGHTS.recovery +
+      dirScore(activity.direction) * CATEGORY_WEIGHTS.activity +
+      dirScore(bodyComp.direction) * CATEGORY_WEIGHTS.bodyComp
+  } else {
+    // Reweight without bodyComp
+    const factor = 1 / (CATEGORY_WEIGHTS.sleep + CATEGORY_WEIGHTS.recovery + CATEGORY_WEIGHTS.activity)
+    totalWeight = 1
+    weightedScore =
+      dirScore(sleep.direction) * CATEGORY_WEIGHTS.sleep * factor +
+      dirScore(recovery.direction) * CATEGORY_WEIGHTS.recovery * factor +
+      dirScore(activity.direction) * CATEGORY_WEIGHTS.activity * factor
+  }
+
+  const normalized = weightedScore / totalWeight
+  if (normalized > 0.15) return 'improving'
+  if (normalized < -0.15) return 'declining'
+  return 'stable'
+}
+
+function computeConfidenceScore(
+  signals: TrajectorySignal[],
+  window: 7 | 14 | 30,
+  sleep: CategoryTrajectory,
+  recovery: CategoryTrajectory,
+  activity: CategoryTrajectory,
+  bodyComp: CategoryTrajectory | null
+): number {
+  let score = 0
+
+  // Data contribution
+  if (window >= 30) score += 30
+  else if (window >= 14) score += 20
+  else score += 10
+
+  // Agreement bonus — do categories agree?
+  const directions = [sleep.direction, recovery.direction, activity.direction]
+  if (bodyComp) directions.push(bodyComp.direction)
+  const allSame = directions.every(d => d === directions[0])
+  if (allSame) score += 20
+
+  // Consistency bonus
+  const avgConsistency = signals.length > 0
+    ? signals.reduce((s, v) => s + v.consistency, 0) / signals.length
+    : 0
+  if (avgConsistency > 0.7) score += 15
+
+  // Volatility penalty — check coefficient of variation of signal strengths
+  if (signals.length > 2) {
+    const strengths = signals.map(s => s.strength)
+    const mean = strengths.reduce((a, b) => a + b, 0) / strengths.length
+    if (mean > 0) {
+      const variance = strengths.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / strengths.length
+      const cv = (Math.sqrt(variance) / mean) * 100
+      if (cv > 25) score -= 10
+    }
+  }
+
+  return Math.max(20, Math.min(95, score))
+}
+
+function generateHeadline(
+  direction: TrajectoryDirection,
+  sleep: CategoryTrajectory,
+  recovery: CategoryTrajectory,
+  activity: CategoryTrajectory,
+  bodyComp: CategoryTrajectory | null
+): string {
+  // Find the strongest improving or declining categories
+  const categories = [
+    { name: 'Sleep', cat: sleep },
+    { name: 'Recovery', cat: recovery },
+    { name: 'Activity', cat: activity },
+  ]
+  if (bodyComp) categories.push({ name: 'Body comp', cat: bodyComp })
+
+  const improving = categories.filter(c => c.cat.direction === 'improving')
+  const declining = categories.filter(c => c.cat.direction === 'declining')
+
+  if (direction === 'improving') {
+    if (improving.length > 0) {
+      const names = improving.slice(0, 2).map(c => c.name.toLowerCase())
+      return `${capitalizeFirst(names.join(' and '))} driving steady improvement`
+    }
+    return 'Health metrics trending upward'
+  }
+
+  if (direction === 'declining') {
+    if (declining.length > 0) {
+      const names = declining.slice(0, 2).map(c => c.name.toLowerCase())
+      return `${capitalizeFirst(names.join(' and '))} showing decline — worth attention`
+    }
+    return 'Some health metrics trending down'
+  }
+
+  // Stable
+  if (improving.length > 0 && declining.length > 0) {
+    return `Mixed signals — ${improving[0].name.toLowerCase()} improving, ${declining[0].name.toLowerCase()} declining`
+  }
+  return 'Health metrics holding steady'
+}
+
+function makeInsufficientTrajectory(daysOfData: number): HealthTrajectory {
+  return {
+    direction: 'stable',
+    confidence: 'insufficient',
+    confidenceScore: 0,
+    window: 7,
+    headline: `Need more data — ${daysOfData} day${daysOfData === 1 ? '' : 's'} tracked so far`,
+    signals: [],
+    sleep: { direction: 'stable', weight: 0.35, topMetric: '', topMetricChange: 0, momentum: 'steady' },
+    recovery: { direction: 'stable', weight: 0.30, topMetric: '', topMetricChange: 0, momentum: 'steady' },
+    activity: { direction: 'stable', weight: 0.20, topMetric: '', topMetricChange: 0, momentum: 'steady' },
+    bodyComp: null,
+    dataState: 'insufficient',
+    daysOfData,
+  }
+}
+
+function capitalizeFirst(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1)
+}

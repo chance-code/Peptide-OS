@@ -8,6 +8,7 @@ import {
   Activity,
   Beaker,
   ChevronDown,
+  ChevronRight,
   ChevronUp,
   Filter,
   Plane,
@@ -17,6 +18,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Claim } from '@/lib/health-claims'
+import type { ProtocolEvidence, EvidenceVerdict, ObservedSignal } from '@/lib/health-protocol-evidence'
 
 interface MetricImpact {
   metric: string
@@ -421,5 +423,133 @@ export function ProtocolImpactCard({
         </div>
       </div>
     </button>
+  )
+}
+
+// ─── Protocol Evidence Card (new) ────────────────────────────────────
+
+interface ProtocolEvidenceCardProps {
+  evidence: ProtocolEvidence
+  onViewFull?: () => void
+  className?: string
+}
+
+const VERDICT_CONFIG: Record<EvidenceVerdict, { label: string; color: string; bg: string }> = {
+  too_early: { label: 'Too Early', color: 'text-[var(--muted-foreground)]', bg: 'bg-[var(--muted-foreground)]/20' },
+  accumulating: { label: 'Accumulating', color: 'text-amber-400', bg: 'bg-amber-500/20' },
+  weak_positive: { label: 'Weak Positive', color: 'text-amber-400', bg: 'bg-amber-500/20' },
+  likely_positive: { label: 'Likely Positive', color: 'text-emerald-400', bg: 'bg-emerald-500/20' },
+  strong_positive: { label: 'Strong Positive', color: 'text-emerald-400', bg: 'bg-emerald-500/20' },
+  no_detectable_effect: { label: 'No Effect Detected', color: 'text-[var(--muted-foreground)]', bg: 'bg-[var(--muted-foreground)]/20' },
+  possible_negative: { label: 'Possible Negative', color: 'text-rose-400', bg: 'bg-rose-500/20' },
+  confounded: { label: 'Confounded', color: 'text-[var(--muted-foreground)]', bg: 'bg-[var(--muted-foreground)]/20' },
+}
+
+export function ProtocolEvidenceCard({ evidence, onViewFull, className }: ProtocolEvidenceCardProps) {
+  const [isExpanded, setIsExpanded] = useState(false)
+  const verdictConfig = VERDICT_CONFIG[evidence.verdict]
+
+  const confidenceColors = {
+    high: 'text-emerald-400',
+    medium: 'text-amber-400',
+    low: 'text-[var(--muted-foreground)]',
+  }
+
+  return (
+    <div className={cn(
+      'rounded-xl overflow-hidden',
+      'bg-[var(--card)]/70 border border-[var(--border)]',
+      className
+    )}>
+      {/* Header */}
+      <div className="px-5 py-4">
+        <div className="flex items-center gap-2 mb-2">
+          <span className={cn(
+            'px-1.5 py-0.5 rounded text-[10px] font-medium uppercase',
+            evidence.protocolType === 'peptide'
+              ? 'bg-violet-500/20 text-violet-400'
+              : 'bg-emerald-500/20 text-emerald-400'
+          )}>
+            {evidence.protocolType}
+          </span>
+          <span className="text-base font-medium text-[var(--foreground)]">
+            {evidence.protocolName}
+          </span>
+        </div>
+        <div className="text-xs text-[var(--muted-foreground)] mb-3">
+          Day {evidence.daysOnProtocol} · {evidence.rampPhase.charAt(0).toUpperCase() + evidence.rampPhase.slice(1)} phase
+        </div>
+
+        {/* Verdict badge */}
+        <div className="flex items-center gap-2 mb-3">
+          <span className={cn(
+            'px-2.5 py-1 rounded-lg text-sm font-semibold',
+            verdictConfig.bg, verdictConfig.color
+          )}>
+            {verdictConfig.label}
+          </span>
+        </div>
+
+        {/* Verdict explanation */}
+        <p className="text-sm text-[var(--muted-foreground)] leading-relaxed">
+          {evidence.verdictExplanation}
+        </p>
+      </div>
+
+      {/* Observed signals */}
+      {evidence.observedSignals.length > 0 && (
+        <div className="border-t border-[var(--border)]">
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="w-full px-5 py-3 flex items-center justify-between text-left hover:bg-[var(--border)]/30 transition-colors"
+          >
+            <span className="text-xs text-[var(--muted-foreground)] uppercase tracking-wider">
+              Observed ({evidence.observedSignals.length})
+            </span>
+            <ChevronDown className={cn(
+              'w-4 h-4 text-[var(--muted-foreground)] transition-transform',
+              isExpanded && 'rotate-180'
+            )} />
+          </button>
+
+          {isExpanded && (
+            <div className="px-5 pb-4 space-y-2">
+              {evidence.observedSignals.slice(0, 5).map((signal) => (
+                <div key={signal.metricType} className="flex items-center justify-between text-sm">
+                  <span className="text-[var(--foreground)]">{signal.metricName}</span>
+                  <div className="flex items-center gap-3">
+                    <span className={cn(
+                      'font-semibold tabular-nums',
+                      signal.isGood ? 'text-emerald-400' : 'text-amber-400'
+                    )}>
+                      {signal.percentChange > 0 ? '+' : ''}{signal.percentChange.toFixed(0)}%
+                    </span>
+                    <span className="text-xs text-[var(--muted-foreground)]">
+                      d={Math.abs(signal.effectSize).toFixed(1)}, {signal.magnitude}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Footer */}
+      <div className="px-5 py-3 border-t border-[var(--border)] flex items-center justify-between">
+        <span className={cn('text-xs font-medium', confidenceColors[evidence.confidence.level])}>
+          {evidence.confidence.level} confidence
+        </span>
+        {onViewFull && (
+          <button
+            onClick={onViewFull}
+            className="text-xs text-[var(--accent)] hover:opacity-80 flex items-center gap-1"
+          >
+            View full evidence
+            <ChevronRight className="w-3 h-3" />
+          </button>
+        )}
+      </div>
+    </div>
   )
 }

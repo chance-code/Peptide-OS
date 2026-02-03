@@ -308,6 +308,116 @@ function round(value: number, decimals: number): number {
   return Math.round(value * factor) / factor
 }
 
+// ─── Signal Classification ────────────────────────────────────────────
+
+export type SignalClass = 'noise' | 'blip' | 'short_term_change' | 'sustained_trend'
+
+export interface ClassifiedSignal {
+  metricType: string
+  currentValue: number
+  signalClass: SignalClass
+  confidence: number
+  timeframe: string               // "today", "3 days", "7+ days"
+  narrative: string               // Human explanation
+  baselineDelta: BaselineDelta
+}
+
+/**
+ * Classify whether a metric's current deviation is noise, a blip,
+ * a short-term change, or a sustained trend.
+ */
+export function classifySignal(
+  metricType: string,
+  recentValues: DailyMetricValue[],
+  baseline: MetricBaseline,
+  polarity: 'higher_better' | 'lower_better' = 'higher_better'
+): ClassifiedSignal | null {
+  if (recentValues.length === 0) return null
+
+  // Sort most recent first
+  const sorted = [...recentValues].sort((a, b) =>
+    new Date(b.date).getTime() - new Date(a.date).getTime()
+  )
+  const current = sorted[0]
+
+  const delta = compareToBaseline(current.value, baseline, polarity)
+  const absZ = Math.abs(delta.zScore)
+
+  // Calculate volatility to determine noise threshold
+  const volatility = calculateVolatility(baseline)
+  const noiseThreshold = volatility.cv > 25 ? 0.8 : 0.5
+
+  // Step 1: Check if within noise range
+  if (absZ < noiseThreshold) {
+    return {
+      metricType,
+      currentValue: current.value,
+      signalClass: 'noise',
+      confidence: 90,
+      timeframe: 'today',
+      narrative: 'Within your normal range.',
+      baselineDelta: delta,
+    }
+  }
+
+  // Step 2: Check consecutive days in same direction
+  const direction = delta.zScore > 0 ? 'above' : 'below'
+  let consecutiveDays = 0
+  let sameDirIn7 = 0
+
+  for (let i = 0; i < Math.min(sorted.length, 7); i++) {
+    const dayDelta = compareToBaseline(sorted[i].value, baseline, polarity)
+    const dayDir = dayDelta.zScore > 0 ? 'above' : 'below'
+    const dayAbsZ = Math.abs(dayDelta.zScore)
+
+    if (dayAbsZ >= noiseThreshold && dayDir === direction) {
+      sameDirIn7++
+      if (i === consecutiveDays) consecutiveDays++
+    } else if (i === consecutiveDays) {
+      // Break in consecutive streak
+      break
+    }
+  }
+
+  // Step 3: Classify
+  if (sameDirIn7 >= 5) {
+    const isGood = (polarity === 'higher_better' && direction === 'above') ||
+                   (polarity === 'lower_better' && direction === 'below')
+    return {
+      metricType,
+      currentValue: current.value,
+      signalClass: 'sustained_trend',
+      confidence: Math.min(95, 70 + sameDirIn7 * 3),
+      timeframe: '7+ days',
+      narrative: `Consistently ${isGood ? 'better' : 'worse'} than baseline for 7+ days. This looks like a real shift.`,
+      baselineDelta: delta,
+    }
+  }
+
+  if (consecutiveDays >= 2) {
+    return {
+      metricType,
+      currentValue: current.value,
+      signalClass: 'short_term_change',
+      confidence: Math.min(80, 50 + consecutiveDays * 10),
+      timeframe: `${consecutiveDays} days`,
+      narrative: `Changed for ${consecutiveDays} consecutive days. Worth watching.`,
+      baselineDelta: delta,
+    }
+  }
+
+  // Only today deviates
+  return {
+    metricType,
+    currentValue: current.value,
+    signalClass: 'blip',
+    confidence: 40,
+    timeframe: 'today',
+    narrative: 'One-day deviation. Likely normal variation.',
+    baselineDelta: delta,
+  }
+}
+
 // Export metric polarity map
 export const METRIC_POLARITY: Record<string, 'higher_better' | 'lower_better'> = {
   // Heart & Recovery
