@@ -12,7 +12,7 @@
     "db:seed": "npx tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "db:reset": "prisma migrate reset --force",
-    "postinstall": "prisma generate",
+    "postinstall": "patch-package && prisma generate",
     "cap:sync": "npx cap sync ios",
     "cap:open": "npx cap open ios"
   },

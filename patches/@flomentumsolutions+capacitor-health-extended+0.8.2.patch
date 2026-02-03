@@ -1,0 +1,152 @@
+diff --git a/node_modules/@flomentumsolutions/capacitor-health-extended/.swiftpm/xcode/xcuserdata/chance.olson.xcuserdatad/xcschemes/xcschememanagement.plist b/node_modules/@flomentumsolutions/capacitor-health-extended/.swiftpm/xcode/xcuserdata/chance.olson.xcuserdatad/xcschemes/xcschememanagement.plist
+new file mode 100644
+index 0000000..5c79f08
+--- /dev/null
++++ b/node_modules/@flomentumsolutions/capacitor-health-extended/.swiftpm/xcode/xcuserdata/chance.olson.xcuserdatad/xcschemes/xcschememanagement.plist
+@@ -0,0 +1,14 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
++<plist version="1.0">
++<dict>
++	<key>SchemeUserState</key>
++	<dict>
++		<key>FlomentumsolutionsCapacitorHealthExtended.xcscheme_^#shared#^_</key>
++		<dict>
++			<key>orderHint</key>
++			<integer>5</integer>
++		</dict>
++	</dict>
++</dict>
++</plist>
+diff --git a/node_modules/@flomentumsolutions/capacitor-health-extended/ios/Sources/HealthPluginPlugin/HealthPlugin.swift b/node_modules/@flomentumsolutions/capacitor-health-extended/ios/Sources/HealthPluginPlugin/HealthPlugin.swift
+index 44eddfc..8e6b0ed 100644
+--- a/node_modules/@flomentumsolutions/capacitor-health-extended/ios/Sources/HealthPluginPlugin/HealthPlugin.swift
++++ b/node_modules/@flomentumsolutions/capacitor-health-extended/ios/Sources/HealthPluginPlugin/HealthPlugin.swift
+@@ -746,6 +746,14 @@ public class HealthPlugin: CAPPlugin, CAPBridgedPlugin {
+                 unit = HKUnit.minute()
+             } else if dataTypeString == "respiratory-rate" {
+                 unit = HKUnit.count().unitDivided(by: HKUnit.minute())
++            } else if dataTypeString == "lean-body-mass" {
++                unit = .gramUnit(with: .kilo)
++            } else if dataTypeString == "bmi" {
++                unit = .count()
++            } else if dataTypeString == "vo2-max" {
++                unit = HKUnit(from: "ml/kg*min")
++            } else if dataTypeString == "stand-hours" {
++                unit = HKUnit.minute()
+             }
+             let value = quantitySample.quantity.doubleValue(for: unit)
+             let timestamp = quantitySample.startDate.timeIntervalSince1970 * 1000
+@@ -1023,6 +1031,14 @@ public class HealthPlugin: CAPPlugin, CAPBridgedPlugin {
+             return [HKObjectType.quantityType(forIdentifier: .appleExerciseTime)].compactMap { $0 }
+         case "sleep":
+             return [HKObjectType.categoryType(forIdentifier: .sleepAnalysis)!].compactMap { $0 }
++        case "READ_LEAN_BODY_MASS", "lean-body-mass":
++            return [HKObjectType.quantityType(forIdentifier: .leanBodyMass)].compactMap { $0 }
++        case "READ_BMI", "bmi":
++            return [HKObjectType.quantityType(forIdentifier: .bodyMassIndex)].compactMap { $0 }
++        case "READ_VO2_MAX", "vo2-max":
++            return [HKObjectType.quantityType(forIdentifier: .vo2Max)].compactMap { $0 }
++        case "READ_STAND_HOURS", "stand-hours":
++            return [HKObjectType.quantityType(forIdentifier: .appleStandTime)].compactMap { $0 }
+         default:
+             print("⚡️ [HealthPlugin] Unknown permission: \(permission)")
+             return []
+@@ -1193,6 +1209,14 @@ public class HealthPlugin: CAPPlugin, CAPBridgedPlugin {
+             return HKObjectType.quantityType(forIdentifier: .flightsClimbed)
+         case "exercise-time":
+             return HKObjectType.quantityType(forIdentifier: .appleExerciseTime)
++        case "lean-body-mass":
++            return HKObjectType.quantityType(forIdentifier: .leanBodyMass)
++        case "bmi":
++            return HKObjectType.quantityType(forIdentifier: .bodyMassIndex)
++        case "vo2-max":
++            return HKObjectType.quantityType(forIdentifier: .vo2Max)
++        case "stand-hours":
++            return HKObjectType.quantityType(forIdentifier: .appleStandTime)
+         default:
+             return nil
+         }
+@@ -1271,6 +1295,16 @@ public class HealthPlugin: CAPPlugin, CAPBridgedPlugin {
+                     }
+                 }
+             }
++        } else if dataTypeString == "sleep-rem" {
++            self.querySleepRemAggregated(startDate: startDate, endDate: endDate) { result, error in
++                DispatchQueue.main.async {
++                    if let error = error {
++                        call.reject(error.localizedDescription)
++                    } else if let result = result {
++                        call.resolve(["aggregatedData": result])
++                    }
++                }
++            }
+         } else {
+             let predicate = HKQuery.predicateForSamples(withStart: startDate, end: endDate, options: .strictStartDate)
+             guard let interval = calculateInterval(bucket: bucket) else {
+@@ -1336,6 +1370,10 @@ public class HealthPlugin: CAPPlugin, CAPBridgedPlugin {
+                             case "flights-climbed": return .count()
+                             case "exercise-time": return HKUnit.minute()
+                             case "mindfulness": return HKUnit.second()
++                            case "lean-body-mass": return .gramUnit(with: .kilo)
++                            case "bmi": return .count()
++                            case "vo2-max": return HKUnit.literUnit(with: .milli).unitDivided(by: HKUnit.gramUnit(with: .kilo).unitMultiplied(by: HKUnit.minute()))
++                            case "stand-hours": return HKUnit.minute()
+                             default: return .count()
+                             }
+                         }()
+@@ -1432,6 +1470,54 @@ public class HealthPlugin: CAPPlugin, CAPBridgedPlugin {
+         healthStore.execute(query)
+     }
+ 
++    func querySleepRemAggregated(startDate: Date, endDate: Date, completion: @escaping ([[String: Any]]?, Error?) -> Void) {
++        guard let sleepType = HKObjectType.categoryType(forIdentifier: .sleepAnalysis) else {
++            DispatchQueue.main.async {
++                completion(nil, NSError(domain: "HealthKit", code: -1, userInfo: [NSLocalizedDescriptionKey: "SleepAnalysis type unavailable"]))
++            }
++            return
++        }
++        // asleepREM requires iOS 16+
++        if #available(iOS 16.0, *) {
++            let remRawValue = HKCategoryValueSleepAnalysis.asleepREM.rawValue
++            let predicate = HKQuery.predicateForSamples(withStart: startDate, end: endDate, options: .strictStartDate)
++            let query = HKSampleQuery(sampleType: sleepType, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, error in
++                var dailyDurations: [Date: TimeInterval] = [:]
++                let calendar = Calendar.current
++                if let categorySamples = samples as? [HKCategorySample], error == nil {
++                    for sample in categorySamples {
++                        guard sample.value == remRawValue else { continue }
++                        let startOfDay = calendar.startOfDay(for: sample.startDate)
++                        let duration = sample.endDate.timeIntervalSince(sample.startDate)
++                        dailyDurations[startOfDay, default: 0] += duration
++                    }
++                    var aggregatedSamples: [[String: Any]] = []
++                    let dayComponent = DateComponents(day: 1)
++                    for (date, duration) in dailyDurations {
++                        aggregatedSamples.append([
++                            "startDate": date,
++                            "endDate": calendar.date(byAdding: dayComponent, to: date) as Any,
++                            "value": duration
++                        ])
++                    }
++                    DispatchQueue.main.async {
++                        completion(aggregatedSamples, nil)
++                    }
++                } else {
++                    DispatchQueue.main.async {
++                        completion(nil, error)
++                    }
++                }
++            }
++            healthStore.execute(query)
++        } else {
++            // iOS 15: REM sleep stages not available
++            DispatchQueue.main.async {
++                completion([], nil)
++            }
++        }
++    }
++
+     func queryBloodPressureAggregated(startDate: Date, endDate: Date, completion: @escaping ([[String: Any]]?, Error?) -> Void) {
+         guard let bpType = HKObjectType.correlationType(forIdentifier: .bloodPressure),
+               let systolicType = HKObjectType.quantityType(forIdentifier: .bloodPressureSystolic),
