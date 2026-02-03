@@ -18,18 +18,31 @@ export function BottomSheet({ isOpen, onClose, title, children }: BottomSheetPro
   const startY = useRef(0)
   const startTime = useRef(0)
 
-  // Handle escape key
+  // Handle escape key and scroll lock
   useEffect(() => {
+    if (!isOpen) return
+
     function handleEscape(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose()
     }
-    if (isOpen) {
-      document.addEventListener('keydown', handleEscape)
-      document.body.style.overflow = 'hidden'
-    }
+
+    // Track scroll position before locking to prevent iOS jump
+    const scrollY = window.scrollY
+    document.addEventListener('keydown', handleEscape)
+    document.body.style.position = 'fixed'
+    document.body.style.top = `-${scrollY}px`
+    document.body.style.left = '0'
+    document.body.style.right = '0'
+    document.body.style.overflow = 'hidden'
+
     return () => {
       document.removeEventListener('keydown', handleEscape)
+      document.body.style.position = ''
+      document.body.style.top = ''
+      document.body.style.left = ''
+      document.body.style.right = ''
       document.body.style.overflow = ''
+      window.scrollTo(0, scrollY)
     }
   }, [isOpen, onClose])
 

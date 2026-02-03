@@ -52,12 +52,24 @@ export function SwipeableCard({
 
     // Determine swipe direction on first significant movement
     if (isHorizontalSwipe.current === null) {
-      if (Math.abs(diffX) > 10 || Math.abs(diffY) > 10) {
-        isHorizontalSwipe.current = Math.abs(diffX) > Math.abs(diffY)
+      const absX = Math.abs(diffX)
+      const absY = Math.abs(diffY)
+      if (absX > 15 || absY > 15) {
+        // Require horizontal movement to be clearly dominant (1.5x vertical)
+        // to avoid capturing near-diagonal touches that are meant for scroll
+        isHorizontalSwipe.current = absX > absY * 1.5
+        if (!isHorizontalSwipe.current) {
+          // Vertical scroll — stop tracking this touch entirely
+          isDragging.current = false
+          return
+        }
+      } else {
+        // Not enough movement to determine direction yet
+        return
       }
     }
 
-    // Only handle horizontal swipes
+    // Confirmed horizontal swipe — prevent vertical scroll interference
     if (isHorizontalSwipe.current) {
       e.preventDefault()
 

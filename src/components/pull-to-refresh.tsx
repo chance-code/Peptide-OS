@@ -16,12 +16,14 @@ export function PullToRefresh({ onRefresh, children, className }: PullToRefreshP
   const containerRef = useRef<HTMLDivElement>(null)
   const startY = useRef(0)
   const isPulling = useRef(false)
+  const isConfirmedPull = useRef(false)
   const pullDistanceRef = useRef(0)
   const isRefreshingRef = useRef(false)
   const onRefreshRef = useRef(onRefresh)
 
   const THRESHOLD = 80
   const MAX_PULL = 120
+  const DIRECTION_LOCK_THRESHOLD = 10 // px before committing to pull vs scroll
 
   // Keep refs in sync with latest values
   onRefreshRef.current = onRefresh
@@ -38,6 +40,7 @@ export function PullToRefresh({ onRefresh, children, className }: PullToRefreshP
       if (container.scrollTop <= 0) {
         startY.current = e.touches[0].clientY
         isPulling.current = true
+        isConfirmedPull.current = false
       }
     }
 
@@ -47,25 +50,38 @@ export function PullToRefresh({ onRefresh, children, className }: PullToRefreshP
       const currentY = e.touches[0].clientY
       const diff = currentY - startY.current
 
-      if (diff > 0) {
-        // Prevent native scroll bounce — this is why we need { passive: false }
-        e.preventDefault()
-
-        const resistance = 0.5
-        const adjustedDiff = Math.min(diff * resistance, MAX_PULL)
-        pullDistanceRef.current = adjustedDiff
-        setPullDistance(adjustedDiff)
-      } else {
+      if (diff < 0) {
         // User scrolling up — cancel pull and let native scroll handle it
         isPulling.current = false
+        isConfirmedPull.current = false
         pullDistanceRef.current = 0
         setPullDistance(0)
+        return
       }
+
+      // Don't call preventDefault until we've confirmed this is a pull gesture
+      if (!isConfirmedPull.current) {
+        if (diff > DIRECTION_LOCK_THRESHOLD) {
+          isConfirmedPull.current = true
+        } else {
+          // Still ambiguous — let the browser handle it naturally
+          return
+        }
+      }
+
+      // Confirmed pull — prevent native scroll bounce
+      e.preventDefault()
+
+      const resistance = 0.5
+      const adjustedDiff = Math.min(diff * resistance, MAX_PULL)
+      pullDistanceRef.current = adjustedDiff
+      setPullDistance(adjustedDiff)
     }
 
     async function onTouchEnd() {
       if (!isPulling.current) return
       isPulling.current = false
+      isConfirmedPull.current = false
 
       const currentPull = pullDistanceRef.current
       pullDistanceRef.current = 0
@@ -87,6 +103,7 @@ export function PullToRefresh({ onRefresh, children, className }: PullToRefreshP
 
     function onTouchCancel() {
       isPulling.current = false
+      isConfirmedPull.current = false
       pullDistanceRef.current = 0
       if (!isRefreshingRef.current) {
         setPullDistance(0)
