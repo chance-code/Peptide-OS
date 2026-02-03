@@ -1,6 +1,6 @@
 'use client'
 
-import { TrendingUp, TrendingDown, Minus, HelpCircle, ChevronRight, Zap } from 'lucide-react'
+import { TrendingUp, TrendingDown, Minus, HelpCircle, ChevronRight, Zap, CheckCircle2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { SignalClass, ClassifiedSignal } from '@/lib/health-baselines'
 
@@ -70,9 +70,14 @@ export function WhatChangedCard({
         <h3 className="text-sm font-medium text-[var(--muted-foreground)] uppercase tracking-wider mb-3">
           What Matters Today
         </h3>
-        <p className="text-sm text-[var(--muted-foreground)]">
-          No significant changes detected — metrics within normal range
-        </p>
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          </div>
+          <p className="text-sm text-[var(--muted-foreground)]">
+            All clear — your metrics are within normal range today.
+          </p>
+        </div>
       </div>
     )
   }

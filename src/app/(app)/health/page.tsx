@@ -698,9 +698,11 @@ export default function HealthDashboardNew() {
               onClick={() => setSelectedSection(tab.id as typeof selectedSection)}
               className={cn(
                 'px-4 py-1.5 rounded-full text-sm font-medium transition-colors',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/50',
+                'active:scale-95',
                 selectedSection === tab.id
                   ? 'bg-[var(--accent-muted)] text-[var(--accent)]'
-                  : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                  : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)]/50'
               )}
             >
               {tab.label}
@@ -708,9 +710,9 @@ export default function HealthDashboardNew() {
           ))}
         </div>
 
-        {/* Integrations panel (collapsible) */}
+        {/* Integrations panel (collapsible, height-constrained) */}
         {showIntegrations && (
-          <div className="max-w-lg mx-auto px-4 pb-4 border-t border-[var(--border)] pt-4">
+          <div className="max-w-lg mx-auto px-4 pb-4 border-t border-[var(--border)] pt-4 max-h-[50vh] overflow-y-auto">
             <div className="text-xs text-[var(--muted-foreground)] uppercase tracking-wider mb-3">Data Sources</div>
             <div className="space-y-3">
               {/* Apple Health */}

@@ -280,7 +280,7 @@ function FilterToggle({
     <button
       onClick={onChange}
       className={cn(
-        'px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors',
+        'px-4 py-2 rounded-lg text-xs font-medium border transition-colors',
         active
           ? 'bg-[var(--accent-muted)] text-[var(--accent)] border-[var(--accent)]/30'
           : 'bg-[var(--border)] text-[var(--muted-foreground)] border-[var(--border)] hover:border-[var(--muted-foreground)]'
