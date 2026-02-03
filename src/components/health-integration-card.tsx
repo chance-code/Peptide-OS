@@ -66,6 +66,7 @@ export function HealthIntegrationCard({
 }: HealthIntegrationCardProps) {
   const isConnected = integration?.isConnected ?? false
   const hasError = !!integration?.syncError
+  const isAuthExpired = hasError && /expired|reconnect/i.test(integration?.syncError || '')
 
   // Credentials login state
   const [showLoginForm, setShowLoginForm] = useState(false)
@@ -194,10 +195,10 @@ export function HealthIntegrationCard({
       )}
 
       {/* Login Form for credentials-based providers */}
-      {showLoginForm && !isConnected && (
+      {showLoginForm && (!isConnected || isAuthExpired) && (
         <form onSubmit={handleCredentialsLogin} className="mb-4 p-3 rounded-xl bg-[var(--muted)]/50 border border-[var(--border)]">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-sm font-medium text-[var(--foreground)]">Sign in to {displayName}</span>
+            <span className="text-sm font-medium text-[var(--foreground)]">{isAuthExpired ? 'Re-authenticate' : 'Sign in to'} {displayName}</span>
             <button
               type="button"
               onClick={() => setShowLoginForm(false)}
@@ -282,26 +283,38 @@ export function HealthIntegrationCard({
       {!showLoginForm && (
         <div className="flex gap-2">
           {isConnected ? (
-            <>
+            isAuthExpired && requiresCredentials ? (
               <Button
-                variant="secondary"
+                variant="primary"
                 size="sm"
-                onClick={onSync}
-                disabled={isSyncing}
-                className="flex-1"
+                onClick={() => { setShowLoginForm(true); setLoginError(null) }}
+                className="w-full"
               >
-                <RefreshCw className={cn('w-4 h-4 mr-2', isSyncing && 'animate-spin')} />
-                {isSyncing ? 'Syncing...' : 'Sync Now'}
+                <Link2 className="w-4 h-4 mr-2" />
+                Re-authenticate
               </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onDisconnect}
-                className="text-[var(--error)]"
-              >
-                <Link2Off className="w-4 h-4" />
-              </Button>
-            </>
+            ) : (
+              <>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={onSync}
+                  disabled={isSyncing}
+                  className="flex-1"
+                >
+                  <RefreshCw className={cn('w-4 h-4 mr-2', isSyncing && 'animate-spin')} />
+                  {isSyncing ? 'Syncing...' : 'Sync Now'}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onDisconnect}
+                  className="text-[var(--error)]"
+                >
+                  <Link2Off className="w-4 h-4" />
+                </Button>
+              </>
+            )
           ) : (
             <Button
               variant="primary"
