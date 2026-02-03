@@ -144,23 +144,23 @@ export default function HistoryPage() {
                         <div
                           className={cn(
                             'w-8 h-8 rounded-full flex items-center justify-center',
-                            log.status === 'completed' && 'bg-green-100',
-                            log.status === 'skipped' && 'bg-slate-100',
-                            log.status === 'missed' && 'bg-red-100',
-                            log.status === 'pending' && 'bg-yellow-100'
+                            log.status === 'completed' && 'bg-emerald-500/20',
+                            log.status === 'skipped' && 'bg-slate-500/20',
+                            log.status === 'missed' && 'bg-red-500/20',
+                            log.status === 'pending' && 'bg-amber-500/20'
                           )}
                         >
                           {log.status === 'completed' && (
-                            <CheckCircle className="w-4 h-4 text-green-600" />
+                            <CheckCircle className="w-4 h-4 text-emerald-500" />
                           )}
                           {log.status === 'skipped' && (
-                            <MinusCircle className="w-4 h-4 text-slate-400" />
+                            <MinusCircle className="w-4 h-4 text-slate-500 dark:text-slate-400" />
                           )}
                           {log.status === 'missed' && (
                             <XCircle className="w-4 h-4 text-red-500" />
                           )}
                           {log.status === 'pending' && (
-                            <div className="w-3 h-3 rounded-full bg-yellow-400" />
+                            <div className="w-3 h-3 rounded-full bg-amber-500" />
                           )}
                         </div>
                         <div className="flex-1 min-w-0">

@@ -16,7 +16,7 @@ import {
   isToday,
   getDay,
 } from 'date-fns'
-import { ChevronLeft, ChevronRight, Check, X, CheckCheck, Flame, TrendingUp } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Check, X, CheckCheck, Flame, TrendingUp, CalendarOff } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { Button } from '@/components/ui/button'
 import { BottomSheet } from '@/components/ui/bottom-sheet'
@@ -584,7 +584,13 @@ export default function CalendarPage() {
                 </div>
               ) : (
                 <div className="text-center py-8">
-                  <p className="text-[var(--muted-foreground)]">No doses scheduled</p>
+                  <div className="w-12 h-12 rounded-full bg-[var(--muted)] flex items-center justify-center mx-auto mb-3">
+                    <CalendarOff className="w-6 h-6 text-[var(--muted-foreground)]" />
+                  </div>
+                  <p className="text-[var(--foreground)] font-medium mb-1">No doses scheduled</p>
+                  <p className="text-sm text-[var(--muted-foreground)]">
+                    This day has no protocols assigned.
+                  </p>
                 </div>
               )}
             </>

@@ -343,7 +343,7 @@ export default function ProtocolsPage() {
                       <div className="flex items-start justify-between mb-2">
                         <div>
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-medium text-slate-900 dark:text-white">
+                            <span className="font-medium text-slate-900 dark:text-white truncate max-w-[180px]">
                               {protocol.peptide.name}
                             </span>
                             <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full', color)}>
