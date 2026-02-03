@@ -252,9 +252,9 @@ export default function ChatPage() {
         <div className="flex justify-end px-4 pt-2">
           <button
             onClick={clearChat}
-            className="flex items-center gap-1 text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)] transition-colors"
           >
-            <Trash2 className="w-3 h-3" />
+            <Trash2 className="w-3.5 h-3.5" />
             Clear chat
           </button>
         </div>

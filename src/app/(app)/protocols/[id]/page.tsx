@@ -564,11 +564,11 @@ export default function ProtocolDetailPage({
         </Button>
         {protocol.status !== 'completed' && (
           <div className="flex gap-2">
-            <Button variant="ghost" size="sm" onClick={startEditing}>
-              <Edit2 className="w-4 h-4 text-slate-600" />
+            <Button variant="ghost" size="sm" onClick={startEditing} className="w-11 h-11 p-0">
+              <Edit2 className="w-5 h-5 text-slate-600" />
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => setShowDeleteModal(true)}>
-              <Trash2 className="w-4 h-4 text-red-500" />
+            <Button variant="ghost" size="sm" onClick={() => setShowDeleteModal(true)} className="w-11 h-11 p-0">
+              <Trash2 className="w-5 h-5 text-red-500" />
             </Button>
           </div>
         )}
