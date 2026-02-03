@@ -114,7 +114,7 @@ export function SwipeableCard({
       <div
         className={cn(
           'absolute inset-0 flex items-center px-6 transition-opacity',
-          isRight ? 'justify-start bg-green-500' : 'justify-end bg-slate-400'
+          isRight ? 'justify-start bg-green-500' : 'justify-end bg-[var(--muted-foreground)]'
         )}
         style={{ opacity: Math.min(progress * 0.8, 0.8) }}
       >
@@ -133,7 +133,7 @@ export function SwipeableCard({
 
       {/* Card content */}
       <div
-        className={cn('relative bg-white', className)}
+        className={cn('relative bg-[var(--background)]', className)}
         style={{
           transform: `translateX(${offsetX}px)`,
           transition: isAnimating ? 'transform 0.2s ease-out' : 'none',

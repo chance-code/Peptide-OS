@@ -10,7 +10,7 @@ export function Skeleton({ className }: SkeletonProps) {
   return (
     <div
       className={cn(
-        'animate-pulse rounded-md bg-slate-200 dark:bg-slate-700',
+        'animate-pulse rounded-md bg-[var(--muted)]',
         className
       )}
     />
@@ -19,7 +19,7 @@ export function Skeleton({ className }: SkeletonProps) {
 
 export function DoseCardSkeleton() {
   return (
-    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm p-4">
+    <div className="rounded-xl border border-[var(--border)] bg-[var(--background)] shadow-sm p-4">
       <div className="flex items-start gap-3">
         <div className="flex-1">
           <Skeleton className="h-5 w-24 mb-2" />
@@ -35,7 +35,7 @@ export function SummarySkeleton() {
   return (
     <div className="grid grid-cols-3 gap-3 mb-6">
       {[0, 1, 2].map((i) => (
-        <div key={i} className="bg-white dark:bg-slate-800 rounded-lg p-3 border border-slate-100 dark:border-slate-700">
+        <div key={i} className="bg-[var(--background)] rounded-lg p-3 border border-[var(--border)]">
           <Skeleton className="h-8 w-8 mx-auto mb-1" />
           <Skeleton className="h-3 w-12 mx-auto" />
         </div>
@@ -46,7 +46,7 @@ export function SummarySkeleton() {
 
 export function CheatSheetCardSkeleton() {
   return (
-    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm p-4">
+    <div className="rounded-xl border border-[var(--border)] bg-[var(--background)] shadow-sm p-4">
       <div className="flex items-center justify-between mb-3">
         <Skeleton className="h-6 w-28" />
         <Skeleton className="h-7 w-16 rounded-full" />
