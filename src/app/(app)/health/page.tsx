@@ -567,9 +567,9 @@ export default function HealthDashboardNew() {
         <div className="max-w-lg mx-auto pt-8">
           <div className="text-center mb-8">
             <Activity className="w-12 h-12 text-[var(--muted-foreground)] mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-[var(--foreground)] mb-2">Connect Health Data</h2>
+            <h2 className="text-xl font-semibold text-[var(--foreground)] mb-2">Connect Apple Health</h2>
             <p className="text-[var(--muted-foreground)]">
-              Connect your health sources to see personalized insights.
+              Apple Health provides everything you need — sleep, HRV, activity, body composition, and more. Connect it to get started.
             </p>
           </div>
 
@@ -841,7 +841,10 @@ export default function HealthDashboardNew() {
                           <Watch className={cn("w-5 h-5", isConnected ? "text-violet-400" : "text-[var(--muted-foreground)]")} />
                         </div>
                         <div>
-                          <div className="font-medium text-[var(--foreground)]">Oura Ring</div>
+                          <div className="font-medium text-[var(--foreground)]">
+                            Oura Ring
+                            {!isConnected && <span className="ml-1.5 text-[10px] font-normal text-[var(--muted-foreground)]">Optional</span>}
+                          </div>
                           {isConnected ? (
                             <div className="text-xs text-emerald-400 flex items-center gap-1">
                               <CheckCircle2 className="w-3 h-3" />
@@ -853,7 +856,7 @@ export default function HealthDashboardNew() {
                               )}
                             </div>
                           ) : (
-                            <div className="text-xs text-[var(--muted-foreground)]">Not connected</div>
+                            <div className="text-xs text-[var(--muted-foreground)]">Adds sleep scores, readiness, and detailed sleep stages</div>
                           )}
                           {hasError && (
                             <div className="text-xs text-amber-400 mt-1">{oura.syncError}</div>
@@ -913,7 +916,10 @@ export default function HealthDashboardNew() {
                           <Moon className={cn("w-5 h-5", isConnected ? "text-cyan-400" : "text-[var(--muted-foreground)]")} />
                         </div>
                         <div>
-                          <div className="font-medium text-[var(--foreground)]">Eight Sleep</div>
+                          <div className="font-medium text-[var(--foreground)]">
+                            Eight Sleep
+                            {!isConnected && <span className="ml-1.5 text-[10px] font-normal text-[var(--muted-foreground)]">Optional</span>}
+                          </div>
                           {isConnected ? (
                             <div className="text-xs text-emerald-400 flex items-center gap-1">
                               <CheckCircle2 className="w-3 h-3" />
@@ -925,7 +931,7 @@ export default function HealthDashboardNew() {
                               )}
                             </div>
                           ) : (
-                            <div className="text-xs text-[var(--muted-foreground)]">Not connected</div>
+                            <div className="text-xs text-[var(--muted-foreground)]">Adds mattress-based sleep tracking and temperature data</div>
                           )}
                           {hasError && (
                             <div className="text-xs text-amber-400 mt-1">{eightSleep.syncError}</div>

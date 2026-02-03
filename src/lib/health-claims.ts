@@ -82,7 +82,7 @@ function getThreshold(metricType: string) {
   return METRIC_THRESHOLDS[metricType] || DEFAULT_THRESHOLD
 }
 
-// Metrics that require Oura or Eight Sleep — Apple Health cannot provide these
+// Metrics available with Oura or Eight Sleep — optional extras beyond Apple Health
 const PROVIDER_EXCLUSIVE_METRICS: Record<string, string> = {
   deep_sleep: 'Oura Ring or Eight Sleep',
   sleep_efficiency: 'Oura Ring or Eight Sleep',
@@ -1041,9 +1041,9 @@ function generateDataAvailabilityClaims(
         id: `availability_${metricType}`,
         type: 'observation',
         priority: 'low',
-        headline: `${getMetricDisplayName(metricType)} data requires ${providerName}`,
-        evidence: `This metric is not available from Apple Health alone`,
-        actionable: `Connect ${providerName} to unlock ${getMetricDisplayName(metricType).toLowerCase()} insights`,
+        headline: `${getMetricDisplayName(metricType)} available with ${providerName}`,
+        evidence: `This is an optional metric not tracked by Apple Health`,
+        actionable: `Connect ${providerName} if you want ${getMetricDisplayName(metricType).toLowerCase()} insights`,
         metricType,
         confidence: { level: 'high', score: 95, reasons: ['Provider requirement'] },
         receipt: {
