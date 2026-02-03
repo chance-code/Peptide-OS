@@ -5,22 +5,24 @@ interface ArcLogoProps {
 }
 
 export function ArcLogo({ size = 64, className = '', withGlow = true }: ArcLogoProps) {
-  // Arc geometry: ~300° sweep, gap at upper-right
-  // The arc runs from bottom-right clockwise to upper-right
-  const r = 50.8
+  // Arc geometry: ~270° sweep, gap at upper-right
+  // Matches the new brand icon — open arc from ~5 o'clock to ~1 o'clock
+  const r = 48
   const cx = 100
   const cy = 100
-  const strokeWidth = 8.2
+  const strokeWidth = 12
 
-  // Calculate arc endpoint for the glowing dot
-  // Arc starts at ~40° (lower right) and ends at ~340° (upper right)
-  // With stroke-dashoffset=-22, the arc is rotated
-  // The visual endpoint is at approximately 40° from the positive x-axis
-  const endAngleRad = (40 * Math.PI) / 180
+  // Arc endpoint: the glowing sphere sits at ~55° (upper-right, ~1 o'clock)
+  const endAngleRad = (55 * Math.PI) / 180
   const dotX = cx + r * Math.cos(endAngleRad)
   const dotY = cy - r * Math.sin(endAngleRad)
 
   const id = `arc-logo-${Math.random().toString(36).slice(2, 8)}`
+
+  // Circumference and arc length for ~270° sweep
+  const circumference = 2 * Math.PI * r
+  const arcLength = (270 / 360) * circumference
+  const gapLength = circumference - arcLength
 
   return (
     <svg
@@ -31,17 +33,18 @@ export function ArcLogo({ size = 64, className = '', withGlow = true }: ArcLogoP
       className={className}
     >
       <defs>
-        {/* Arc gradient: dark teal → bright cyan */}
+        {/* Arc gradient: steel blue at bottom → mint cyan at top */}
         <linearGradient id={`${id}-gradient`} x1="0%" y1="100%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="#0d9488" />
-          <stop offset="50%" stopColor="#2dd4bf" />
-          <stop offset="100%" stopColor="#67e8f9" />
+          <stop offset="0%" stopColor="#334d7a" />
+          <stop offset="40%" stopColor="#4a9e9e" />
+          <stop offset="70%" stopColor="#6ee7c0" />
+          <stop offset="100%" stopColor="#a7f3d0" />
         </linearGradient>
         {withGlow && (
           <radialGradient id={`${id}-glow`} cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#67e8f9" stopOpacity="0.8" />
-            <stop offset="50%" stopColor="#67e8f9" stopOpacity="0.3" />
-            <stop offset="100%" stopColor="#67e8f9" stopOpacity="0" />
+            <stop offset="0%" stopColor="#a7f3d0" stopOpacity="0.9" />
+            <stop offset="40%" stopColor="#6ee7c0" stopOpacity="0.4" />
+            <stop offset="100%" stopColor="#6ee7c0" stopOpacity="0" />
           </radialGradient>
         )}
       </defs>
@@ -55,15 +58,15 @@ export function ArcLogo({ size = 64, className = '', withGlow = true }: ArcLogoP
         stroke={`url(#${id}-gradient)`}
         strokeWidth={strokeWidth}
         strokeLinecap="round"
-        strokeDasharray="274.7 44.3"
-        strokeDashoffset="-22"
+        strokeDasharray={`${arcLength} ${gapLength}`}
+        strokeDashoffset="-18"
       />
 
-      {/* Glowing endpoint */}
+      {/* Glowing endpoint sphere */}
       {withGlow && (
         <>
-          <circle cx={dotX} cy={dotY} r="16" fill={`url(#${id}-glow)`} />
-          <circle cx={dotX} cy={dotY} r="5.5" fill="#67e8f9" />
+          <circle cx={dotX} cy={dotY} r="18" fill={`url(#${id}-glow)`} />
+          <circle cx={dotX} cy={dotY} r="6.5" fill="#a7f3d0" />
         </>
       )}
     </svg>

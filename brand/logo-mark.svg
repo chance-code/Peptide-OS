@@ -1,17 +1,17 @@
 <svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
   <!-- Arc Protocol Logo - Monochrome Mark (no background) -->
-  <!-- Open arc - ~310° sweep, gap at upper-right -->
-  <!-- Circumference = 2π × 50.8 ≈ 319.1, 310° arc ≈ 274.7, gap ≈ 44.3 -->
+  <!-- Open arc - ~270° sweep, gap at upper-right -->
+  <!-- Circumference = 2π × 48 ≈ 301.6, 270° arc ≈ 226.2, gap ≈ 75.4 -->
   <circle
-    cx="100" cy="100" r="50.8"
+    cx="100" cy="100" r="48"
     fill="none"
     stroke="currentColor"
-    stroke-width="8.2"
+    stroke-width="12"
     stroke-linecap="round"
-    stroke-dasharray="274.7 44.3"
-    stroke-dashoffset="-22"
+    stroke-dasharray="226.2 75.4"
+    stroke-dashoffset="-18"
   />
 
-  <!-- Inner nucleus - slightly offset -->
-  <circle cx="98" cy="102" r="8.6" fill="currentColor"/>
+  <!-- Endpoint sphere -->
+  <circle cx="127.5" cy="72.5" r="6.5" fill="currentColor"/>
 </svg>
