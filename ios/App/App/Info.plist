@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-        <string>Peptide OS</string>
+        <string>Arc Protocol</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -47,5 +47,24 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSHealthShareUsageDescription</key>
+	<string>Arc Protocol uses your health data to track and correlate metrics with your supplement protocols, providing personalized insights on sleep, HRV, weight, body composition, and activity.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>Arc Protocol can log your supplement doses to Apple Health for a complete health record.</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.arcprotocol.app</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>arcprotocol</string>
+			</array>
+		</dict>
+	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Arc Protocol uses your camera to scan vial and supplement labels for automatic data entry.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Arc Protocol needs access to your photo library to select images of vial and supplement labels for scanning.</string>
 </dict>
 </plist>

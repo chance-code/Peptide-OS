@@ -9,26 +9,27 @@
    ======================================== */
 
 :root {
-  /* Background layers - Soft Graphite */
+  /* === SURFACES === */
   --background: #F8FAFC;
   --background-secondary: #F1F5F9;
-  --foreground: #1F2A37;
+  --foreground: #111827;
 
   /* Card system */
   --card: #FFFFFF;
-  --card-foreground: #1F2A37;
+  --card-foreground: #111827;
   --card-hover: #F8FAFC;
 
   /* Muted/subtle */
   --muted: #F1F5F9;
   --muted-foreground: #6B7280;
 
-  /* Borders & rings */
+  /* === BORDERS === */
   --border: #E5E7EB;
-  --border-subtle: #F1F5F9;
+  --border-subtle: #F3F4F6;
+  --border-strong: #D1D5DB;
   --ring: #4B5563;
 
-  /* Semantic colors - Muted, not loud */
+  /* === SEMANTIC === */
   --success: #059669;
   --success-muted: #ECFDF5;
   --warning: #D97706;
@@ -38,39 +39,54 @@
   --info: #6B7280;
   --info-muted: #F3F4F6;
 
-  /* Accent - Soft Graphite */
-  --accent: #4B5563;
+  /* === ACCENT (Indigo) === */
+  --accent: #4F46E5;
   --accent-foreground: #FFFFFF;
-  --accent-muted: #E5E7EB;
+  --accent-muted: #EEF2FF;
+  --accent-secondary: #0EA5E9;
+  --accent-secondary-muted: #E0F2FE;
 
-  /* Premium effects - subtle */
+  /* === HEALTH TAB SURFACES (Light) === */
+  --health-bg: linear-gradient(to bottom, #F1F5F9, #EEF2FF);
+  --health-card: #FFFFFF;
+  --health-card-border: #E5E7EB;
+  --health-hero-bg: linear-gradient(135deg, #F8FAFC 0%, #EEF2FF 50%, #E0F2FE 100%);
+  --health-score-ring: #4F46E5;
+  --health-text-primary: #111827;
+  --health-text-secondary: #4B5563;
+  --health-text-muted: #9CA3AF;
+
+  /* === EFFECTS === */
   --glow-success: 0 0 20px rgba(5, 150, 105, 0.2);
-  --glow-accent: 0 0 20px rgba(75, 85, 99, 0.2);
-  --shadow-card: 0 1px 3px rgba(31, 42, 55, 0.04), 0 1px 2px rgba(31, 42, 55, 0.02);
-  --shadow-card-hover: 0 4px 12px rgba(31, 42, 55, 0.06), 0 2px 4px rgba(31, 42, 55, 0.03);
+  --glow-accent: 0 0 20px rgba(79, 70, 229, 0.2);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+  --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.06), 0 2px 4px rgba(0, 0, 0, 0.03);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.08);
 }
 
 .dark {
-  /* Soft Graphite - Dark mode */
+  /* === SURFACES (Dark) === */
   --background: #0B1220;
   --background-secondary: #111827;
-  --foreground: #F8FAFC;
+  --foreground: #F9FAFB;
 
   /* Dark card system */
   --card: #111827;
-  --card-foreground: #F8FAFC;
+  --card-foreground: #F9FAFB;
   --card-hover: #1F2937;
 
   /* Muted dark */
   --muted: #1F2937;
   --muted-foreground: #9CA3AF;
 
-  /* Borders - subtle graphite */
+  /* === BORDERS (Dark) === */
   --border: #374151;
   --border-subtle: #1F2937;
+  --border-strong: #4B5563;
   --ring: #9CA3AF;
 
-  /* Semantic colors - muted for dark mode */
+  /* === SEMANTIC (Dark) === */
   --success: #34D399;
   --success-muted: rgba(52, 211, 153, 0.12);
   --warning: #FBBF24;
@@ -80,16 +96,30 @@
   --info: #9CA3AF;
   --info-muted: rgba(156, 163, 175, 0.12);
 
-  /* Accent - Light graphite for contrast */
-  --accent: #D1D5DB;
-  --accent-foreground: #1F2A37;
-  --accent-muted: rgba(209, 213, 219, 0.12);
+  /* === ACCENT (Dark) === */
+  --accent: #818CF8;
+  --accent-foreground: #111827;
+  --accent-muted: rgba(129, 140, 248, 0.15);
+  --accent-secondary: #38BDF8;
+  --accent-secondary-muted: rgba(56, 189, 248, 0.15);
 
-  /* Premium effects - subtle */
+  /* === HEALTH TAB SURFACES (Dark) === */
+  --health-bg: linear-gradient(to bottom, #0B1220, #1E1B4B);
+  --health-card: #1F2937;
+  --health-card-border: #374151;
+  --health-hero-bg: linear-gradient(135deg, #0F172A 0%, #1E1B4B 50%, #172554 100%);
+  --health-score-ring: #818CF8;
+  --health-text-primary: #F9FAFB;
+  --health-text-secondary: #D1D5DB;
+  --health-text-muted: #6B7280;
+
+  /* === EFFECTS (Dark) === */
   --glow-success: 0 0 24px rgba(52, 211, 153, 0.25);
-  --glow-accent: 0 0 24px rgba(209, 213, 219, 0.15);
+  --glow-accent: 0 0 24px rgba(129, 140, 248, 0.25);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.02);
   --shadow-card-hover: 0 8px 25px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5);
 }
 
 @theme inline {
@@ -104,6 +134,15 @@ body {
   font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Smooth theme transitions */
+html.theme-transition,
+html.theme-transition *,
+html.theme-transition *::before,
+html.theme-transition *::after {
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.2s ease !important;
+  transition-delay: 0s !important;
 }
 
 /* Safe area padding for iOS */
@@ -214,6 +253,16 @@ input[type='number'] {
 
 .animate-fade-in {
   animation: pageFadeIn 0.2s ease-out forwards;
+}
+
+/* Hub slide up animation */
+@keyframes slideUp {
+  0% { transform: translateY(100%); }
+  100% { transform: translateY(0); }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 /* Ring fill animation for scores */

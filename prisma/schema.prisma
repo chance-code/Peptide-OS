@@ -23,10 +23,12 @@ model UserProfile {
   updatedAt DateTime @updatedAt
 
   // Relations
-  protocols      Protocol[]
-  inventoryVials InventoryVial[]
-  doseLogs       DoseLog[]
-  reconstitutions Reconstitution[]
+  protocols          Protocol[]
+  inventoryVials     InventoryVial[]
+  doseLogs           DoseLog[]
+  reconstitutions    Reconstitution[]
+  healthIntegrations HealthIntegration[]
+  healthMetrics      HealthMetric[]
 }
 
 // ============================================
@@ -269,7 +271,7 @@ model Note {
 }
 
 // ============================================
-// PUSH SUBSCRIPTIONS
+// PUSH SUBSCRIPTIONS (Web Push)
 // ============================================
 model PushSubscription {
   id          String   @id @default(cuid())
@@ -291,4 +293,100 @@ model PushSubscription {
   updatedAt   DateTime @updatedAt
 
   @@index([userId])
+}
+
+// ============================================
+// DEVICE TOKENS (Native iOS/Android Push)
+// ============================================
+model DeviceToken {
+  id          String   @id @default(cuid())
+
+  // Device token from APNs (iOS) or FCM (Android)
+  token       String   @unique
+  platform    String   // 'ios' | 'android'
+
+  // User association
+  userId      String?
+
+  // Notification preferences
+  enabled     Boolean  @default(true)
+  morningTime String?  // e.g., "08:00"
+  eveningTime String?  // e.g., "20:00"
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// ============================================
+// HEALTH INTEGRATIONS
+// ============================================
+model HealthIntegration {
+  id            String   @id @default(cuid())
+  userId        String
+  provider      String   // 'apple_health' | 'oura' | 'eight_sleep'
+
+  // OAuth tokens (encrypted at rest by Turso)
+  accessToken   String?
+  refreshToken  String?
+  tokenExpiry   DateTime?
+
+  // Connection status
+  isConnected   Boolean  @default(false)
+  lastSyncAt    DateTime?
+  syncError     String?
+
+  // Preferences
+  enabledMetrics String?  // JSON array: ["sleep", "hrv", "rhr"]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user          UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+  @@index([userId])
+}
+
+// ============================================
+// HEALTH METRICS
+// ============================================
+model HealthMetric {
+  id          String   @id @default(cuid())
+  userId      String
+  provider    String   // 'apple_health' | 'oura' | 'eight_sleep'
+
+  metricType  String   // 'sleep_duration' | 'hrv' | 'rhr' | 'sleep_score' | 'weight' | 'steps'
+  value       Float
+  unit        String   // 'minutes' | 'ms' | 'bpm' | 'score' | 'kg' | 'steps'
+
+  recordedAt  DateTime // When the metric was recorded
+  context     String?  // JSON: { "sleep_stage": "deep", "source": "watch" }
+
+  createdAt   DateTime @default(now())
+
+  user        UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider, metricType, recordedAt])
+  @@index([userId, recordedAt])
+  @@index([userId, metricType])
+}
+
+// ============================================
+// HEALTH SYNC LOG
+// ============================================
+model HealthSyncLog {
+  id          String   @id @default(cuid())
+  userId      String
+  provider    String
+
+  status      String   // 'success' | 'partial' | 'failed'
+  metricsCount Int     @default(0)
+  errorMessage String?
+
+  startedAt   DateTime
+  completedAt DateTime?
+
+  @@index([userId, provider])
 }

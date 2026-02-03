@@ -73,7 +73,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
 
     loadUser()
-  }, [setCurrentUser, storedUserId, session?.user?.name, sessionStatus])
+  // Only re-run when session status changes (authenticated/unauthenticated)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionStatus])
 
   if (isLoading || sessionStatus === 'loading') {
     return (

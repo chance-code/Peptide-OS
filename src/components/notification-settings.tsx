@@ -1,11 +1,17 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Bell, BellOff, Check } from 'lucide-react'
+import { useEffect, useState, useRef } from 'react'
+import { Bell, BellOff, Check, Smartphone } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import {
+  isCapacitor,
+  registerNativePush,
+  unregisterNativePush,
+  isNativePushAvailable,
+} from '@/lib/capacitor-push'
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
@@ -21,37 +27,58 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 export function NotificationSettings() {
   const { currentUserId } = useAppStore()
   const [isSupported, setIsSupported] = useState(false)
+  const [isNative, setIsNative] = useState(false)
   const [isSubscribed, setIsSubscribed] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
-  const [permission, setPermission] = useState<NotificationPermission>('default')
+  const [permission, setPermission] = useState<NotificationPermission | 'unknown'>('default')
   const [morningTime, setMorningTime] = useState('08:00')
   const [eveningTime, setEveningTime] = useState('20:00')
   const [testSent, setTestSent] = useState(false)
+  const deviceTokenRef = useRef<string | null>(null)
 
   useEffect(() => {
     checkSupport()
   }, [])
 
   async function checkSupport() {
-    const supported =
-      'serviceWorker' in navigator &&
-      'PushManager' in window &&
-      'Notification' in window
+    // Check if we're in native app
+    const native = isCapacitor()
+    setIsNative(native)
 
-    setIsSupported(supported)
+    if (native) {
+      // Check native push support
+      const nativeAvailable = await isNativePushAvailable()
+      setIsSupported(nativeAvailable)
 
-    if (supported) {
-      setPermission(Notification.permission)
+      // For native, we check if we have a stored token
+      // The actual permission check happens when enabling
+      const storedToken = localStorage.getItem('device_push_token')
+      if (storedToken) {
+        deviceTokenRef.current = storedToken
+        setIsSubscribed(true)
+      }
+    } else {
+      // Web push support check
+      const supported =
+        'serviceWorker' in navigator &&
+        'PushManager' in window &&
+        'Notification' in window
 
-      // Check if already subscribed (only if service worker is already registered)
-      try {
-        const registration = await navigator.serviceWorker.getRegistration('/sw.js')
-        if (registration) {
-          const subscription = await registration.pushManager.getSubscription()
-          setIsSubscribed(!!subscription)
+      setIsSupported(supported)
+
+      if (supported) {
+        setPermission(Notification.permission)
+
+        // Check if already subscribed (only if service worker is already registered)
+        try {
+          const registration = await navigator.serviceWorker.getRegistration('/sw.js')
+          if (registration) {
+            const subscription = await registration.pushManager.getSubscription()
+            setIsSubscribed(!!subscription)
+          }
+        } catch (error) {
+          console.log('No existing service worker registration')
         }
-      } catch (error) {
-        console.log('No existing service worker registration')
       }
     }
 
@@ -76,65 +103,86 @@ export function NotificationSettings() {
     setIsLoading(true)
 
     try {
-      // Fetch VAPID public key from server
-      console.log('Fetching VAPID key...')
-      const keyResponse = await fetch('/api/push/vapid-key')
-      if (!keyResponse.ok) {
-        console.error('Failed to fetch VAPID key')
-        alert('Push notifications not configured. Please check server settings.')
-        setIsLoading(false)
-        return
-      }
-      const { publicKey: vapidPublicKey } = await keyResponse.json()
-      console.log('VAPID key fetched')
-
-      // Request permission
-      const result = await Notification.requestPermission()
-      setPermission(result)
-
-      if (result !== 'granted') {
-        console.log('Notification permission denied')
-        setIsLoading(false)
-        return
-      }
-
-      // Register service worker
-      console.log('Registering service worker...')
-      await registerServiceWorker()
-      const registration = await navigator.serviceWorker.ready
-      console.log('Service worker ready')
-
-      // Subscribe to push
-      console.log('Subscribing to push...')
-      const applicationServerKey = urlBase64ToUint8Array(vapidPublicKey)
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: applicationServerKey.buffer as ArrayBuffer,
-      })
-      console.log('Push subscription created')
-
-      // Send subscription to server
-      console.log('Sending subscription to server...')
-      const response = await fetch('/api/push/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          subscription: subscription.toJSON(),
-          userId: currentUserId,
+      if (isNative) {
+        // Native push registration
+        const result = await registerNativePush(
+          currentUserId,
           morningTime,
           eveningTime,
-        }),
-      })
+          // On notification received while app is open
+          (notification) => {
+            console.log('Notification received:', notification)
+          },
+          // On notification tapped
+          (action) => {
+            console.log('Notification tapped:', action)
+            // Navigate to the URL in the notification data
+            const url = action.notification.data?.url as string
+            if (url && typeof window !== 'undefined') {
+              window.location.href = url
+            }
+          }
+        )
 
-      if (response.ok) {
-        console.log('Subscription saved')
-        setIsSubscribed(true)
+        if (result.success && result.token) {
+          localStorage.setItem('device_push_token', result.token)
+          deviceTokenRef.current = result.token
+          setIsSubscribed(true)
+        } else {
+          alert(result.error || 'Failed to enable notifications')
+        }
       } else {
-        console.error('Failed to save subscription:', await response.text())
+        // Web push registration
+        // Fetch VAPID public key from server
+        const keyResponse = await fetch('/api/push/vapid-key')
+        if (!keyResponse.ok) {
+          alert('Push notifications not configured. Please check server settings.')
+          setIsLoading(false)
+          return
+        }
+        const { publicKey: vapidPublicKey } = await keyResponse.json()
+
+        // Request permission
+        const result = await Notification.requestPermission()
+        setPermission(result)
+
+        if (result !== 'granted') {
+          setIsLoading(false)
+          return
+        }
+
+        // Register service worker
+        await registerServiceWorker()
+        const registration = await navigator.serviceWorker.ready
+
+        // Subscribe to push
+        const applicationServerKey = urlBase64ToUint8Array(vapidPublicKey)
+        const subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: applicationServerKey.buffer as ArrayBuffer,
+        })
+
+        // Send subscription to server
+        const response = await fetch('/api/push/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            subscription: subscription.toJSON(),
+            userId: currentUserId,
+            morningTime,
+            eveningTime,
+          }),
+        })
+
+        if (response.ok) {
+          setIsSubscribed(true)
+        } else {
+          console.error('Failed to save subscription')
+        }
       }
     } catch (error) {
       console.error('Failed to subscribe:', error)
-      alert('Failed to enable notifications. Check browser console for details.')
+      alert('Failed to enable notifications. Check console for details.')
     } finally {
       setIsLoading(false)
     }
@@ -144,19 +192,30 @@ export function NotificationSettings() {
     setIsLoading(true)
 
     try {
-      const registration = await navigator.serviceWorker.ready
-      const subscription = await registration.pushManager.getSubscription()
+      if (isNative) {
+        // Native push unregistration
+        const token = deviceTokenRef.current || localStorage.getItem('device_push_token')
+        if (token) {
+          await unregisterNativePush(token)
+          localStorage.removeItem('device_push_token')
+          deviceTokenRef.current = null
+        }
+      } else {
+        // Web push unregistration
+        const registration = await navigator.serviceWorker.ready
+        const subscription = await registration.pushManager.getSubscription()
 
-      if (subscription) {
-        // Unsubscribe from push
-        await subscription.unsubscribe()
+        if (subscription) {
+          // Unsubscribe from push
+          await subscription.unsubscribe()
 
-        // Remove from server
-        await fetch('/api/push/subscribe', {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ endpoint: subscription.endpoint }),
-        })
+          // Remove from server
+          await fetch('/api/push/subscribe', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ endpoint: subscription.endpoint }),
+          })
+        }
       }
 
       setIsSubscribed(false)
@@ -200,9 +259,9 @@ export function NotificationSettings() {
   if (!isSupported) {
     return (
       <Card>
-        <CardContent className="py-6 text-center text-slate-500 dark:text-slate-400">
+        <CardContent className="py-6 text-center text-[var(--muted-foreground)]">
           <BellOff className="w-8 h-8 mx-auto mb-2 opacity-50" />
-          <p>Push notifications are not supported in this browser.</p>
+          <p>Push notifications are not supported {isNative ? 'on this device' : 'in this browser'}.</p>
         </CardContent>
       </Card>
     )
@@ -211,9 +270,9 @@ export function NotificationSettings() {
   if (permission === 'denied') {
     return (
       <Card>
-        <CardContent className="py-6 text-center text-slate-500 dark:text-slate-400">
+        <CardContent className="py-6 text-center text-[var(--muted-foreground)]">
           <BellOff className="w-8 h-8 mx-auto mb-2 opacity-50" />
-          <p>Notifications are blocked. Please enable them in your browser settings.</p>
+          <p>Notifications are blocked. Please enable them in {isNative ? 'Settings > Notifications' : 'your browser settings'}.</p>
         </CardContent>
       </Card>
     )
@@ -223,16 +282,18 @@ export function NotificationSettings() {
     <Card>
       <CardHeader>
         <CardTitle className="text-base flex items-center gap-2">
-          <Bell className="w-5 h-5" />
+          {isNative ? <Smartphone className="w-5 h-5" /> : <Bell className="w-5 h-5" />}
           Dose Reminders
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {isSubscribed ? (
           <>
-            <div className="flex items-center gap-2 text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 p-3 rounded-lg">
+            <div className="flex items-center gap-2 text-[var(--success)] bg-[var(--success-muted)] p-3 rounded-lg">
               <Check className="w-5 h-5" />
-              <span className="text-sm font-medium">Notifications enabled</span>
+              <span className="text-sm font-medium">
+                {isNative ? 'Native notifications enabled' : 'Notifications enabled'}
+              </span>
             </div>
 
             <div className="space-y-3">
@@ -248,7 +309,7 @@ export function NotificationSettings() {
                 value={eveningTime}
                 onChange={(e) => setEveningTime(e.target.value)}
               />
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+              <p className="text-xs text-[var(--muted-foreground)]">
                 You&apos;ll receive reminders at these times if you have pending doses.
               </p>
             </div>
@@ -268,7 +329,7 @@ export function NotificationSettings() {
                 size="sm"
                 onClick={unsubscribe}
                 disabled={isLoading}
-                className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30"
+                className="text-[var(--error)] hover:bg-[var(--error-muted)]"
               >
                 Disable
               </Button>
@@ -276,7 +337,7 @@ export function NotificationSettings() {
           </>
         ) : (
           <>
-            <p className="text-sm text-slate-600 dark:text-slate-300">
+            <p className="text-sm text-[var(--muted-foreground)]">
               Get reminders when it&apos;s time for your doses. Never miss a dose again.
             </p>
             <Button
@@ -284,7 +345,7 @@ export function NotificationSettings() {
               disabled={isLoading}
               className="w-full"
             >
-              <Bell className="w-4 h-4 mr-2" />
+              {isNative ? <Smartphone className="w-4 h-4 mr-2" /> : <Bell className="w-4 h-4 mr-2" />}
               {isLoading ? 'Enabling...' : 'Enable Notifications'}
             </Button>
           </>

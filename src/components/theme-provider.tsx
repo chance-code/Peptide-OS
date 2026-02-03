@@ -37,12 +37,22 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
     setResolvedTheme(resolved)
 
+    // Enable transition effect
+    root.classList.add('theme-transition')
+
     // Apply theme
     root.classList.remove('light', 'dark')
     root.classList.add(resolved)
 
+    // Remove transition class after animation completes
+    const timeout = setTimeout(() => {
+      root.classList.remove('theme-transition')
+    }, 300)
+
     // Save preference
     localStorage.setItem('theme', theme)
+
+    return () => clearTimeout(timeout)
   }, [theme])
 
   // Listen for system theme changes

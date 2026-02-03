@@ -1,8 +1,25 @@
 <svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
-  <!-- The Core - Soft Graphite (Light Mode) -->
-  <rect width="1024" height="1024" fill="#F8FAFC"/>
+  <!-- Arc Protocol Logo - Light Mode -->
+  <rect width="1024" height="1024" rx="224" fill="#F8FAFC"/>
 
-  <circle cx="512" cy="512" r="307" stroke="#6B7280" stroke-width="21" fill="none"/>
-  <circle cx="512" cy="512" r="190" stroke="#6B7280" stroke-width="21" fill="none"/>
-  <circle cx="512" cy="512" r="77" fill="#6B7280"/>
+  <defs>
+    <linearGradient id="arcGradLight" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#4F46E5"/>
+      <stop offset="100%" stop-color="#6366F1"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Open arc - ~310° sweep, gap at upper-right -->
+  <circle
+    cx="512" cy="512" r="260"
+    fill="none"
+    stroke="url(#arcGradLight)"
+    stroke-width="42"
+    stroke-linecap="round"
+    stroke-dasharray="1407 227"
+    stroke-dashoffset="-113"
+  />
+
+  <!-- Inner nucleus -->
+  <circle cx="502" cy="522" r="44" fill="url(#arcGradLight)"/>
 </svg>

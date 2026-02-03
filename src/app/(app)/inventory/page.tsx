@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import Link from 'next/link'
 import { format, differenceInDays } from 'date-fns'
 import { Plus, Package, AlertTriangle, Clock, Droplet, Syringe, Pill } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import { useAppStore } from '@/store'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -17,51 +18,45 @@ interface VialWithPeptide extends InventoryVial {
 
 type FilterType = 'all' | ItemType
 
+function getExpirationStatus(vial: VialWithPeptide) {
+  if (vial.isExpired) return 'expired'
+  if (!vial.expirationDate) return 'unknown'
+
+  const daysUntilExpiry = differenceInDays(new Date(vial.expirationDate), new Date())
+  if (daysUntilExpiry <= 7) return 'expiring-soon'
+  return 'valid'
+}
+
 export default function InventoryPage() {
-  const { currentUserId } = useAppStore()
-  const [vials, setVials] = useState<VialWithPeptide[]>([])
+  const currentUserId = useAppStore(s => s.currentUserId)
   const [showExpired, setShowExpired] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
   const [typeFilter, setTypeFilter] = useState<FilterType>('all')
 
-  const fetchInventory = useCallback(async () => {
-    if (!currentUserId) return
-
-    try {
-      setIsLoading(true)
+  const { data: vials = [], isLoading } = useQuery<VialWithPeptide[]>({
+    queryKey: ['inventory', currentUserId, showExpired],
+    queryFn: async () => {
       const params = new URLSearchParams({
-        userId: currentUserId,
+        userId: currentUserId!,
         includeExpired: showExpired.toString(),
         includeExhausted: 'false',
       })
       const res = await fetch(`/api/inventory?${params}`)
-      if (res.ok) {
-        const data = await res.json()
-        setVials(data)
-      }
-    } catch (error) {
-      console.error('Error fetching inventory:', error)
-    } finally {
-      setIsLoading(false)
-    }
-  }, [currentUserId, showExpired])
+      if (!res.ok) throw new Error('Failed to fetch inventory')
+      return res.json()
+    },
+    enabled: !!currentUserId,
+    staleTime: 1000 * 60 * 5,
+  })
 
-  useEffect(() => {
-    fetchInventory()
-  }, [fetchInventory])
-
-  function getExpirationStatus(vial: VialWithPeptide) {
-    if (vial.isExpired) return 'expired'
-    if (!vial.expirationDate) return 'unknown'
-
-    const daysUntilExpiry = differenceInDays(new Date(vial.expirationDate), new Date())
-    if (daysUntilExpiry <= 7) return 'expiring-soon'
-    return 'valid'
-  }
-
-  const activeVials = vials.filter((v) => !v.isExpired && !v.isExhausted)
-  const expiredVials = vials.filter((v) => v.isExpired)
-  const expiringVials = activeVials.filter((v) => getExpirationStatus(v) === 'expiring-soon')
+  const { activeVials, expiredVials, expiringVials, filteredVials } = useMemo(() => {
+    const active = vials.filter((v) => !v.isExpired && !v.isExhausted)
+    const expired = vials.filter((v) => v.isExpired)
+    const expiring = active.filter((v) => getExpirationStatus(v) === 'expiring-soon')
+    const filtered = typeFilter === 'all'
+      ? vials
+      : vials.filter(v => (v.peptide.type || 'peptide') === typeFilter)
+    return { activeVials: active, expiredVials: expired, expiringVials: expiring, filteredVials: filtered }
+  }, [vials, typeFilter])
 
   return (
     <div className="p-4 pb-20">
@@ -122,7 +117,7 @@ export default function InventoryPage() {
           </div>
           <div className="bg-amber-50 dark:bg-amber-900/30 rounded-lg p-3 text-center border border-amber-100 dark:border-amber-800">
             <div className="text-2xl font-bold text-amber-700 dark:text-amber-400">
-              {activeVials.filter((v) => getExpirationStatus(v) === 'expiring-soon').length}
+              {expiringVials.length}
             </div>
             <div className="text-xs text-amber-600 dark:text-amber-500">Expiring</div>
           </div>
@@ -187,12 +182,7 @@ export default function InventoryPage() {
       </div>
 
       {/* Vials List */}
-      {(() => {
-        const filteredVials = typeFilter === 'all'
-          ? vials
-          : vials.filter(v => (v.peptide.type || 'peptide') === typeFilter)
-
-        return isLoading ? (
+      {isLoading ? (
         <div className="text-center py-8 text-slate-500 dark:text-slate-400">Loading...</div>
       ) : filteredVials.length > 0 ? (
         <div className="space-y-3">
@@ -284,8 +274,7 @@ export default function InventoryPage() {
             </div>
           </CardContent>
         </Card>
-      )
-      })()}
+      )}
     </div>
   )
 }

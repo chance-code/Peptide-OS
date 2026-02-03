@@ -1,8 +1,40 @@
 <svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
-  <!-- The Core - Soft Graphite (Dark Mode) -->
-  <rect width="1024" height="1024" fill="#0B1220"/>
+  <!-- Arc Protocol Logo - Dark Mode (Primary) -->
+  <!-- Background: Deep Navy -->
+  <rect width="1024" height="1024" rx="224" fill="#0B1220"/>
 
-  <circle cx="512" cy="512" r="307" stroke="#F8FAFC" stroke-width="21" fill="none"/>
-  <circle cx="512" cy="512" r="190" stroke="#F8FAFC" stroke-width="21" fill="none"/>
-  <circle cx="512" cy="512" r="77" fill="#F8FAFC"/>
+  <defs>
+    <!-- Subtle gradient for the arc - cool indigo to slightly warmer -->
+    <linearGradient id="arcGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#818CF8"/>
+      <stop offset="100%" stop-color="#A5B4FC"/>
+    </linearGradient>
+    <!-- Round end caps via mask approach -->
+  </defs>
+
+  <!--
+    The Arc: ~310° of a circle, gap at ~1 o'clock position.
+    Center: 512, 512. Radius: 260.
+    Start angle: 35° (gap start), End angle: 345° (gap end, i.e. 310° sweep).
+    Using stroke-dasharray to create the open arc.
+
+    Circumference = 2π × 260 ≈ 1633.6
+    310° = 310/360 × 1633.6 ≈ 1407.3
+    Gap = 50° = 50/360 × 1633.6 ≈ 226.9
+
+    Rotate to position gap at ~1-2 o'clock (upper right)
+  -->
+  <circle
+    cx="512" cy="512" r="260"
+    fill="none"
+    stroke="url(#arcGrad)"
+    stroke-width="42"
+    stroke-linecap="round"
+    stroke-dasharray="1407 227"
+    stroke-dashoffset="-113"
+    opacity="1"
+  />
+
+  <!-- Inner nucleus - slightly offset toward lower-left for asymmetry -->
+  <circle cx="502" cy="522" r="44" fill="url(#arcGrad)"/>
 </svg>

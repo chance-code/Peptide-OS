@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
 import { format, differenceInDays } from 'date-fns'
@@ -227,13 +227,20 @@ export default function ProtocolsPage() {
     return Math.round(volumeMl * 100)
   }
 
-  const filteredProtocols = protocols.filter((p) => {
-    // Filter by status
+  const filteredProtocols = useMemo(() => protocols.filter((p) => {
     if (filter !== 'all' && p.status !== filter) return false
-    // Filter by type
     if (typeFilter !== 'all' && (p.peptide.type || 'peptide') !== typeFilter) return false
     return true
-  })
+  }), [protocols, filter, typeFilter])
+
+  // Pre-compute stats, pen units, and labels for all filtered protocols
+  const protocolDisplayData = useMemo(() => {
+    return filteredProtocols.map((protocol) => ({
+      stats: getProgressStats(protocol),
+      penUnits: getPenUnits(protocol),
+      itemLabel: getItemLabel(protocol.peptide.name, protocol.peptide.type),
+    }))
+  }, [filteredProtocols])
 
   return (
     <PullToRefresh onRefresh={handleRefresh} className="h-full">
@@ -327,9 +334,7 @@ export default function ProtocolsPage() {
         ) : filteredProtocols.length > 0 ? (
           <div className="space-y-3">
             {filteredProtocols.map((protocol, index) => {
-              const stats = getProgressStats(protocol)
-              const penUnits = getPenUnits(protocol)
-              const { label, color } = getItemLabel(protocol.peptide.name, protocol.peptide.type)
+              const { stats, penUnits, itemLabel: { label, color } } = protocolDisplayData[index]
 
               return (
                 <Link key={protocol.id} href={`/protocols/${protocol.id}`}>

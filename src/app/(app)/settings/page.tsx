@@ -1,8 +1,9 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { signOut } from 'next-auth/react'
-import { User, Edit2, LogOut, Crown, Zap, Sun, Moon, Monitor } from 'lucide-react'
+import { User, Edit2, LogOut, Crown, Zap, Sun, Moon, Monitor, Activity, ChevronRight } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { useTheme } from '@/components/theme-provider'
 import { Paywall } from '@/components/paywall'
@@ -55,7 +56,7 @@ export default function SettingsPage() {
 
   return (
     <div className="p-4 pb-20">
-      <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-4">Settings</h2>
+      <h2 className="text-xl font-semibold text-[var(--foreground)] mb-4">Settings</h2>
 
       {/* Current Profile */}
       {currentUser && (
@@ -65,13 +66,13 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-slate-900 dark:bg-slate-100 flex items-center justify-center">
-                <User className="w-6 h-6 text-white dark:text-slate-900" />
+              <div className="w-12 h-12 rounded-full bg-[var(--foreground)] flex items-center justify-center">
+                <User className="w-6 h-6 text-[var(--background)]" />
               </div>
               <div className="flex-1">
-                <div className="font-medium text-slate-900 dark:text-white">{currentUser.name}</div>
+                <div className="font-medium text-[var(--foreground)]">{currentUser.name}</div>
                 {currentUser.notes && (
-                  <div className="text-sm text-slate-500 dark:text-slate-400">{currentUser.notes}</div>
+                  <div className="text-sm text-[var(--muted-foreground)]">{currentUser.notes}</div>
                 )}
               </div>
               <Button
@@ -95,19 +96,19 @@ export default function SettingsPage() {
                 <Crown className="w-5 h-5 text-white" />
               </div>
               <div className="flex-1">
-                <div className="font-medium text-slate-900 dark:text-white">Premium Active</div>
-                <div className="text-sm text-slate-500 dark:text-slate-400">All features unlocked</div>
+                <div className="font-medium text-[var(--foreground)]">Premium Active</div>
+                <div className="text-sm text-[var(--muted-foreground)]">All features unlocked</div>
               </div>
               <Badge className="bg-gradient-to-r from-amber-400 to-orange-500 text-white">PRO</Badge>
             </div>
           ) : (
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center">
-                <Zap className="w-5 h-5 text-slate-400" />
+              <div className="w-10 h-10 rounded-full bg-[var(--muted)] flex items-center justify-center">
+                <Zap className="w-5 h-5 text-[var(--muted-foreground)]" />
               </div>
               <div className="flex-1">
-                <div className="font-medium text-slate-900 dark:text-white">Free Plan</div>
-                <div className="text-sm text-slate-500 dark:text-slate-400">Upgrade for all features</div>
+                <div className="font-medium text-[var(--foreground)]">Free Plan</div>
+                <div className="text-sm text-[var(--muted-foreground)]">Upgrade for all features</div>
               </div>
               <Button size="sm" onClick={() => setShowPaywall(true)}>
                 Upgrade
@@ -133,10 +134,10 @@ export default function SettingsPage() {
                 key={value}
                 onClick={() => setTheme(value)}
                 className={cn(
-                  'flex-1 flex flex-col items-center gap-2 p-3 rounded-xl transition-colors',
+                  'flex-1 flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all duration-200',
                   theme === value
-                    ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
-                    : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                    ? 'bg-[var(--accent)] text-[var(--accent-foreground)] border-[var(--accent)] shadow-lg'
+                    : 'bg-[var(--muted)] text-[var(--muted-foreground)] border-transparent hover:border-[var(--border)]'
                 )}
               >
                 <Icon className="w-5 h-5" />
@@ -152,12 +153,36 @@ export default function SettingsPage() {
         <NotificationSettings />
       </div>
 
+      {/* Connected Health Services */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="text-base">Connected Health Services</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Link
+            href="/health"
+            className="flex items-center justify-between p-3 -m-3 rounded-xl hover:bg-[var(--muted)] transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                <Activity className="w-5 h-5 text-emerald-500" />
+              </div>
+              <div>
+                <div className="font-medium text-[var(--foreground)]">Health Integrations</div>
+                <div className="text-sm text-[var(--muted-foreground)]">Apple Health, Oura, Eight Sleep</div>
+              </div>
+            </div>
+            <ChevronRight className="w-5 h-5 text-[var(--muted-foreground)]" />
+          </Link>
+        </CardContent>
+      </Card>
+
       {/* App Info */}
       <Card className="mb-6">
         <CardHeader>
           <CardTitle className="text-base">About</CardTitle>
         </CardHeader>
-        <CardContent className="text-sm text-slate-500 dark:text-slate-400 space-y-1">
+        <CardContent className="text-sm text-[var(--muted-foreground)] space-y-1">
           <div>Peptide OS v1.0.0</div>
           <div>Local-first personal protocol management</div>
         </CardContent>
