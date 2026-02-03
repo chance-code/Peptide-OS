@@ -169,7 +169,7 @@ export default function SettingsPage() {
               </div>
               <div>
                 <div className="font-medium text-[var(--foreground)]">Health Integrations</div>
-                <div className="text-sm text-[var(--muted-foreground)]">Apple Health, Oura, Eight Sleep</div>
+                <div className="text-sm text-[var(--muted-foreground)]">Manage connections on the Health tab</div>
               </div>
             </div>
             <ChevronRight className="w-5 h-5 text-[var(--muted-foreground)]" />

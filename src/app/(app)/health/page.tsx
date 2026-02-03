@@ -222,23 +222,10 @@ export default function HealthDashboardNew() {
     }
   }
 
-  // Connect Eight Sleep (credentials flow)
-  const connectEightSleep = async () => {
-    try {
-      const res = await fetch('/api/health/integrations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider: 'eight_sleep' })
-      })
-      if (res.ok) {
-        const data = await res.json()
-        if (data.requiresCredentials && data.loginEndpoint) {
-          window.location.href = '/settings?connectEightSleep=true'
-        }
-      }
-    } catch (error) {
-      console.error('Failed to connect Eight Sleep:', error)
-    }
+  // Connect Eight Sleep (credentials flow — inline form, no navigation)
+  const connectEightSleep = () => {
+    setShowIntegrations(true)
+    setEightSleepReauth(prev => ({ ...prev, show: true, error: null }))
   }
 
   // Re-authenticate Eight Sleep with email/password
