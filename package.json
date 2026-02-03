@@ -39,6 +39,7 @@
     "next": "16.1.6",
     "next-auth": "^4.24.13",
     "openai": "^6.17.0",
+    "patch-package": "^8.0.1",
     "prisma": "^5.22.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
