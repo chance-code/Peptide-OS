@@ -227,7 +227,7 @@ export default function ProtocolDetailPage({
   if (isLoading) {
     return (
       <div className="p-4">
-        <div className="text-center py-8 text-slate-500">Loading...</div>
+        <div className="text-center py-8 text-[var(--muted-foreground)]">Loading...</div>
       </div>
     )
   }
@@ -235,7 +235,7 @@ export default function ProtocolDetailPage({
   if (!protocol) {
     return (
       <div className="p-4">
-        <div className="text-center py-8 text-slate-500">Protocol not found</div>
+        <div className="text-center py-8 text-[var(--muted-foreground)]">Protocol not found</div>
       </div>
     )
   }
@@ -318,7 +318,7 @@ export default function ProtocolDetailPage({
       <div className="p-4 pb-20 pt-[calc(1rem+env(safe-area-inset-top))]">
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-slate-900">Edit Protocol</h2>
+          <h2 className="text-xl font-semibold text-[var(--foreground)]">Edit Protocol</h2>
           <Button variant="ghost" size="sm" onClick={() => setIsEditing(false)}>
             <X className="w-4 h-4" />
           </Button>
@@ -331,8 +331,8 @@ export default function ProtocolDetailPage({
               <CardTitle className="text-base">Peptide</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-lg font-medium text-slate-900">{protocol.peptide.name}</div>
-              <p className="text-xs text-slate-500 mt-1">Peptide cannot be changed. Create a new protocol instead.</p>
+              <div className="text-lg font-medium text-[var(--foreground)]">{protocol.peptide.name}</div>
+              <p className="text-xs text-[var(--muted-foreground)] mt-1">Peptide cannot be changed. Create a new protocol instead.</p>
             </CardContent>
           </Card>
 
@@ -381,7 +381,7 @@ export default function ProtocolDetailPage({
                 <CardTitle className="text-base">
                   Reconstitution Info {!showReconstitution && '(optional)'}
                 </CardTitle>
-                <span className="text-slate-400 text-sm">
+                <span className="text-[var(--muted-foreground)] text-sm">
                   {showReconstitution ? '−' : '+'}
                 </span>
               </button>
@@ -417,12 +417,12 @@ export default function ProtocolDetailPage({
                   placeholder="e.g., 2"
                 />
                 {editVialAmount && editDiluentVolume && editDoseAmount && (
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                    <div className="text-sm text-green-700">
+                  <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-3">
+                    <div className="text-sm text-emerald-600 dark:text-emerald-400">
                       <strong>Concentration:</strong>{' '}
                       {(parseFloat(editVialAmount) / parseFloat(editDiluentVolume)).toFixed(2)} {editVialUnit}/mL
                     </div>
-                    <div className="text-sm text-green-700 mt-1">
+                    <div className="text-sm text-emerald-600 dark:text-emerald-400 mt-1">
                       <strong>Per dose:</strong>{' '}
                       {(() => {
                         const concentration = parseFloat(editVialAmount) / parseFloat(editDiluentVolume)
@@ -462,9 +462,9 @@ export default function ProtocolDetailPage({
                   id="indefinite"
                   checked={editIndefinite}
                   onChange={(e) => setEditIndefinite(e.target.checked)}
-                  className="rounded border-slate-300"
+                  className="rounded border-[var(--border)]"
                 />
-                <label htmlFor="indefinite" className="text-sm text-slate-700">
+                <label htmlFor="indefinite" className="text-sm text-[var(--foreground)]">
                   Run indefinitely (no end date)
                 </label>
               </div>
@@ -487,7 +487,7 @@ export default function ProtocolDetailPage({
 
               {editFrequency === 'custom' && (
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                  <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
                     Select Days
                   </label>
                   <div className="flex flex-wrap gap-2">
@@ -498,8 +498,8 @@ export default function ProtocolDetailPage({
                         onClick={() => toggleCustomDay(day.value)}
                         className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                           editCustomDays.includes(day.value)
-                            ? 'bg-slate-900 text-white'
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            ? 'bg-[var(--foreground)] text-[var(--background)]'
+                            : 'bg-[var(--muted)] text-[var(--muted-foreground)] hover:bg-[var(--border)]'
                         }`}
                       >
                         {day.label}
@@ -520,7 +520,7 @@ export default function ProtocolDetailPage({
               <textarea
                 value={editNotes}
                 onChange={(e) => setEditNotes(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 min-h-[80px]"
+                className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)] min-h-[80px]"
                 placeholder="Any additional notes..."
               />
             </CardContent>
@@ -565,7 +565,7 @@ export default function ProtocolDetailPage({
         {protocol.status !== 'completed' && (
           <div className="flex gap-2">
             <Button variant="ghost" size="sm" onClick={startEditing} className="w-11 h-11 p-0">
-              <Edit2 className="w-5 h-5 text-slate-600" />
+              <Edit2 className="w-5 h-5 text-[var(--muted-foreground)]" />
             </Button>
             <Button variant="ghost" size="sm" onClick={() => setShowDeleteModal(true)} className="w-11 h-11 p-0">
               <Trash2 className="w-5 h-5 text-red-500" />
@@ -577,7 +577,7 @@ export default function ProtocolDetailPage({
       {/* Title */}
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-1">
-          <h1 className="text-2xl font-bold text-slate-900 truncate max-w-[240px]">
+          <h1 className="text-2xl font-bold text-[var(--foreground)] truncate max-w-[240px]">
             {protocol.peptide.name}
           </h1>
           <Badge
@@ -592,7 +592,7 @@ export default function ProtocolDetailPage({
             {protocol.status}
           </Badge>
         </div>
-        <p className="text-slate-500">
+        <p className="text-[var(--muted-foreground)]">
           {protocol.doseAmount} {protocol.doseUnit} • {formatDays()}
         </p>
       </div>
@@ -608,35 +608,35 @@ export default function ProtocolDetailPage({
       <div className="grid grid-cols-2 gap-3 mb-6">
         <Card>
           <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-slate-900">{daysCompleted}</div>
-            <div className="text-xs text-slate-500">Days Completed</div>
+            <div className="text-2xl font-bold text-[var(--foreground)]">{daysCompleted}</div>
+            <div className="text-xs text-[var(--muted-foreground)]">Days Completed</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4 text-center">
             {daysRemaining !== null && totalWeeks !== null ? (
               <>
-                <div className="text-2xl font-bold text-slate-900">{daysRemaining}</div>
-                <div className="text-xs text-slate-500">Days Left ({totalWeeks}wk cycle)</div>
+                <div className="text-2xl font-bold text-[var(--foreground)]">{daysRemaining}</div>
+                <div className="text-xs text-[var(--muted-foreground)]">Days Left ({totalWeeks}wk cycle)</div>
               </>
             ) : (
               <>
-                <Infinity className="w-6 h-6 mx-auto text-slate-900" />
-                <div className="text-xs text-slate-500 mt-1">Ongoing</div>
+                <Infinity className="w-6 h-6 mx-auto text-[var(--foreground)]" />
+                <div className="text-xs text-[var(--muted-foreground)] mt-1">Ongoing</div>
               </>
             )}
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-green-600">{adherenceRate}%</div>
-            <div className="text-xs text-slate-500">Adherence</div>
+            <div className="text-2xl font-bold text-emerald-500">{adherenceRate}%</div>
+            <div className="text-xs text-[var(--muted-foreground)]">Adherence</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-slate-900">{expectedDoses}</div>
-            <div className="text-xs text-slate-500">
+            <div className="text-2xl font-bold text-[var(--foreground)]">{expectedDoses}</div>
+            <div className="text-xs text-[var(--muted-foreground)]">
               {protocol.status === 'completed' ? 'Total Doses' : 'Doses Logged'}
             </div>
           </CardContent>
@@ -651,11 +651,11 @@ export default function ProtocolDetailPage({
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Pen Units - Primary Info */}
-            <div className="text-center py-4 bg-blue-50 rounded-xl">
-              <div className="text-4xl font-bold text-blue-800">
+            <div className="text-center py-4 bg-[var(--accent)]/10 rounded-xl">
+              <div className="text-4xl font-bold text-[var(--accent)]">
                 {penUnits} units
               </div>
-              <div className="text-blue-600 mt-1">
+              <div className="text-[var(--accent)] opacity-80 mt-1">
                 Draw to this line
               </div>
             </div>
@@ -669,15 +669,15 @@ export default function ProtocolDetailPage({
 
             {/* Dose Details */}
             <div className="grid grid-cols-2 gap-3">
-              <div className="bg-slate-50 rounded-xl p-4">
-                <div className="text-xs text-slate-500 uppercase tracking-wide mb-1">Dose</div>
-                <div className="font-semibold text-slate-900">
+              <div className="bg-[var(--muted)] rounded-xl p-4">
+                <div className="text-xs text-[var(--muted-foreground)] uppercase tracking-wider mb-1">Dose</div>
+                <div className="font-semibold text-[var(--foreground)]">
                   {protocol.doseAmount} {protocol.doseUnit}
                 </div>
               </div>
-              <div className="bg-slate-50 rounded-xl p-4">
-                <div className="text-xs text-slate-500 uppercase tracking-wide mb-1">Concentration</div>
-                <div className="font-semibold text-slate-900">
+              <div className="bg-[var(--muted)] rounded-xl p-4">
+                <div className="text-xs text-[var(--muted-foreground)] uppercase tracking-wider mb-1">Concentration</div>
+                <div className="font-semibold text-[var(--foreground)]">
                   {concentration}
                 </div>
               </div>
@@ -690,11 +690,11 @@ export default function ProtocolDetailPage({
       {progress !== null && (
         <Card className="mb-6">
           <CardContent className="p-4">
-            <div className="flex justify-between text-sm text-slate-500 mb-2">
+            <div className="flex justify-between text-sm text-[var(--muted-foreground)] mb-2">
               <span>Progress</span>
               <span>{Math.round(progress)}%</span>
             </div>
-            <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+            <div className="h-2 bg-[var(--muted)] rounded-full overflow-hidden">
               <div
                 className="h-full bg-green-500 rounded-full transition-all"
                 style={{ width: `${progress}%` }}
@@ -711,16 +711,16 @@ export default function ProtocolDetailPage({
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex items-center gap-3">
-            <Calendar className="w-4 h-4 text-slate-400" />
+            <Calendar className="w-4 h-4 text-[var(--muted-foreground)]" />
             <div>
-              <div className="text-sm text-slate-500">Start Date</div>
+              <div className="text-sm text-[var(--muted-foreground)]">Start Date</div>
               <div className="font-medium">{format(startDate, 'MMMM d, yyyy')}</div>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <Calendar className="w-4 h-4 text-slate-400" />
+            <Calendar className="w-4 h-4 text-[var(--muted-foreground)]" />
             <div>
-              <div className="text-sm text-slate-500">End Date</div>
+              <div className="text-sm text-[var(--muted-foreground)]">End Date</div>
               <div className="font-medium">
                 {endDate && totalWeeks
                   ? `${format(endDate, 'MMMM d, yyyy')} (${totalWeeks} week cycle)`
@@ -730,9 +730,9 @@ export default function ProtocolDetailPage({
           </div>
           {(protocol.timing || protocol.timings) && (
             <div className="flex items-center gap-3">
-              <Clock className="w-4 h-4 text-slate-400" />
+              <Clock className="w-4 h-4 text-[var(--muted-foreground)]" />
               <div>
-                <div className="text-sm text-slate-500">Timing</div>
+                <div className="text-sm text-[var(--muted-foreground)]">Timing</div>
                 <div className="font-medium">
                   {(() => {
                     if (protocol.timings) {
@@ -751,21 +751,21 @@ export default function ProtocolDetailPage({
           )}
           {protocol.vialAmount && protocol.diluentVolume && (
             <div className="flex items-center gap-3">
-              <Beaker className="w-4 h-4 text-slate-400" />
+              <Beaker className="w-4 h-4 text-[var(--muted-foreground)]" />
               <div>
-                <div className="text-sm text-slate-500">Reconstitution</div>
+                <div className="text-sm text-[var(--muted-foreground)]">Reconstitution</div>
                 <div className="font-medium">
                   {protocol.vialAmount}{protocol.vialUnit} + {protocol.diluentVolume}mL BAC water
                 </div>
-                <div className="text-xs text-slate-500">
+                <div className="text-xs text-[var(--muted-foreground)]">
                   = {(protocol.vialAmount / protocol.diluentVolume).toFixed(2)} {protocol.vialUnit}/mL
                 </div>
               </div>
             </div>
           )}
           {protocol.notes && (
-            <div className="pt-2 border-t border-slate-100">
-              <div className="text-sm text-slate-500 mb-1">Notes</div>
+            <div className="pt-2 border-t border-[var(--border)]">
+              <div className="text-sm text-[var(--muted-foreground)] mb-1">Notes</div>
               <div className="text-sm">{protocol.notes}</div>
             </div>
           )}
@@ -805,7 +805,7 @@ export default function ProtocolDetailPage({
         onClose={() => setShowDeleteModal(false)}
         title="Delete Protocol"
       >
-        <p className="text-slate-600 mb-4">
+        <p className="text-[var(--muted-foreground)] mb-4">
           Are you sure you want to delete this protocol? This action cannot be undone.
         </p>
         <div className="flex gap-3">
