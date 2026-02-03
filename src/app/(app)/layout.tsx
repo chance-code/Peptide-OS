@@ -96,7 +96,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="h-dvh flex flex-col bg-[var(--background)]">
       <TopHeader />
-      <main className="flex-1 pb-16 max-w-lg mx-auto w-full overflow-auto animate-page-in">{children}</main>
+      <main className="flex-1 pb-[calc(4rem+env(safe-area-inset-bottom))] max-w-lg mx-auto w-full overflow-auto animate-page-in">{children}</main>
       <BottomNav />
     </div>
   )

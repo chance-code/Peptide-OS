@@ -563,7 +563,7 @@ export default function HealthDashboardNew() {
     const appleHealthIntegration = integrations?.find((i: Integration) => i.provider === 'apple_health')
 
     return (
-      <div className="min-h-screen bg-[var(--background)] p-4 pt-[env(safe-area-inset-top)]">
+      <div className="min-h-full bg-[var(--background)] p-4">
         <div className="max-w-lg mx-auto pt-8">
           <div className="text-center mb-8">
             <Activity className="w-12 h-12 text-[var(--muted-foreground)] mx-auto mb-4" />
@@ -634,9 +634,9 @@ export default function HealthDashboardNew() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--background)] pb-24">
+    <div className="min-h-full bg-[var(--background)] pb-4">
       {/* Header */}
-      <div className="sticky top-0 z-10 glass border-b border-[var(--border)] pt-[env(safe-area-inset-top)]">
+      <div className="sticky top-0 z-10 glass border-b border-[var(--border)]">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
           <h1 className="text-lg font-semibold text-[var(--foreground)]">Health</h1>
           <div className="flex items-center gap-2">
@@ -726,7 +726,10 @@ export default function HealthDashboardNew() {
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setSelectedSection(tab.id as typeof selectedSection)}
+              onClick={() => {
+                setSelectedSection(tab.id as typeof selectedSection)
+                document.querySelector('main')?.scrollTo(0, 0)
+              }}
               className={cn(
                 'px-4 py-1.5 rounded-full text-sm font-medium transition-colors',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/50',
