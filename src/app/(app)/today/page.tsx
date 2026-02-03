@@ -509,7 +509,7 @@ export default function TodayPage() {
                                   <button
                                     type="button"
                                     onClick={() => handleStatusChange(item, 'pending')}
-                                    className="px-3 py-1.5 rounded-lg bg-[var(--muted)] hover:bg-[var(--border)] text-[var(--muted-foreground)] text-sm font-medium transition-colors active:scale-95"
+                                    className="px-3 py-2.5 rounded-lg bg-[var(--muted)] hover:bg-[var(--border)] text-[var(--muted-foreground)] text-sm font-medium transition-colors active:scale-95"
                                   >
                                     Skipped
                                   </button>

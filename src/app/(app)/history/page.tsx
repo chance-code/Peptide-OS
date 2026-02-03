@@ -70,7 +70,7 @@ export default function HistoryPage() {
 
   return (
     <div className="p-4 pb-20">
-      <h2 className="text-xl font-semibold text-slate-900 mb-4">History</h2>
+      <h2 className="text-xl font-semibold text-[var(--foreground)] mb-4">History</h2>
 
       {/* Date Range Selector */}
       <div className="flex gap-2 mb-4">
@@ -81,8 +81,8 @@ export default function HistoryPage() {
             className={cn(
               'px-4 py-2.5 rounded-full text-sm font-medium transition-colors',
               dateRange === range
-                ? 'bg-slate-900 text-white'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                ? 'bg-[var(--foreground)] text-[var(--background)]'
+                : 'bg-[var(--muted)] text-[var(--muted-foreground)] hover:bg-[var(--border)]'
             )}
           >
             {range} days
@@ -96,27 +96,27 @@ export default function HistoryPage() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-green-600" />
-                <span className="font-medium text-slate-900">Adherence Rate</span>
+                <TrendingUp className="w-5 h-5 text-emerald-500" />
+                <span className="font-medium text-[var(--foreground)]">Adherence Rate</span>
               </div>
-              <span className="text-2xl font-bold text-green-600">{adherenceRate}%</span>
+              <span className="text-2xl font-bold text-emerald-500">{adherenceRate}%</span>
             </div>
             <div className="grid grid-cols-4 gap-2 text-center">
               <div>
-                <div className="text-lg font-semibold text-slate-900">{stats.total}</div>
-                <div className="text-xs text-slate-500">Total</div>
+                <div className="text-lg font-semibold text-[var(--foreground)]">{stats.total}</div>
+                <div className="text-xs text-[var(--muted-foreground)]">Total</div>
               </div>
               <div>
-                <div className="text-lg font-semibold text-green-600">{stats.completed}</div>
-                <div className="text-xs text-slate-500">Done</div>
+                <div className="text-lg font-semibold text-emerald-500">{stats.completed}</div>
+                <div className="text-xs text-[var(--muted-foreground)]">Done</div>
               </div>
               <div>
-                <div className="text-lg font-semibold text-slate-400">{stats.skipped}</div>
-                <div className="text-xs text-slate-500">Skipped</div>
+                <div className="text-lg font-semibold text-[var(--muted-foreground)]">{stats.skipped}</div>
+                <div className="text-xs text-[var(--muted-foreground)]">Skipped</div>
               </div>
               <div>
                 <div className="text-lg font-semibold text-red-500">{stats.missed}</div>
-                <div className="text-xs text-slate-500">Missed</div>
+                <div className="text-xs text-[var(--muted-foreground)]">Missed</div>
               </div>
             </div>
           </CardContent>
@@ -125,7 +125,7 @@ export default function HistoryPage() {
 
       {/* History List */}
       {isLoading ? (
-        <div className="text-center py-8 text-slate-500">Loading...</div>
+        <div className="text-center py-8 text-[var(--muted-foreground)]">Loading...</div>
       ) : sortedDates.length > 0 ? (
         <div className="space-y-4">
           {sortedDates.map((date) => {
@@ -134,11 +134,11 @@ export default function HistoryPage() {
 
             return (
               <div key={date}>
-                <div className="text-sm font-medium text-slate-500 mb-2">
+                <div className="text-sm font-medium text-[var(--muted-foreground)] mb-2">
                   {isToday ? 'Today' : format(new Date(date), 'EEEE, MMMM d')}
                 </div>
                 <Card>
-                  <CardContent className="p-0 divide-y divide-slate-100">
+                  <CardContent className="p-0 divide-y divide-[var(--border)]">
                     {dayLogs.map((log) => (
                       <div key={log.id} className="p-3 flex items-center gap-3">
                         <div
@@ -154,7 +154,7 @@ export default function HistoryPage() {
                             <CheckCircle className="w-4 h-4 text-emerald-500" />
                           )}
                           {log.status === 'skipped' && (
-                            <MinusCircle className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+                            <MinusCircle className="w-4 h-4 text-[var(--muted-foreground)]" />
                           )}
                           {log.status === 'missed' && (
                             <XCircle className="w-4 h-4 text-red-500" />
@@ -164,10 +164,10 @@ export default function HistoryPage() {
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium text-slate-900">
+                          <div className="font-medium text-[var(--foreground)]">
                             {log.protocol.peptide.name}
                           </div>
-                          <div className="text-sm text-slate-500">
+                          <div className="text-sm text-[var(--muted-foreground)]">
                             {log.actualDose || log.protocol.doseAmount}{' '}
                             {log.actualUnit || log.protocol.doseUnit}
                           </div>
@@ -196,8 +196,8 @@ export default function HistoryPage() {
       ) : (
         <Card>
           <CardContent className="py-8 text-center">
-            <div className="text-slate-400 mb-2">No history</div>
-            <div className="text-sm text-slate-500">
+            <div className="text-[var(--muted-foreground)] mb-2">No history</div>
+            <div className="text-sm text-[var(--muted-foreground)]">
               Start tracking doses to see your history here
             </div>
           </CardContent>
