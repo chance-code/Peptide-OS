@@ -13,7 +13,6 @@ import {
   Activity,
   MoreHorizontal,
   Settings,
-  Calculator,
   X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -30,7 +29,7 @@ const primaryNavItems = [
 const hubItems = [
   { href: '/inventory', label: 'Inventory', icon: Package, description: 'Track your supplies' },
   { href: '/chat', label: 'Chat', icon: MessageCircle, description: 'AI assistant' },
-  { href: '/reconstitution', label: 'Calculator', icon: Calculator, description: 'Reconstitution helper' },
+  { href: '/library', label: 'Library', icon: BookOpen, description: 'Peptide reference guide' },
   { href: '/settings', label: 'Settings', icon: Settings, description: 'Preferences & account' },
 ]
 
