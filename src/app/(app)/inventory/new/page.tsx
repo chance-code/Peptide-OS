@@ -476,7 +476,7 @@ export default function NewInventoryPage() {
 
   return (
     <div className="p-4 pb-24">
-      <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-4">
+      <h2 className="text-xl font-semibold text-[var(--foreground)] mb-4">
         Add {itemType === 'peptide' ? 'Vial' : 'Supplement'}
       </h2>
 
@@ -565,7 +565,7 @@ export default function NewInventoryPage() {
             ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
             : scanResult.confidence === 'medium'
               ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
-              : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+              : 'bg-[var(--muted)] border-[var(--border)]'
           }
         `}>
           <div className="flex items-start gap-3">
@@ -879,9 +879,9 @@ export default function NewInventoryPage() {
               placeholder="e.g., 2"
             />
             {concentration && (
-              <div className="p-3 bg-slate-50 dark:bg-slate-700 rounded-lg">
-                <div className="text-sm text-slate-500 dark:text-slate-400">Concentration</div>
-                <div className="font-mono text-lg font-semibold text-slate-900 dark:text-white">
+              <div className="p-3 bg-[var(--muted)] rounded-lg">
+                <div className="text-sm text-[var(--muted-foreground)]">Concentration</div>
+                <div className="font-mono text-lg font-semibold text-[var(--foreground)]">
                   {concentration} {totalUnit}/ml
                 </div>
               </div>
@@ -915,7 +915,7 @@ export default function NewInventoryPage() {
               onChange={(e) => setExpirationDate(e.target.value)}
             />
             {itemType === 'peptide' && (
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+              <p className="text-xs text-[var(--muted-foreground)]">
                 Tip: Most reconstituted peptides expire 28 days after reconstitution when
                 refrigerated.
               </p>
@@ -932,7 +932,7 @@ export default function NewInventoryPage() {
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 dark:focus:ring-slate-400 min-h-[80px] placeholder:text-slate-400 dark:placeholder:text-slate-500"
+              className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)] min-h-[80px] placeholder:text-[var(--muted-foreground)]"
               placeholder="Storage location, supplier, etc."
             />
           </CardContent>

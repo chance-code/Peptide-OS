@@ -92,20 +92,20 @@ export function Paywall({ isOpen, onClose, onPurchaseSuccess }: PaywallProps) {
   if (!isNativePlatform()) {
     return (
       <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl max-w-md w-full p-6 relative">
+        <div className="bg-[var(--background)] rounded-2xl max-w-md w-full p-6 relative">
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"
+            className="absolute top-4 right-4 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
           >
             <X className="w-6 h-6" />
           </button>
 
           <div className="text-center py-8">
             <Sparkles className="w-12 h-12 text-amber-500 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-slate-900 mb-2">
+            <h2 className="text-xl font-bold text-[var(--foreground)] mb-2">
               Premium Available on iOS
             </h2>
-            <p className="text-slate-600">
+            <p className="text-[var(--muted-foreground)]">
               Download the Peptide OS app from the App Store to unlock premium features.
             </p>
           </div>
@@ -116,10 +116,10 @@ export function Paywall({ isOpen, onClose, onPurchaseSuccess }: PaywallProps) {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto relative">
+      <div className="bg-[var(--background)] rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto relative">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 z-10"
+          className="absolute top-4 right-4 text-[var(--muted-foreground)] hover:text-[var(--foreground)] z-10"
         >
           <X className="w-6 h-6" />
         </button>
@@ -136,7 +136,7 @@ export function Paywall({ isOpen, onClose, onPurchaseSuccess }: PaywallProps) {
         </div>
 
         {/* Features */}
-        <div className="p-6 border-b border-slate-100">
+        <div className="p-6 border-b border-[var(--border)]">
           <div className="space-y-3">
             {[
               'Unlimited protocols',
@@ -150,7 +150,7 @@ export function Paywall({ isOpen, onClose, onPurchaseSuccess }: PaywallProps) {
                 <div className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center">
                   <Check className="w-3 h-3 text-emerald-600" />
                 </div>
-                <span className="text-slate-700">{feature}</span>
+                <span className="text-[var(--foreground)]">{feature}</span>
               </div>
             ))}
           </div>
@@ -171,7 +171,7 @@ export function Paywall({ isOpen, onClose, onPurchaseSuccess }: PaywallProps) {
                   className={`w-full p-4 rounded-xl border-2 transition-all text-left relative ${
                     isSelected
                       ? 'border-emerald-500 bg-emerald-50'
-                      : 'border-slate-200 hover:border-slate-300'
+                      : 'border-[var(--border)] hover:border-[var(--muted-foreground)]'
                   }`}
                 >
                   {isAnnual && (
@@ -186,15 +186,15 @@ export function Paywall({ isOpen, onClose, onPurchaseSuccess }: PaywallProps) {
                   )}
                   <div className="flex justify-between items-center">
                     <div>
-                      <div className="font-semibold text-slate-900">
+                      <div className="font-semibold text-[var(--foreground)]">
                         {pkg.product.title}
                       </div>
-                      <div className="text-sm text-slate-500">
+                      <div className="text-sm text-[var(--muted-foreground)]">
                         {pkg.product.description}
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="font-bold text-slate-900">
+                      <div className="font-bold text-[var(--foreground)]">
                         {pkg.product.priceString}
                       </div>
                       {isAnnual && (
@@ -210,13 +210,13 @@ export function Paywall({ isOpen, onClose, onPurchaseSuccess }: PaywallProps) {
           ) : (
             // Fallback display when packages haven't loaded
             <div className="space-y-3">
-              <div className="p-4 rounded-xl border-2 border-slate-200">
+              <div className="p-4 rounded-xl border-2 border-[var(--border)]">
                 <div className="flex justify-between items-center">
                   <div>
-                    <div className="font-semibold text-slate-900">Monthly</div>
-                    <div className="text-sm text-slate-500">Billed monthly</div>
+                    <div className="font-semibold text-[var(--foreground)]">Monthly</div>
+                    <div className="text-sm text-[var(--muted-foreground)]">Billed monthly</div>
                   </div>
-                  <div className="font-bold text-slate-900">$6.99/mo</div>
+                  <div className="font-bold text-[var(--foreground)]">$6.99/mo</div>
                 </div>
               </div>
               <div className="p-4 rounded-xl border-2 border-emerald-500 bg-emerald-50 relative">
@@ -225,22 +225,22 @@ export function Paywall({ isOpen, onClose, onPurchaseSuccess }: PaywallProps) {
                 </span>
                 <div className="flex justify-between items-center">
                   <div>
-                    <div className="font-semibold text-slate-900">Annual</div>
-                    <div className="text-sm text-slate-500">Billed yearly</div>
+                    <div className="font-semibold text-[var(--foreground)]">Annual</div>
+                    <div className="text-sm text-[var(--muted-foreground)]">Billed yearly</div>
                   </div>
                   <div className="text-right">
-                    <div className="font-bold text-slate-900">$49.99/yr</div>
+                    <div className="font-bold text-[var(--foreground)]">$49.99/yr</div>
                     <div className="text-xs text-emerald-600">Save 40%</div>
                   </div>
                 </div>
               </div>
-              <div className="p-4 rounded-xl border-2 border-slate-200">
+              <div className="p-4 rounded-xl border-2 border-[var(--border)]">
                 <div className="flex justify-between items-center">
                   <div>
-                    <div className="font-semibold text-slate-900">Lifetime</div>
-                    <div className="text-sm text-slate-500">One-time purchase</div>
+                    <div className="font-semibold text-[var(--foreground)]">Lifetime</div>
+                    <div className="text-sm text-[var(--muted-foreground)]">One-time purchase</div>
                   </div>
-                  <div className="font-bold text-slate-900">$99.99</div>
+                  <div className="font-bold text-[var(--foreground)]">$99.99</div>
                 </div>
               </div>
             </div>
@@ -269,12 +269,12 @@ export function Paywall({ isOpen, onClose, onPurchaseSuccess }: PaywallProps) {
           <button
             onClick={handleRestore}
             disabled={isRestoring}
-            className="w-full text-slate-500 text-sm hover:text-slate-700"
+            className="w-full text-[var(--muted-foreground)] text-sm hover:text-[var(--foreground)]"
           >
             {isRestoring ? 'Restoring...' : 'Restore Purchases'}
           </button>
 
-          <div className="flex items-center justify-center gap-4 text-xs text-slate-400">
+          <div className="flex items-center justify-center gap-4 text-xs text-[var(--muted-foreground)]">
             <Shield className="w-4 h-4" />
             <span>Secured by Apple. Cancel anytime.</span>
           </div>
