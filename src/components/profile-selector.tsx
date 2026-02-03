@@ -77,18 +77,18 @@ export function ProfileSelector({ onSelect }: ProfileSelectorProps) {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
-        <div className="text-slate-500 dark:text-slate-400">Loading profiles...</div>
+      <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
+        <div className="text-[var(--muted-foreground)]">Loading profiles...</div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen bg-[var(--background)] flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Peptide OS</h1>
-          <p className="text-slate-500 dark:text-slate-400">
+          <h1 className="text-2xl font-bold text-[var(--foreground)] mb-2">Peptide OS</h1>
+          <p className="text-[var(--muted-foreground)]">
             {users.length > 0 ? 'Select your profile' : 'Create your first profile'}
           </p>
         </div>
@@ -99,15 +99,15 @@ export function ProfileSelector({ onSelect }: ProfileSelectorProps) {
               <button
                 key={user.id}
                 onClick={() => handleSelectUser(user)}
-                className="w-full flex items-center gap-3 p-4 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-sm transition-all text-left"
+                className="w-full flex items-center gap-3 p-4 bg-[var(--background)] rounded-xl border border-[var(--border)] hover:border-[var(--muted-foreground)] hover:shadow-sm transition-all text-left"
               >
-                <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
-                  <User className="w-5 h-5 text-slate-600 dark:text-slate-300" />
+                <div className="w-10 h-10 rounded-full bg-[var(--muted)] flex items-center justify-center">
+                  <User className="w-5 h-5 text-[var(--muted-foreground)]" />
                 </div>
                 <div className="flex-1">
-                  <div className="font-medium text-slate-900 dark:text-white">{user.name}</div>
+                  <div className="font-medium text-[var(--foreground)]">{user.name}</div>
                   {user.notes && (
-                    <div className="text-sm text-slate-500 dark:text-slate-400 truncate">{user.notes}</div>
+                    <div className="text-sm text-[var(--muted-foreground)] truncate">{user.notes}</div>
                   )}
                 </div>
                 {user.isActive && (

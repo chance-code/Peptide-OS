@@ -129,12 +129,12 @@ export function PullToRefresh({ onRefresh, children, className }: PullToRefreshP
       >
         <div
           className={cn(
-            'w-10 h-10 rounded-full bg-white dark:bg-slate-700 shadow-lg flex items-center justify-center',
+            'w-10 h-10 rounded-full bg-[var(--background)] shadow-lg flex items-center justify-center',
             isRefreshing && 'animate-spin'
           )}
         >
           <RefreshCw
-            className="w-5 h-5 text-slate-600 dark:text-slate-300"
+            className="w-5 h-5 text-[var(--muted-foreground)]"
             style={{
               transform: isRefreshing ? undefined : `rotate(${rotation}deg)`,
             }}

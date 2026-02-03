@@ -68,7 +68,7 @@ function getItemLabel(name: string, itemType?: string | null): { label: string; 
     if (benefit) {
       return { label: benefit, color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300' }
     }
-    return { label: 'Supplement', color: 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300' }
+    return { label: 'Supplement', color: 'bg-[var(--muted)] text-[var(--muted-foreground)]' }
   }
 
   // For peptides, look up in reference
@@ -247,7 +247,7 @@ export default function ProtocolsPage() {
       <div className="p-4 pb-20">
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Protocols</h2>
+          <h2 className="text-xl font-semibold text-[var(--foreground)]">Protocols</h2>
           <Link href="/protocols/new">
             <Button size="sm">
               <Plus className="w-4 h-4 mr-1" />
@@ -263,8 +263,8 @@ export default function ProtocolsPage() {
             onClick={() => setTypeFilter('all')}
             className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
               typeFilter === 'all'
-                ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
-                : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                ? 'bg-[var(--foreground)] text-[var(--background)]'
+                : 'bg-[var(--muted)] text-[var(--muted-foreground)] hover:bg-[var(--border)]'
             }`}
           >
             All
@@ -275,7 +275,7 @@ export default function ProtocolsPage() {
             className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
               typeFilter === 'peptide'
                 ? 'bg-[var(--accent)] text-white'
-                : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                : 'bg-[var(--muted)] text-[var(--muted-foreground)] hover:bg-[var(--border)]'
             }`}
           >
             <Syringe className="w-3.5 h-3.5" />
@@ -287,7 +287,7 @@ export default function ProtocolsPage() {
             className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
               typeFilter === 'supplement'
                 ? 'bg-[var(--success)] text-white'
-                : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                : 'bg-[var(--muted)] text-[var(--muted-foreground)] hover:bg-[var(--border)]'
             }`}
           >
             <Pill className="w-3.5 h-3.5" />
@@ -304,8 +304,8 @@ export default function ProtocolsPage() {
               className={cn(
                 'px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors',
                 filter === f
-                  ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
-                  : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                  ? 'bg-[var(--foreground)] text-[var(--background)]'
+                  : 'bg-[var(--muted)] text-[var(--muted-foreground)] hover:bg-[var(--border)]'
               )}
             >
               {f.charAt(0).toUpperCase() + f.slice(1)}
@@ -330,7 +330,7 @@ export default function ProtocolsPage() {
 
         {/* Protocols List */}
         {isLoading ? (
-          <div className="text-center py-8 text-slate-500 dark:text-slate-400">Loading...</div>
+          <div className="text-center py-8 text-[var(--muted-foreground)]">Loading...</div>
         ) : filteredProtocols.length > 0 ? (
           <div className="space-y-3">
             {filteredProtocols.map((protocol, index) => {
@@ -343,7 +343,7 @@ export default function ProtocolsPage() {
                       <div className="flex items-start justify-between mb-2">
                         <div>
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-medium text-slate-900 dark:text-white truncate max-w-[180px]">
+                            <span className="font-medium text-[var(--foreground)] truncate max-w-[180px]">
                               {protocol.peptide.name}
                             </span>
                             <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full', color)}>
@@ -355,13 +355,13 @@ export default function ProtocolsPage() {
                               </span>
                             )}
                           </div>
-                          <div className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+                          <div className="text-sm text-[var(--muted-foreground)] mt-0.5">
                             {protocol.servingSize
                               ? `${protocol.servingSize} ${protocol.servingUnit || 'serving'}${protocol.servingSize > 1 ? 's' : ''}`
                               : `${protocol.doseAmount} ${protocol.doseUnit}`}
                             {protocol.timing && ` • ${protocol.timing}`}
                           </div>
-                          <div className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+                          <div className="text-xs text-[var(--muted-foreground)] mt-0.5">
                             {formatDays(protocol) || (protocol.frequency === 'weekly' ? 'Weekly' : protocol.frequency)}
                           </div>
                         </div>
@@ -382,28 +382,28 @@ export default function ProtocolsPage() {
                               e.preventDefault()
                               handleToggleStatus(protocol)
                             }}
-                            className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700"
+                            className="p-1 rounded hover:bg-[var(--muted)]"
                           >
                             {protocol.status === 'active' ? (
-                              <Pause className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+                              <Pause className="w-4 h-4 text-[var(--muted-foreground)]" />
                             ) : (
-                              <Play className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+                              <Play className="w-4 h-4 text-[var(--muted-foreground)]" />
                             )}
                           </button>
                         </div>
                       </div>
 
                       {/* Progress */}
-                      <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400 mt-3">
+                      <div className="flex items-center gap-4 text-xs text-[var(--muted-foreground)] mt-3">
                         <span>Day {stats.daysCompleted}</span>
                         {stats.daysRemaining !== null && stats.totalWeeks !== null ? (
                           <>
-                            <span className="text-slate-300 dark:text-slate-600">•</span>
+                            <span className="text-[var(--border)]">•</span>
                             <span>{stats.daysRemaining} days left ({stats.totalWeeks} week cycle)</span>
                           </>
                         ) : (
                           <>
-                            <span className="text-slate-300 dark:text-slate-600">•</span>
+                            <span className="text-[var(--border)]">•</span>
                             <span className="flex items-center gap-1">
                               <Infinity className="w-3 h-3" />
                               Ongoing
@@ -414,7 +414,7 @@ export default function ProtocolsPage() {
 
                       {/* Progress Bar */}
                       {stats.progress !== null && (
-                        <div className="mt-2 h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                        <div className="mt-2 h-1.5 bg-[var(--muted)] rounded-full overflow-hidden">
                           <div
                             className="h-full bg-green-500 rounded-full transition-all"
                             style={{ width: `${stats.progress}%` }}
@@ -430,8 +430,8 @@ export default function ProtocolsPage() {
         ) : (
           <Card>
             <CardContent className="py-8 text-center">
-              <div className="text-slate-400 dark:text-slate-500 mb-2">No protocols found</div>
-              <div className="text-sm text-slate-500 dark:text-slate-400">
+              <div className="text-[var(--muted-foreground)] mb-2">No protocols found</div>
+              <div className="text-sm text-[var(--muted-foreground)]">
                 {filter !== 'all'
                   ? `No ${filter} protocols`
                   : 'Create your first protocol to get started'}
