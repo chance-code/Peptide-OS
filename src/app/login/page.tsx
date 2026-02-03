@@ -38,7 +38,12 @@ function LoginForm() {
   const callbackUrl = searchParams.get('callbackUrl') || '/today'
 
   const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
+  const [error, setError] = useState(() => {
+    const urlError = searchParams.get('error')
+    if (urlError === 'no_session') return 'Your session expired. Please sign in again.'
+    if (urlError) return urlError
+    return ''
+  })
   const [loading, setLoading] = useState(false)
   const [loadingProvider, setLoadingProvider] = useState<string | null>(null)
   const [isNative, setIsNative] = useState(false)

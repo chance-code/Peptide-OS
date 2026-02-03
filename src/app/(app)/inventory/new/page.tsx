@@ -475,7 +475,7 @@ export default function NewInventoryPage() {
   const filteredPeptides = peptides.filter(p => (p.type || 'peptide') === itemType)
 
   return (
-    <div className="p-4 pb-48">
+    <div className="p-4 pb-24">
       <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-4">
         Add {itemType === 'peptide' ? 'Vial' : 'Supplement'}
       </h2>
@@ -640,9 +640,9 @@ export default function NewInventoryPage() {
                   <button
                     type="button"
                     onClick={() => removeSupplementImage(index)}
-                    className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center"
+                    className="absolute -top-3 -right-3 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg"
                   >
-                    <X className="w-3 h-3" />
+                    <X className="w-4 h-4" />
                   </button>
                 </div>
               ))}

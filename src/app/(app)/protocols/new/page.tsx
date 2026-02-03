@@ -513,7 +513,7 @@ export default function NewProtocolPage() {
   const filteredPeptides = peptides.filter(p => (p.type || 'peptide') === itemType)
 
   return (
-    <div className="p-4 pb-48">
+    <div className="p-4 pb-24">
       <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-4">New Protocol</h2>
 
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -679,9 +679,9 @@ export default function NewProtocolPage() {
                       <button
                         type="button"
                         onClick={() => removeImage(index)}
-                        className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg"
+                        className="absolute -top-3 -right-3 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg"
                       >
-                        <X className="w-3 h-3" />
+                        <X className="w-4 h-4" />
                       </button>
                     </div>
                   ))}
