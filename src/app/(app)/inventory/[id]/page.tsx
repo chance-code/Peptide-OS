@@ -161,14 +161,14 @@ export default function EditInventoryPage({
   if (isLoading) {
     return (
       <div className="p-4">
-        <div className="text-center py-8 text-slate-500">Loading...</div>
+        <div className="text-center py-8 text-[var(--muted-foreground)]">Loading...</div>
       </div>
     )
   }
 
   return (
     <div className="p-4 pb-20 pt-[calc(1rem+env(safe-area-inset-top))]">
-      <h2 className="text-xl font-semibold text-slate-900 mb-4">Edit Vial</h2>
+      <h2 className="text-xl font-semibold text-[var(--foreground)] mb-4">Edit Vial</h2>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Peptide Selection */}
@@ -236,9 +236,9 @@ export default function EditInventoryPage({
               placeholder="e.g., 2"
             />
             {concentration && (
-              <div className="p-3 bg-slate-50 rounded-lg">
-                <div className="text-sm text-slate-500">Concentration</div>
-                <div className="font-mono text-lg font-semibold text-slate-900">
+              <div className="p-3 bg-[var(--muted)] rounded-lg">
+                <div className="text-sm text-[var(--muted-foreground)]">Concentration</div>
+                <div className="font-mono text-lg font-semibold text-[var(--foreground)]">
                   {concentration} {totalUnit}/ml
                 </div>
               </div>
@@ -284,9 +284,9 @@ export default function EditInventoryPage({
                 id="isExhausted"
                 checked={isExhausted}
                 onChange={(e) => setIsExhausted(e.target.checked)}
-                className="rounded border-slate-300"
+                className="rounded border-[var(--border)]"
               />
-              <label htmlFor="isExhausted" className="text-sm text-slate-700">
+              <label htmlFor="isExhausted" className="text-sm text-[var(--foreground)]">
                 Vial is exhausted (empty)
               </label>
             </div>
@@ -302,7 +302,7 @@ export default function EditInventoryPage({
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 min-h-[80px]"
+              className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] text-[var(--foreground)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)] min-h-[80px]"
               placeholder="Storage location, supplier, etc."
             />
           </CardContent>
@@ -342,7 +342,7 @@ export default function EditInventoryPage({
               </Button>
             ) : (
               <div className="space-y-3">
-                <p className="text-sm text-slate-600 text-center">
+                <p className="text-sm text-[var(--muted-foreground)] text-center">
                   Are you sure you want to delete this vial? This cannot be undone.
                 </p>
                 <div className="flex gap-3">

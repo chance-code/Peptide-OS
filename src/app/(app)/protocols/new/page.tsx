@@ -689,7 +689,7 @@ export default function NewProtocolPage() {
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="w-20 h-20 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-lg flex items-center justify-center text-slate-400 hover:border-slate-400 dark:hover:border-slate-500 transition-colors"
+                      className="w-20 h-20 border-2 border-dashed border-[var(--border)] rounded-lg flex items-center justify-center text-[var(--muted-foreground)] hover:border-[var(--muted-foreground)] transition-colors"
                     >
                       <Plus className="w-6 h-6" />
                     </button>
@@ -1107,9 +1107,9 @@ export default function NewProtocolPage() {
                 id="indefinite"
                 checked={indefinite}
                 onChange={(e) => setIndefinite(e.target.checked)}
-                className="rounded border-slate-300 dark:border-slate-600 dark:bg-slate-800"
+                className="rounded border-[var(--border)]"
               />
-              <label htmlFor="indefinite" className="text-sm text-slate-700 dark:text-slate-300">
+              <label htmlFor="indefinite" className="text-sm text-[var(--foreground)]">
                 Run indefinitely (no end date)
               </label>
             </div>
