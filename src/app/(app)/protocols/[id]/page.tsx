@@ -315,7 +315,7 @@ export default function ProtocolDetailPage({
   // Edit mode UI
   if (isEditing) {
     return (
-      <div className="p-4 pb-20">
+      <div className="p-4 pb-20 pt-[calc(1rem+env(safe-area-inset-top))]">
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold text-slate-900">Edit Protocol</h2>
@@ -550,7 +550,7 @@ export default function ProtocolDetailPage({
 
   // Normal view mode
   return (
-    <div className="p-4 pb-20">
+    <div className="p-4 pb-20 pt-[calc(1rem+env(safe-area-inset-top))]">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <Button
@@ -577,7 +577,7 @@ export default function ProtocolDetailPage({
       {/* Title */}
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-1">
-          <h1 className="text-2xl font-bold text-slate-900">
+          <h1 className="text-2xl font-bold text-slate-900 truncate max-w-[240px]">
             {protocol.peptide.name}
           </h1>
           <Badge

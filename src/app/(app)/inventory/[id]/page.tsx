@@ -167,7 +167,7 @@ export default function EditInventoryPage({
   }
 
   return (
-    <div className="p-4 pb-20">
+    <div className="p-4 pb-20 pt-[calc(1rem+env(safe-area-inset-top))]">
       <h2 className="text-xl font-semibold text-slate-900 mb-4">Edit Vial</h2>
 
       <form onSubmit={handleSubmit} className="space-y-4">

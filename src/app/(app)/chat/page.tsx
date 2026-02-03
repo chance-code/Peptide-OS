@@ -341,7 +341,7 @@ export default function ChatPage() {
       </div>
 
       {/* Input - z-60 to sit above bottom nav (z-50) */}
-      <div className="border-t border-[var(--border)] bg-[var(--card)] p-3 pb-20 relative z-[60]">
+      <div className="border-t border-[var(--border)] bg-[var(--card)] p-3 pb-[calc(5rem+env(safe-area-inset-bottom))] relative z-[60]">
         <form onSubmit={handleSubmit} className="flex gap-2 items-end max-w-lg mx-auto">
           <div className="flex-1">
             <textarea
