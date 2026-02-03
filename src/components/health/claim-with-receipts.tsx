@@ -381,7 +381,7 @@ export function InsightThemeCard({ theme, onClaimClick, className }: InsightThem
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <h3 className="text-base font-medium text-[var(--foreground)]">
+              <h3 className="text-base font-medium text-[var(--foreground)] truncate">
                 {theme.title}
               </h3>
               <span className="text-xs text-[var(--muted-foreground)]">

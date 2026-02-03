@@ -304,8 +304,8 @@ export default function HealthDashboardNew() {
     setShowWhyModal(true)
   }, [])
 
-  // Process health data (real or demo)
-  const processedData = useMemo(() => {
+  // ── Data source selection ──
+  const dataSource = useMemo(() => {
     let metrics: SeedMetric[]
     let interventions: typeof SEED_INTERVENTIONS
     let contextEvents: typeof SEED_CONTEXT_EVENTS
@@ -330,10 +330,6 @@ export default function HealthDashboardNew() {
       return null
     }
 
-    const today = format(new Date(), 'yyyy-MM-dd')
-    const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd')
-
-    // Group metrics by type
     const metricsByType = new Map<string, SeedMetric[]>()
     for (const m of metrics) {
       if (!metricsByType.has(m.metricType)) {
@@ -342,26 +338,46 @@ export default function HealthDashboardNew() {
       metricsByType.get(m.metricType)!.push(m)
     }
 
-    // Compute baselines
-    const baselines = new Map<string, MetricBaseline>()
-    for (const [metricType, values] of metricsByType) {
+    const availableMetrics = new Set(metricsByType.keys())
+
+    return { metrics, interventions, contextEvents, metricsByType, availableMetrics }
+  }, [useDemoData, realMetrics, realProtocols])
+
+  // ── Baselines ──
+  const baselines = useMemo(() => {
+    if (!dataSource) return null
+    const map = new Map<string, MetricBaseline>()
+    for (const [metricType, values] of dataSource.metricsByType) {
       const baseline = computeBaseline(
         values.map(v => ({ date: v.date, value: v.value })),
         28
       )
       if (baseline) {
         baseline.metricType = metricType
-        baselines.set(metricType, baseline)
+        map.set(metricType, baseline)
       }
     }
+    return map
+  }, [dataSource])
 
-    // ── NEW: Compute trajectory ──
-    const trajectory = computeTrajectory(metrics, baselines)
+  // ── Trajectory + body composition ──
+  const trajectory = useMemo(() => {
+    if (!dataSource || !baselines) return null
+    return computeTrajectory(dataSource.metrics, baselines)
+  }, [dataSource, baselines])
 
-    // ── NEW: Compute body composition state ──
-    const bodyCompState = computeBodyCompState(metrics)
+  const bodyCompState = useMemo(() => {
+    if (!dataSource) return null
+    return computeBodyCompState(dataSource.metrics)
+  }, [dataSource])
 
-    // ── NEW: Classify signals for today's deltas ──
+  // ── Today's deltas (signal classification) ──
+  const todayDeltas = useMemo(() => {
+    if (!dataSource || !baselines) return []
+
+    const today = format(new Date(), 'yyyy-MM-dd')
+    const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd')
+
     const keyMetrics = [
       'hrv', 'deep_sleep', 'sleep_efficiency', 'rhr', 'waso', 'sleep_score',
       'weight', 'body_fat_percentage', 'lean_body_mass', 'muscle_mass',
@@ -369,14 +385,14 @@ export default function HealthDashboardNew() {
       'respiratory_rate', 'blood_oxygen',
     ]
 
-    const todayDeltas: DeltaItem[] = []
+    const deltas: DeltaItem[] = []
 
     for (const metricType of keyMetrics) {
       const baseline = baselines.get(metricType)
       if (!baseline) continue
 
-      const todayValue = metrics.find(m => m.date === today && m.metricType === metricType)
-      const yesterdayValue = metrics.find(m => m.date === yesterday && m.metricType === metricType)
+      const todayValue = dataSource.metrics.find(m => m.date === today && m.metricType === metricType)
+      const yesterdayValue = dataSource.metrics.find(m => m.date === yesterday && m.metricType === metricType)
       const currentValue = todayValue || yesterdayValue
       if (!currentValue) continue
 
@@ -385,8 +401,7 @@ export default function HealthDashboardNew() {
 
       if (delta.significance === 'none') continue
 
-      // Classify signal
-      const recentValues = metrics
+      const recentValues = dataSource.metrics
         .filter(m => m.metricType === metricType)
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
         .slice(0, 7)
@@ -397,7 +412,7 @@ export default function HealthDashboardNew() {
       const isGood = (polarity === 'higher_better' && delta.direction === 'above') ||
                      (polarity === 'lower_better' && delta.direction === 'below')
 
-      todayDeltas.push({
+      deltas.push({
         id: metricType,
         metric: getMetricDisplayName(metricType),
         metricType,
@@ -411,45 +426,31 @@ export default function HealthDashboardNew() {
       })
     }
 
-    todayDeltas.sort((a, b) => Math.abs(b.zScore || 0) - Math.abs(a.zScore || 0))
+    deltas.sort((a, b) => Math.abs(b.zScore || 0) - Math.abs(a.zScore || 0))
+    return deltas
+  }, [dataSource, baselines])
 
-    // Generate claims
+  // ── Claims, themes, recommendation ──
+  const claimsData = useMemo(() => {
+    if (!dataSource || !baselines) return null
+
     const allClaims = generateClaims({
-      metrics,
-      interventions,
-      contextEvents,
+      metrics: dataSource.metrics,
+      interventions: dataSource.interventions,
+      contextEvents: dataSource.contextEvents,
       baselines
     })
 
-    const availableMetrics = new Set(metricsByType.keys())
     const claims = allClaims.filter(c => {
       if (!c.metricType) return true
       if (c.id.startsWith('availability_')) return true
-      return availableMetrics.has(c.metricType)
+      return dataSource.availableMetrics.has(c.metricType)
     })
 
     const availabilityClaims = claims.filter(c => c.id.startsWith('availability_'))
     const insightClaims = claims.filter(c => !c.id.startsWith('availability_'))
-
-    // ── NEW: Group claims into themes ──
     const themes = groupClaimsIntoThemes(insightClaims)
 
-    // ── NEW: Compute protocol evidence ──
-    const protocolEvidence = computeProtocolEvidence(interventions, metrics, contextEvents, baselines)
-
-    // Data status
-    const dataStatus = {
-      sleep: { tracked: 0, total: 3, metrics: ['sleep_duration', 'rem_sleep', 'hrv'] },
-      body: { tracked: 0, total: 5, metrics: ['weight', 'body_fat_percentage', 'lean_body_mass', 'muscle_mass', 'bmi'] },
-      activity: { tracked: 0, total: 4, metrics: ['steps', 'active_calories', 'exercise_minutes', 'walking_running_distance'] },
-      vitals: { tracked: 0, total: 3, metrics: ['rhr', 'respiratory_rate', 'blood_oxygen'] },
-      fitness: { tracked: 0, total: 1, metrics: ['vo2_max'] },
-    }
-    for (const [, info] of Object.entries(dataStatus)) {
-      info.tracked = info.metrics.filter(m => availableMetrics.has(m)).length
-    }
-
-    // Top recommendation from claims
     const actionableClaim = insightClaims
       .filter(c => c.type === 'warning' || c.priority === 'high')
       .sort((a, b) => {
@@ -457,7 +458,7 @@ export default function HealthDashboardNew() {
         return (priorityOrder[a.priority] || 2) - (priorityOrder[b.priority] || 2)
       })[0]
 
-    const topRecommendation = actionableClaim
+    const recommendation = actionableClaim
       ? {
           action: actionableClaim.actionable || actionableClaim.headline,
           reason: actionableClaim.evidence || 'Based on your recent health data trends.',
@@ -465,20 +466,48 @@ export default function HealthDashboardNew() {
         }
       : null
 
+    return { insightClaims, availabilityClaims, themes, recommendation }
+  }, [dataSource, baselines])
+
+  // ── Protocol evidence ──
+  const protocolEvidence = useMemo(() => {
+    if (!dataSource || !baselines) return []
+    return computeProtocolEvidence(dataSource.interventions, dataSource.metrics, dataSource.contextEvents, baselines)
+  }, [dataSource, baselines])
+
+  // ── Data status ──
+  const dataStatus = useMemo(() => {
+    if (!dataSource) return null
+    const status = {
+      sleep: { tracked: 0, total: 3, metrics: ['sleep_duration', 'rem_sleep', 'hrv'] },
+      body: { tracked: 0, total: 5, metrics: ['weight', 'body_fat_percentage', 'lean_body_mass', 'muscle_mass', 'bmi'] },
+      activity: { tracked: 0, total: 4, metrics: ['steps', 'active_calories', 'exercise_minutes', 'walking_running_distance'] },
+      vitals: { tracked: 0, total: 3, metrics: ['rhr', 'respiratory_rate', 'blood_oxygen'] },
+      fitness: { tracked: 0, total: 1, metrics: ['vo2_max'] },
+    }
+    for (const [, info] of Object.entries(status)) {
+      info.tracked = info.metrics.filter(m => dataSource.availableMetrics.has(m)).length
+    }
+    return status
+  }, [dataSource])
+
+  // ── Assembled processedData ──
+  const processedData = useMemo(() => {
+    if (!dataSource || !baselines || !trajectory || !bodyCompState || !dataStatus) return null
     return {
       trajectory,
       bodyCompState,
       deltas: todayDeltas,
-      claims: insightClaims,
-      availabilityClaims,
-      themes,
+      claims: claimsData?.insightClaims ?? [],
+      availabilityClaims: claimsData?.availabilityClaims ?? [],
+      themes: claimsData?.themes ?? [],
       protocolEvidence,
       dataStatus,
-      recommendation: topRecommendation,
+      recommendation: claimsData?.recommendation ?? null,
       baselines,
-      interventions,
+      interventions: dataSource.interventions,
     }
-  }, [useDemoData, realMetrics, realProtocols])
+  }, [dataSource, baselines, trajectory, bodyCompState, todayDeltas, claimsData, protocolEvidence, dataStatus])
 
   // Loading state: queries still in flight and user has connected integrations
   if (!processedData && isLoadingMetrics && hasConnectedIntegrations) {
@@ -651,10 +680,12 @@ export default function HealthDashboardNew() {
                         : "bg-[var(--success-muted)] text-[var(--success)]"
                     )}
                   >
-                    {syncState
-                      ? `${freshCount}/${totalMetrics} fresh`
-                      : hoursAgo < 1 ? 'Just synced' : isStale ? `Stale (${hoursAgo}h)` : `Synced ${hoursAgo}h ago`
-                    }
+                    <span className="truncate max-w-[120px] inline-block align-middle">
+                      {syncState
+                        ? `${freshCount}/${totalMetrics} fresh`
+                        : hoursAgo < 1 ? 'Just synced' : isStale ? `Stale (${hoursAgo}h)` : `Synced ${hoursAgo}h ago`
+                      }
+                    </span>
                   </button>
                 )
               }
