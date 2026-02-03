@@ -16,6 +16,7 @@ export function PullToRefresh({ onRefresh, children, className }: PullToRefreshP
   const containerRef = useRef<HTMLDivElement>(null)
   const startY = useRef(0)
   const isPulling = useRef(false)
+  const pullDistanceRef = useRef(0)
 
   const THRESHOLD = 80
   const MAX_PULL = 120
@@ -25,7 +26,7 @@ export function PullToRefresh({ onRefresh, children, className }: PullToRefreshP
     if (!container || isRefreshing) return
 
     // Only allow pull-to-refresh when scrolled to top
-    if (container.scrollTop === 0) {
+    if (container.scrollTop <= 0) {
       startY.current = e.touches[0].clientY
       isPulling.current = true
     }
@@ -41,6 +42,7 @@ export function PullToRefresh({ onRefresh, children, className }: PullToRefreshP
       // Apply resistance as we pull further
       const resistance = 0.5
       const adjustedDiff = Math.min(diff * resistance, MAX_PULL)
+      pullDistanceRef.current = adjustedDiff
       setPullDistance(adjustedDiff)
     }
   }, [isRefreshing])
@@ -49,7 +51,12 @@ export function PullToRefresh({ onRefresh, children, className }: PullToRefreshP
     if (!isPulling.current) return
     isPulling.current = false
 
-    if (pullDistance >= THRESHOLD && !isRefreshing) {
+    // Use ref to avoid stale closure — React 18 batching means
+    // state from the last touchmove may not have rendered yet
+    const currentPull = pullDistanceRef.current
+    pullDistanceRef.current = 0
+
+    if (currentPull >= THRESHOLD && !isRefreshing) {
       setIsRefreshing(true)
       setPullDistance(60) // Hold at refresh position
 
@@ -62,7 +69,16 @@ export function PullToRefresh({ onRefresh, children, className }: PullToRefreshP
     } else {
       setPullDistance(0)
     }
-  }, [pullDistance, isRefreshing, onRefresh])
+  }, [isRefreshing, onRefresh])
+
+  // Reset on touch cancel (iOS fires this during native scroll bounce)
+  const handleTouchCancel = useCallback(() => {
+    isPulling.current = false
+    pullDistanceRef.current = 0
+    if (!isRefreshing) {
+      setPullDistance(0)
+    }
+  }, [isRefreshing])
 
   const progress = Math.min(pullDistance / THRESHOLD, 1)
   const rotation = progress * 180
@@ -70,10 +86,11 @@ export function PullToRefresh({ onRefresh, children, className }: PullToRefreshP
   return (
     <div
       ref={containerRef}
-      className={cn('relative h-full overflow-auto', className)}
+      className={cn('relative h-full overflow-auto overscroll-none', className)}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchCancel}
     >
       {/* Pull indicator */}
       <div
