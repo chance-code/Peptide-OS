@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Search, ChevronDown, ChevronUp, Pill, Sparkles, Scale, Heart, Zap, Beaker, BookOpen, FlaskConical, ArrowRight, Clock, AlertTriangle, Target, RefreshCw } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { Search, ChevronDown, ChevronUp, Pill, Sparkles, Scale, Heart, Zap, Beaker, BookOpen, FlaskConical, ArrowRight, Clock, AlertTriangle, Target, RefreshCw, Activity } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -9,7 +10,86 @@ import { cn } from '@/lib/utils'
 import { PEPTIDE_REFERENCE, type PeptideReference, type CycleGuidance } from '@/lib/peptide-reference'
 import { SUPPLEMENT_REFERENCE, type SupplementReference } from '@/lib/supplement-reference'
 import { calculateReconstitution, mlToUnits } from '@/lib/reconstitution'
+import { useAppStore } from '@/store'
 import type { DoseUnit, ReconstitutionResult } from '@/types'
+
+// Lightweight type for protocol data from API
+interface UserProtocol {
+  id: string
+  startDate: string
+  endDate: string | null
+  status: string
+  doseAmount: number
+  doseUnit: string
+  frequency: string
+  peptide: {
+    id: string
+    name: string
+    type: string
+  }
+}
+
+// Cycle phase calculation
+interface CyclePhase {
+  phase: 'mid-cycle' | 'end-of-cycle' | 'past-end' | 'ongoing'
+  daysIn: number
+  daysTotal: number | null
+  progress: number | null
+  message: string
+}
+
+function getCyclePhase(startDate: string, endDate: string | null): CyclePhase {
+  const start = new Date(startDate)
+  const today = new Date()
+  const daysIn = Math.max(0, Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)))
+
+  if (!endDate) {
+    const weeks = Math.floor(daysIn / 7)
+    return {
+      phase: 'ongoing',
+      daysIn,
+      daysTotal: null,
+      progress: null,
+      message: weeks > 0
+        ? `Running for ${weeks} week${weeks !== 1 ? 's' : ''} — reassess periodically`
+        : 'Just started — stay consistent',
+    }
+  }
+
+  const end = new Date(endDate)
+  const daysTotal = Math.max(1, Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)))
+  const progress = Math.min(daysIn / daysTotal, 1)
+
+  if (daysIn > daysTotal) {
+    const pastDays = daysIn - daysTotal
+    return {
+      phase: 'past-end',
+      daysIn,
+      daysTotal,
+      progress: 1,
+      message: `${pastDays} day${pastDays !== 1 ? 's' : ''} past planned end — time to reassess`,
+    }
+  }
+
+  if (progress >= 0.7) {
+    const daysLeft = daysTotal - daysIn
+    return {
+      phase: 'end-of-cycle',
+      daysIn,
+      daysTotal,
+      progress,
+      message: `${daysLeft} day${daysLeft !== 1 ? 's' : ''} remaining — begin reassessment planning`,
+    }
+  }
+
+  return {
+    phase: 'mid-cycle',
+    daysIn,
+    daysTotal,
+    progress,
+    message: 'Monitor and stay consistent',
+  }
+}
 
 const CATEGORY_INFO: Record<string, { label: string; icon: typeof Pill; color: string }> = {
   healing: { label: 'Healing', icon: Heart, color: 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300' },
@@ -50,6 +130,57 @@ function formatCycleSummary(g: CycleGuidance): string {
   }
 
   return parts.join(' · ')
+}
+
+function ProtocolContext({ protocol }: { protocol: UserProtocol }) {
+  const phase = getCyclePhase(protocol.startDate, protocol.endDate)
+
+  const phaseColors: Record<CyclePhase['phase'], string> = {
+    'mid-cycle': 'text-blue-400',
+    'end-of-cycle': 'text-amber-400',
+    'past-end': 'text-red-400',
+    'ongoing': 'text-emerald-400',
+  }
+
+  const phaseLabels: Record<CyclePhase['phase'], string> = {
+    'mid-cycle': 'Mid-cycle',
+    'end-of-cycle': 'End of cycle',
+    'past-end': 'Past end date',
+    'ongoing': 'Ongoing',
+  }
+
+  const barColor = phase.phase === 'past-end' ? 'bg-red-400'
+    : phase.phase === 'end-of-cycle' ? 'bg-amber-400'
+    : 'bg-[var(--accent)]'
+
+  return (
+    <div className="mt-2 mb-3 p-3 rounded-xl bg-blue-500/5 border border-blue-500/15">
+      <div className="flex items-center gap-1.5 mb-2">
+        <Activity className="w-3.5 h-3.5 text-blue-400" />
+        <span className="text-xs font-semibold text-[var(--foreground)] uppercase tracking-wide">Your Protocol</span>
+      </div>
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
+        <span className="font-medium text-[var(--foreground)]">
+          Day {phase.daysIn}{phase.daysTotal ? ` of ${phase.daysTotal}` : ''}
+        </span>
+        <span className={cn('text-xs font-medium', phaseColors[phase.phase])}>
+          {phaseLabels[phase.phase]}
+        </span>
+        <span className="text-xs text-[var(--muted-foreground)]">
+          {protocol.doseAmount} {protocol.doseUnit} · {protocol.frequency}
+        </span>
+      </div>
+      {phase.progress !== null && (
+        <div className="mt-2 h-1.5 rounded-full bg-[var(--muted)] overflow-hidden">
+          <div
+            className={cn('h-full rounded-full transition-all', barColor)}
+            style={{ width: `${Math.min(Math.round(phase.progress * 100), 100)}%` }}
+          />
+        </div>
+      )}
+      <p className="text-xs text-[var(--muted-foreground)] mt-2">{phase.message}</p>
+    </div>
+  )
 }
 
 function GuidanceContent({ guidance }: { guidance: CycleGuidance }) {
@@ -158,7 +289,7 @@ function GuidanceContent({ guidance }: { guidance: CycleGuidance }) {
   )
 }
 
-function PeptideCard({ peptide }: { peptide: PeptideReference }) {
+function PeptideCard({ peptide, protocol }: { peptide: PeptideReference; protocol?: UserProtocol }) {
   const [isExpanded, setIsExpanded] = useState(false)
   const categoryInfo = CATEGORY_INFO[peptide.category] || CATEGORY_INFO.other
   const CategoryIcon = categoryInfo.icon
@@ -173,12 +304,18 @@ function PeptideCard({ peptide }: { peptide: PeptideReference }) {
         <CardContent className="p-4">
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
                 <span className="font-semibold text-[var(--foreground)]">{peptide.name}</span>
                 <Badge className={cn('text-xs', categoryInfo.color)}>
                   <CategoryIcon className="w-3 h-3 mr-1" />
                   {categoryInfo.label}
                 </Badge>
+                {protocol && (
+                  <Badge className="text-xs bg-blue-500/10 border border-blue-500/20 text-blue-400">
+                    <Activity className="w-3 h-3 mr-1" />
+                    Active
+                  </Badge>
+                )}
               </div>
               {peptide.description && !isExpanded && (
                 <p className="text-sm text-[var(--muted-foreground)] line-clamp-1">{peptide.description}</p>
@@ -204,6 +341,9 @@ function PeptideCard({ peptide }: { peptide: PeptideReference }) {
               {peptide.description}
             </p>
           )}
+
+          {/* User protocol context — shown first when running */}
+          {protocol && <ProtocolContext protocol={protocol} />}
 
           {/* Guidance sections (cycle, outcomes, timeline, stop signals) */}
           {peptide.guidance && <GuidanceContent guidance={peptide.guidance} />}
@@ -243,26 +383,33 @@ function PeptideCard({ peptide }: { peptide: PeptideReference }) {
   )
 }
 
-function SupplementCard({ supplement }: { supplement: SupplementReference }) {
+function SupplementCard({ supplement, protocol }: { supplement: SupplementReference; protocol?: UserProtocol }) {
   const [isExpanded, setIsExpanded] = useState(false)
   const hasGuidance = !!supplement.guidance
+  const isExpandable = hasGuidance || !!protocol
 
   return (
-    <Card className="overflow-hidden" interactive={hasGuidance}>
+    <Card className="overflow-hidden" interactive={isExpandable}>
       <button
         type="button"
-        className={cn('w-full text-left', hasGuidance ? 'cursor-pointer' : 'cursor-default')}
-        onClick={() => hasGuidance && setIsExpanded(!isExpanded)}
+        className={cn('w-full text-left', isExpandable ? 'cursor-pointer' : 'cursor-default')}
+        onClick={() => isExpandable && setIsExpanded(!isExpanded)}
       >
         <CardContent className="p-4">
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
                 <span className="font-semibold text-[var(--foreground)]">{supplement.name}</span>
                 <Badge className="text-xs bg-teal-100 text-teal-800 dark:bg-teal-900/50 dark:text-teal-300">
                   <Pill className="w-3 h-3 mr-1" />
                   {supplement.benefit}
                 </Badge>
+                {protocol && (
+                  <Badge className="text-xs bg-blue-500/10 border border-blue-500/20 text-blue-400">
+                    <Activity className="w-3 h-3 mr-1" />
+                    Active
+                  </Badge>
+                )}
               </div>
               {!isExpanded && supplement.guidance && (
                 <p className="text-xs text-[var(--muted-foreground)] mt-0.5">
@@ -270,7 +417,7 @@ function SupplementCard({ supplement }: { supplement: SupplementReference }) {
                 </p>
               )}
             </div>
-            {hasGuidance && (
+            {isExpandable && (
               <div className="ml-2 text-[var(--muted-foreground)]">
                 {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
               </div>
@@ -279,10 +426,14 @@ function SupplementCard({ supplement }: { supplement: SupplementReference }) {
         </CardContent>
       </button>
 
-      {isExpanded && supplement.guidance && (
+      {isExpanded && (
         <div className="px-4 pb-4 pt-0 border-t border-[var(--border)] bg-[var(--muted)]/50">
           <div className="pt-3">
-            <GuidanceContent guidance={supplement.guidance} />
+            {/* User protocol context */}
+            {protocol && <ProtocolContext protocol={protocol} />}
+
+            {/* Guidance sections */}
+            {supplement.guidance && <GuidanceContent guidance={supplement.guidance} />}
           </div>
           {supplement.aliases && supplement.aliases.length > 0 && (
             <div className="pt-1">
@@ -537,6 +688,28 @@ export default function LibraryPage() {
   const [activeTab, setActiveTab] = useState<LibraryTab>('reference')
   const [search, setSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+  const { currentUserId } = useAppStore()
+
+  // Fetch user's active protocols to connect Library to user data
+  const { data: userProtocols = [] } = useQuery<UserProtocol[]>({
+    queryKey: ['protocols', currentUserId, 'active'],
+    queryFn: async () => {
+      const res = await fetch(`/api/protocols?userId=${currentUserId}&status=active`)
+      if (!res.ok) return []
+      return res.json()
+    },
+    enabled: !!currentUserId,
+    staleTime: 1000 * 60 * 5,
+  })
+
+  // Build lookup: compound name (lowercase) → active protocol
+  const protocolsByName = useMemo(() => {
+    const map = new Map<string, UserProtocol>()
+    for (const p of userProtocols) {
+      map.set(p.peptide.name.toLowerCase(), p)
+    }
+    return map
+  }, [userProtocols])
 
   const isSupplementsView = selectedCategory === 'supplements'
 
@@ -675,13 +848,19 @@ export default function LibraryPage() {
             {isSupplementsView ? (
               filteredSupplements.map((supplement, index) => (
                 <div key={supplement.name} className={cn('animate-card-in', `stagger-${Math.min(index + 1, 10)}`)}>
-                  <SupplementCard supplement={supplement} />
+                  <SupplementCard
+                    supplement={supplement}
+                    protocol={protocolsByName.get(supplement.name.toLowerCase())}
+                  />
                 </div>
               ))
             ) : (
               filteredPeptides.map((peptide, index) => (
                 <div key={peptide.name} className={cn('animate-card-in', `stagger-${Math.min(index + 1, 10)}`)}>
-                  <PeptideCard peptide={peptide} />
+                  <PeptideCard
+                    peptide={peptide}
+                    protocol={protocolsByName.get(peptide.name.toLowerCase())}
+                  />
                 </div>
               ))
             )}
