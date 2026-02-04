@@ -31,6 +31,12 @@ export type MetricType =
   | 'respiratory_rate'
   | 'blood_oxygen'
   | 'body_temperature'
+  // Oura readiness & recovery
+  | 'readiness_score'
+  | 'temperature_deviation'
+  | 'stress_high'
+  | 'recovery_high'
+  | 'resilience_level'
 
 export type MetricUnit =
   | 'minutes'
@@ -152,7 +158,7 @@ export function getProviderInfo(): ProviderInfo[] {
       name: 'oura',
       displayName: 'Oura Ring',
       description: 'Sync sleep scores, HRV, heart rate, and activity from your Oura Ring',
-      supportedMetrics: ['sleep_duration', 'sleep_score', 'hrv', 'rhr', 'steps'],
+      supportedMetrics: ['sleep_duration', 'sleep_score', 'hrv', 'rhr', 'steps', 'readiness_score', 'temperature_deviation', 'stress_high', 'recovery_high', 'resilience_level'],
       requiresOAuth: true,
       requiresCredentials: false,
       isNativeOnly: false,
@@ -200,7 +206,13 @@ export function normalizeMetricUnit(metricType: MetricType): MetricUnit {
     // Vitals
     respiratory_rate: 'breaths_min',
     blood_oxygen: 'percent',
-    body_temperature: 'celsius'
+    body_temperature: 'celsius',
+    // Oura readiness & recovery
+    readiness_score: 'score',
+    temperature_deviation: 'celsius',
+    stress_high: 'minutes',
+    recovery_high: 'minutes',
+    resilience_level: 'score'
   }
   return unitMap[metricType]
 }
@@ -248,6 +260,14 @@ export function formatMetricValue(value: number, metricType: MetricType): string
       return `${value.toFixed(2)} km`
     case 'respiratory_rate':
       return `${value.toFixed(1)} br/min`
+    case 'readiness_score':
+    case 'resilience_level':
+      return `${Math.round(value)}`
+    case 'temperature_deviation':
+      return `${value >= 0 ? '+' : ''}${value.toFixed(2)}°C`
+    case 'stress_high':
+    case 'recovery_high':
+      return `${Math.round(value)}m`
     default:
       return String(value)
   }
@@ -282,7 +302,13 @@ export function getMetricDisplayName(metricType: MetricType): string {
     // Vitals
     respiratory_rate: 'Respiratory Rate',
     blood_oxygen: 'Blood Oxygen',
-    body_temperature: 'Body Temp'
+    body_temperature: 'Body Temp',
+    // Oura readiness & recovery
+    readiness_score: 'Readiness Score',
+    temperature_deviation: 'Temp Deviation',
+    stress_high: 'High Stress',
+    recovery_high: 'Recovery Time',
+    resilience_level: 'Resilience'
   }
   return nameMap[metricType]
 }

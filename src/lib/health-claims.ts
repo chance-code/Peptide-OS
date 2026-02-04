@@ -435,7 +435,7 @@ function generateWarningClaims(
     const recentAvg = recent.reduce((s, m) => s + m.value, 0) / recent.length
     const priorAvg = prior.reduce((s, m) => s + m.value, 0) / prior.length
 
-    const change = ((recentAvg - priorAvg) / priorAvg) * 100
+    const change = priorAvg !== 0 ? clampPercent(((recentAvg - priorAvg) / priorAvg) * 100) : 0
     const polarity = METRIC_POLARITY[metricType] || 'higher_better'
 
     // Tighter thresholds for slow-changing body composition metrics
@@ -516,7 +516,7 @@ function generateCorrelationClaims(
       const alcoholAvg = alcoholNights.reduce((s, m) => s + m.value, 0) / alcoholNights.length
       const normalAvg = normalNights.reduce((s, m) => s + m.value, 0) / normalNights.length
       const diff = alcoholAvg - normalAvg
-      const pctDiff = (diff / normalAvg) * 100
+      const pctDiff = normalAvg !== 0 ? clampPercent((diff / normalAvg) * 100) : 0
 
       if (Math.abs(pctDiff) > 10) {
         claims.push({
@@ -596,7 +596,7 @@ function generateCorrelationClaims(
     if (goodSleepSteps.length >= 5 && badSleepSteps.length >= 5) {
       const goodAvg = goodSleepSteps.reduce((a, b) => a + b, 0) / goodSleepSteps.length
       const badAvg = badSleepSteps.reduce((a, b) => a + b, 0) / badSleepSteps.length
-      const pctDiff = ((goodAvg - badAvg) / badAvg) * 100
+      const pctDiff = badAvg !== 0 ? clampPercent(((goodAvg - badAvg) / badAvg) * 100) : 0
 
       if (Math.abs(pctDiff) > 10) {
         claims.push({
@@ -658,7 +658,7 @@ function generateCorrelationClaims(
       const highAvg = highExDayHRV.reduce((a, b) => a + b, 0) / highExDayHRV.length
       const lowAvg = lowExDayHRV.reduce((a, b) => a + b, 0) / lowExDayHRV.length
       const hrvDiff = highAvg - lowAvg
-      const pctDiff = (hrvDiff / lowAvg) * 100
+      const pctDiff = lowAvg !== 0 ? clampPercent((hrvDiff / lowAvg) * 100) : 0
 
       if (Math.abs(pctDiff) > 5) {
         claims.push({
@@ -734,7 +734,7 @@ function generateTrendClaims(
       const recentAvg = recentHalf.reduce((s, m) => s + m.value, 0) / recentHalf.length
       const olderAvg = olderHalf.reduce((s, m) => s + m.value, 0) / olderHalf.length
 
-      const change = ((recentAvg - olderAvg) / olderAvg) * 100
+      const change = olderAvg !== 0 ? clampPercent(((recentAvg - olderAvg) / olderAvg) * 100) : 0
       const absChange = Math.abs(change)
 
       // Only report meaningful trends (>3% for most metrics, >1% for weight/body comp)
@@ -1043,7 +1043,7 @@ function generateRecompositionClaims(
         },
         receipt: {
           sampleSize: { before: halfW, after: halfW },
-          effectSize: { cohensD: 0, percentChange: (weightChange / olderWAvg) * 100, absoluteChange: weightChange, direction: 'negative', magnitude: 'small' },
+          effectSize: { cohensD: 0, percentChange: olderWAvg !== 0 ? clampPercent((weightChange / olderWAvg) * 100) : 0, absoluteChange: weightChange, direction: 'negative', magnitude: 'small' },
           timeWindow: {
             start: weightData[0]?.date || '',
             end: weightData[weightData.length - 1]?.date || ''
@@ -1173,7 +1173,7 @@ function calculateEffectSize(before: number[], after: number[]): EffectSize {
   const pooledStd = Math.sqrt((beforeVar + afterVar) / 2)
   const cohensD = pooledStd !== 0 ? (afterMean - beforeMean) / pooledStd : 0
 
-  const percentChange = beforeMean !== 0 ? ((afterMean - beforeMean) / beforeMean) * 100 : 0
+  const percentChange = beforeMean !== 0 ? clampPercent(((afterMean - beforeMean) / beforeMean) * 100) : 0
   const absoluteChange = afterMean - beforeMean
 
   const direction: EffectSize['direction'] =
@@ -1279,6 +1279,11 @@ function generateDeltaHeadline(
   const quality = isPositive ? '(good)' : ''
 
   return `${metric} ${direction} ${Math.abs(delta.percentDelta).toFixed(0)}% ${quality}`
+}
+
+// Helper: Clamp percent change to prevent extreme values from division edge cases
+function clampPercent(pct: number): number {
+  return Math.max(-500, Math.min(500, pct))
 }
 
 function getMetricDisplayName(metricType: string): string {

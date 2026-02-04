@@ -52,13 +52,43 @@ interface OuraSleepSession {
   deep_sleep_duration: number
   average_heart_rate: number
   lowest_heart_rate: number
+  average_hrv: number | null // HRV in milliseconds
+}
+
+interface OuraDailyStress {
+  day: string
+  stress_high: number        // Minutes of high stress
+  recovery_high: number      // Minutes of recovery
+  day_summary: string        // "restored", "normal", "stressed"
+}
+
+interface OuraDailyResilience {
+  day: string
+  level: string              // "limited", "adequate", "solid", "strong", "exceptional"
+  contributors: {
+    sleep_recovery: number
+    daytime_recovery: number
+    stress: number
+  }
+}
+
+// Convert resilience level text to numeric score
+function resilienceLevelToScore(level: string): number {
+  const levelMap: Record<string, number> = {
+    'limited': 20,
+    'adequate': 40,
+    'solid': 60,
+    'strong': 80,
+    'exceptional': 100
+  }
+  return levelMap[level.toLowerCase()] ?? 0
 }
 
 const ouraProvider: HealthProvider = {
   name: 'oura',
   displayName: 'Oura Ring',
   description: 'Sync sleep scores, HRV, heart rate, and activity from your Oura Ring',
-  supportedMetrics: ['sleep_duration', 'sleep_score', 'hrv', 'rhr', 'steps'],
+  supportedMetrics: ['sleep_duration', 'sleep_score', 'hrv', 'rhr', 'steps', 'readiness_score', 'temperature_deviation', 'stress_high', 'recovery_high', 'resilience_level'],
   requiresOAuth: true,
 
   getAuthUrl(userId: string, redirectUri: string): string {
@@ -240,32 +270,87 @@ const ouraProvider: HealthProvider = {
               }
             })
           }
+
+          // Add HRV from sleep session (actual HRV in milliseconds, not HRV balance score)
+          if (session.average_hrv != null) {
+            metrics.push({
+              metricType: 'hrv',
+              value: session.average_hrv,
+              unit: 'ms',
+              recordedAt: new Date(session.day),
+              context: {
+                source: 'sleep_session',
+                lowest_heart_rate: session.lowest_heart_rate,
+                average_heart_rate: session.average_heart_rate
+              }
+            })
+          }
         }
       }
     } catch (error) {
       console.error('Error fetching Oura sleep sessions:', error)
     }
 
-    // Fetch HRV data
+    // Fetch daily readiness data (includes readiness score, temperature deviation, and HRV balance)
     try {
-      const hrvResponse = await fetch(
+      const readinessResponse = await fetch(
         `${OURA_API_BASE}/usercollection/daily_readiness?start_date=${startDate}&end_date=${endDate}`,
         { headers }
       )
 
-      if (hrvResponse.ok) {
-        const hrvData = await hrvResponse.json()
-        for (const day of hrvData.data as Array<{ day: string; contributors: { hrv_balance: number } }>) {
-          // Oura provides HRV balance as a score, not raw ms value
-          // We'd need to fetch detailed HRV from heart_rate endpoint for actual values
-          if (day.contributors?.hrv_balance) {
-            // Note: This is HRV balance score, not raw HRV in ms
-            // For actual HRV, we'd need additional API calls
+      if (readinessResponse.ok) {
+        const readinessData = await readinessResponse.json()
+        for (const day of readinessData.data as Array<{
+          day: string
+          score: number
+          temperature_deviation: number | null
+          contributors: {
+            activity_balance: number
+            body_temperature: number
+            hrv_balance: number
+            previous_day_activity: number
+            previous_night: number
+            recovery_index: number
+            resting_heart_rate: number
+            sleep_balance: number
+          }
+        }>) {
+          // Add readiness score
+          if (day.score != null) {
+            metrics.push({
+              metricType: 'readiness_score',
+              value: day.score,
+              unit: 'score',
+              recordedAt: new Date(day.day),
+              context: {
+                activity_balance: day.contributors?.activity_balance,
+                body_temperature: day.contributors?.body_temperature,
+                hrv_balance: day.contributors?.hrv_balance,
+                previous_day_activity: day.contributors?.previous_day_activity,
+                previous_night: day.contributors?.previous_night,
+                recovery_index: day.contributors?.recovery_index,
+                resting_heart_rate: day.contributors?.resting_heart_rate,
+                sleep_balance: day.contributors?.sleep_balance
+              }
+            })
+          }
+
+          // Add temperature deviation (body temp deviation from baseline in Celsius)
+          if (day.temperature_deviation != null) {
+            metrics.push({
+              metricType: 'temperature_deviation',
+              value: day.temperature_deviation,
+              unit: 'celsius',
+              recordedAt: new Date(day.day),
+              context: {
+                readiness_score: day.score
+              }
+            })
           }
         }
       }
     } catch (error) {
-      console.error('Error fetching Oura HRV data:', error)
+      console.error('Error fetching Oura readiness data:', error)
     }
 
     // Fetch activity/steps
@@ -291,6 +376,77 @@ const ouraProvider: HealthProvider = {
       }
     } catch (error) {
       console.error('Error fetching Oura activity data:', error)
+    }
+
+    // Fetch daily stress data
+    try {
+      const stressResponse = await fetch(
+        `${OURA_API_BASE}/usercollection/daily_stress?start_date=${startDate}&end_date=${endDate}`,
+        { headers }
+      )
+
+      if (stressResponse.ok) {
+        const stressData = await stressResponse.json()
+        for (const day of stressData.data as OuraDailyStress[]) {
+          // Add stress_high metric
+          if (day.stress_high != null) {
+            metrics.push({
+              metricType: 'stress_high',
+              value: day.stress_high,
+              unit: 'minutes',
+              recordedAt: new Date(day.day),
+              context: {
+                day_summary: day.day_summary
+              }
+            })
+          }
+
+          // Add recovery_high metric
+          if (day.recovery_high != null) {
+            metrics.push({
+              metricType: 'recovery_high',
+              value: day.recovery_high,
+              unit: 'minutes',
+              recordedAt: new Date(day.day),
+              context: {
+                day_summary: day.day_summary
+              }
+            })
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching Oura daily stress data:', error)
+    }
+
+    // Fetch daily resilience data
+    try {
+      const resilienceResponse = await fetch(
+        `${OURA_API_BASE}/usercollection/daily_resilience?start_date=${startDate}&end_date=${endDate}`,
+        { headers }
+      )
+
+      if (resilienceResponse.ok) {
+        const resilienceData = await resilienceResponse.json()
+        for (const day of resilienceData.data as OuraDailyResilience[]) {
+          if (day.level != null) {
+            metrics.push({
+              metricType: 'resilience_level',
+              value: resilienceLevelToScore(day.level),
+              unit: 'score',
+              recordedAt: new Date(day.day),
+              context: {
+                level_text: day.level,
+                sleep_recovery: day.contributors?.sleep_recovery,
+                daytime_recovery: day.contributors?.daytime_recovery,
+                stress: day.contributors?.stress
+              }
+            })
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching Oura daily resilience data:', error)
     }
 
     return metrics

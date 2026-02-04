@@ -35,6 +35,9 @@ interface EightSleepInterval {
   timeseries?: {
     tempRoomC?: Array<{ value: number }>
     tempBedC?: Array<{ value: number }>
+    hrv?: Array<[number, number]>              // [timestamp, value] - HRV in ms
+    heartRate?: Array<[number, number]>        // [timestamp, value] - BPM
+    respiratoryRate?: Array<[number, number]>  // [timestamp, value] - breaths/min
   }
   sleepFitnessScore?: {
     total: number
@@ -92,7 +95,14 @@ const eightSleepProvider: HealthProvider = {
   name: 'eight_sleep',
   displayName: 'Eight Sleep',
   description: 'Import sleep scores and bed temperature data from your Eight Sleep mattress',
-  supportedMetrics: ['sleep_score', 'time_in_bed', 'bed_temperature'],
+  supportedMetrics: [
+    'sleep_score',
+    'time_in_bed',
+    'bed_temperature',
+    'hrv',
+    'respiratory_rate',
+    'rem_sleep'
+  ],
   requiresOAuth: false, // Changed to false - uses email/password
 
   // Not used - email/password auth instead
@@ -172,9 +182,44 @@ const eightSleepProvider: HealthProvider = {
             })
           }
 
-          // Time in bed (duration)
+          // Time in bed (duration) and detailed sleep stages
           const durationSeconds = interval.duration ||
             (interval.stages?.reduce((sum, s) => sum + s.duration, 0) || 0)
+
+          // Calculate detailed stage durations
+          const stageDurations: Record<string, number> = {
+            awake: 0,
+            light: 0,
+            deep: 0,
+            rem: 0
+          }
+
+          if (interval.stages && interval.stages.length > 0) {
+            for (const stage of interval.stages) {
+              if (Object.prototype.hasOwnProperty.call(stageDurations, stage.stage)) {
+                stageDurations[stage.stage] += stage.duration
+              }
+            }
+          }
+
+          // Convert seconds to hours for stage durations
+          const deepSleepHours = stageDurations.deep / 3600
+          const remSleepHours = stageDurations.rem / 3600
+          const lightSleepHours = stageDurations.light / 3600
+          const awakeDuringNightHours = stageDurations.awake / 3600
+
+          // Calculate sleep latency (time from bedtime to first non-awake stage)
+          let sleepLatencySeconds = 0
+          if (interval.stages && interval.stages.length > 0) {
+            for (const stage of interval.stages) {
+              if (stage.stage === 'awake') {
+                sleepLatencySeconds += stage.duration
+              } else {
+                // Found first non-awake stage, stop counting
+                break
+              }
+            }
+          }
 
           if (durationSeconds > 0) {
             metrics.push({
@@ -186,7 +231,28 @@ const eightSleepProvider: HealthProvider = {
                 stages: interval.stages?.reduce((acc, stage) => {
                   acc[stage.stage] = Math.round(stage.duration / 60)
                   return acc
-                }, {} as Record<string, number>)
+                }, {} as Record<string, number>),
+                // Detailed stage durations in hours
+                deepSleepHours: Math.round(deepSleepHours * 100) / 100,
+                remSleepHours: Math.round(remSleepHours * 100) / 100,
+                lightSleepHours: Math.round(lightSleepHours * 100) / 100,
+                awakeDuringNightHours: Math.round(awakeDuringNightHours * 100) / 100,
+                // Sleep latency in minutes
+                sleepLatencyMinutes: Math.round(sleepLatencySeconds / 60)
+              }
+            })
+          }
+
+          // REM sleep (from stages) - as separate metric
+          if (stageDurations.rem > 0) {
+            metrics.push({
+              metricType: 'rem_sleep',
+              value: Math.round(stageDurations.rem / 60), // Convert to minutes
+              unit: 'minutes',
+              recordedAt,
+              context: {
+                durationSeconds: stageDurations.rem,
+                durationHours: Math.round(remSleepHours * 100) / 100
               }
             })
           }
@@ -205,6 +271,52 @@ const eightSleepProvider: HealthProvider = {
                 roomTemp: interval.timeseries.tempRoomC?.[0]?.value
               }
             })
+          }
+
+          // HRV (average from timeseries)
+          if (interval.timeseries?.hrv && interval.timeseries.hrv.length > 0) {
+            const hrvValues = interval.timeseries.hrv
+              .map(([, val]) => val)
+              .filter(v => v > 0)
+
+            if (hrvValues.length > 0) {
+              const avgHrv = hrvValues.reduce((a, b) => a + b, 0) / hrvValues.length
+
+              metrics.push({
+                metricType: 'hrv',
+                value: Math.round(avgHrv * 10) / 10, // Round to 1 decimal
+                unit: 'ms',
+                recordedAt,
+                context: {
+                  dataPoints: hrvValues.length,
+                  min: Math.min(...hrvValues),
+                  max: Math.max(...hrvValues)
+                }
+              })
+            }
+          }
+
+          // Respiratory rate (average from timeseries)
+          if (interval.timeseries?.respiratoryRate && interval.timeseries.respiratoryRate.length > 0) {
+            const respValues = interval.timeseries.respiratoryRate
+              .map(([, val]) => val)
+              .filter(v => v > 0)
+
+            if (respValues.length > 0) {
+              const avgRespRate = respValues.reduce((a, b) => a + b, 0) / respValues.length
+
+              metrics.push({
+                metricType: 'respiratory_rate',
+                value: Math.round(avgRespRate * 10) / 10, // Round to 1 decimal
+                unit: 'breaths_min',
+                recordedAt,
+                context: {
+                  dataPoints: respValues.length,
+                  min: Math.min(...respValues),
+                  max: Math.max(...respValues)
+                }
+              })
+            }
           }
         }
       } else {

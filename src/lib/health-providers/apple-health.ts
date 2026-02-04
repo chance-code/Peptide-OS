@@ -71,6 +71,11 @@ const PERMISSIONS_FOR_METRICS: Record<string, string[]> = {
   rhr: ['READ_RESTING_HEART_RATE'],
   sleep_duration: ['READ_SLEEP'],
   rem_sleep: ['READ_SLEEP'],
+  deep_sleep: ['READ_SLEEP'],
+  // Derived sleep metrics (calculated on iOS native, synced via HealthSyncManager)
+  sleep_efficiency: ['READ_SLEEP'],
+  waso: ['READ_SLEEP'],
+  sleep_latency: ['READ_SLEEP'],
   steps: ['READ_STEPS'],
   active_calories: ['READ_ACTIVE_CALORIES'],
   basal_calories: ['READ_BASAL_CALORIES'],
@@ -94,6 +99,7 @@ const METRIC_TO_DATA_TYPE: Record<string, string> = {
   rhr: 'resting-heart-rate',
   sleep_duration: 'sleep',
   rem_sleep: 'sleep-rem',
+  deep_sleep: 'sleep-deep',
   steps: 'steps',
   active_calories: 'active-calories',
   basal_calories: 'basal-calories',
@@ -222,8 +228,12 @@ const appleHealthProvider: HealthProvider = {
     'weight', 'body_fat_percentage', 'lean_body_mass', 'bmi', 'muscle_mass',
     // Heart & HRV
     'hrv', 'rhr',
-    // Sleep
-    'sleep_duration', 'rem_sleep',
+    // Sleep (duration, stages, and derived metrics)
+    // Note: sleep_efficiency, waso, sleep_latency are calculated on iOS native
+    // from raw sleep samples and synced via HealthSyncManager. The Capacitor plugin
+    // doesn't expose raw samples needed for web-side calculation.
+    'sleep_duration', 'rem_sleep', 'deep_sleep',
+    'sleep_efficiency', 'waso', 'sleep_latency',
     // Activity
     'steps', 'active_calories', 'basal_calories', 'exercise_minutes',
     'stand_hours', 'walking_running_distance',

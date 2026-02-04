@@ -5,6 +5,15 @@ import { prisma } from './prisma'
 import { MetricType, getMetricDisplayName, formatMetricValue } from './health-providers'
 
 // ============================================================================
+// HELPERS
+// ============================================================================
+
+// Helper: Clamp percent change to prevent extreme values from division edge cases
+function clampPercent(pct: number): number {
+  return Math.max(-500, Math.min(500, pct))
+}
+
+// ============================================================================
 // CONFIGURATION
 // ============================================================================
 
@@ -37,7 +46,13 @@ const SOURCE_PRIORITY: Record<MetricType, string[]> = {
   // Vitals
   respiratory_rate: ['apple_health', 'oura'],
   blood_oxygen: ['apple_health', 'oura'],
-  body_temperature: ['apple_health', 'oura']
+  body_temperature: ['apple_health', 'oura'],
+  // Oura readiness & recovery
+  readiness_score: ['oura'],
+  temperature_deviation: ['oura'],
+  stress_high: ['oura'],
+  recovery_high: ['oura'],
+  resilience_level: ['oura']
 }
 
 const METRIC_POLARITY: Record<MetricType, 'higher_better' | 'lower_better' | 'neutral'> = {
@@ -69,7 +84,13 @@ const METRIC_POLARITY: Record<MetricType, 'higher_better' | 'lower_better' | 'ne
   // Vitals
   respiratory_rate: 'neutral', // Depends on context
   blood_oxygen: 'higher_better',
-  body_temperature: 'neutral'
+  body_temperature: 'neutral',
+  // Oura readiness & recovery
+  readiness_score: 'higher_better',
+  temperature_deviation: 'neutral', // Zero deviation is optimal
+  stress_high: 'lower_better',
+  recovery_high: 'higher_better',
+  resilience_level: 'higher_better'
 }
 
 // Optimal ranges for health metrics
@@ -102,7 +123,13 @@ const OPTIMAL_RANGES: Record<MetricType, { min: number; optimal: number; max: nu
   // Vitals
   respiratory_rate: { min: 12, optimal: 14, max: 20, unit: 'br/min' },
   blood_oxygen: { min: 95, optimal: 98, max: 100, unit: '%' },
-  body_temperature: { min: 36, optimal: 36.8, max: 37.5, unit: '°C' }
+  body_temperature: { min: 36, optimal: 36.8, max: 37.5, unit: '°C' },
+  // Oura readiness & recovery
+  readiness_score: { min: 60, optimal: 85, max: 100, unit: 'score' },
+  temperature_deviation: { min: -0.5, optimal: 0, max: 0.5, unit: '°C' },
+  stress_high: { min: 0, optimal: 0, max: 60, unit: 'min' },
+  recovery_high: { min: 60, optimal: 180, max: 360, unit: 'min' },
+  resilience_level: { min: 20, optimal: 80, max: 100, unit: 'score' }
 }
 
 // ============================================================================
@@ -377,9 +404,9 @@ export async function calculateHealthTrends(
       : previousAvg
 
     const change = currentAvg - previousAvg
-    const changePercent = previousAvg !== 0 ? (change / previousAvg) * 100 : 0
+    const changePercent = previousAvg !== 0 ? clampPercent((change / previousAvg) * 100) : 0
     const previousChange = previousAvg - olderAvg
-    const previousChangePercent = olderAvg !== 0 ? (previousChange / olderAvg) * 100 : 0
+    const previousChangePercent = olderAvg !== 0 ? clampPercent((previousChange / olderAvg) * 100) : 0
 
     const polarity = METRIC_POLARITY[metricType]
     let trend: 'improving' | 'declining' | 'stable'
@@ -471,7 +498,7 @@ export async function analyzeSleepArchitecture(userId: string): Promise<SleepArc
   if (recentScores.length >= 3 && olderScores.length >= 3) {
     const recentAvg = recentScores.reduce((s, m) => s + m.value, 0) / recentScores.length
     const olderAvg = olderScores.reduce((s, m) => s + m.value, 0) / olderScores.length
-    const change = ((recentAvg - olderAvg) / olderAvg) * 100
+    const change = olderAvg !== 0 ? clampPercent(((recentAvg - olderAvg) / olderAvg) * 100) : 0
     if (change > 5) recentTrend = 'improving'
     else if (change < -5) recentTrend = 'declining'
   }
@@ -659,7 +686,7 @@ export async function analyzeProtocolImpact(userId: string): Promise<ProtocolImp
       const beforeAvg = before.reduce((s, m) => s + m.value, 0) / before.length
       const afterAvg = after.reduce((s, m) => s + m.value, 0) / after.length
       const change = afterAvg - beforeAvg
-      const changePercent = beforeAvg !== 0 ? (change / beforeAvg) * 100 : 0
+      const changePercent = beforeAvg !== 0 ? clampPercent((change / beforeAvg) * 100) : 0
 
       const polarity = METRIC_POLARITY[metricType]
       let impact = changePercent

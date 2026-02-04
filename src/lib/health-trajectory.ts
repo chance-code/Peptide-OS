@@ -4,6 +4,7 @@
 
 import { subDays, parseISO, differenceInDays, format } from 'date-fns'
 import { METRIC_POLARITY, computeBaseline, type MetricBaseline, type DailyMetricValue } from './health-baselines'
+import { clampPercent, validateChangePercent, validateMetricValue, type MetricType } from './health-constants'
 import type { SeedMetric } from './demo-data/seed-metrics'
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -211,7 +212,7 @@ export function computeBodyCompState(metrics: SeedMetric[]): BodyCompState {
     const secondHalf = vals.slice(half)
     const firstAvg = firstHalf.reduce((s, v) => s + v.value, 0) / firstHalf.length
     const secondAvg = secondHalf.reduce((s, v) => s + v.value, 0) / secondHalf.length
-    const pctChange = ((secondAvg - firstAvg) / firstAvg) * 100
+    const pctChange = firstAvg !== 0 ? clampPercent(((secondAvg - firstAvg) / firstAvg) * 100) : 0
     if (Math.abs(pctChange) < 1) return 'stable'
     return pctChange > 0 ? 'up' : 'down'
   }
@@ -317,7 +318,11 @@ function computePerMetricSignals(metrics: SeedMetric[], window: 7 | 14 | 30 | 90
   for (const [metricType, values] of byType) {
     if (values.length < 3) continue
 
-    const sorted = [...values].sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime())
+    // Filter out invalid values based on metric bounds
+    const validValues = values.filter(v => validateMetricValue(metricType as MetricType, v.value))
+    if (validValues.length < 3) continue
+
+    const sorted = [...validValues].sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime())
 
     // Split into halves
     const half = Math.floor(sorted.length / 2)
@@ -329,9 +334,10 @@ function computePerMetricSignals(metrics: SeedMetric[], window: 7 | 14 | 30 | 90
     const firstAvg = firstHalf.reduce((s, v) => s + v.value, 0) / firstHalf.length
     const secondAvg = secondHalf.reduce((s, v) => s + v.value, 0) / secondHalf.length
 
-    if (firstAvg === 0) continue
-
-    const percentChange = ((secondAvg - firstAvg) / firstAvg) * 100
+    // Calculate and validate percent change (guard zero denominators)
+    let percentChange = firstAvg !== 0 ? ((secondAvg - firstAvg) / firstAvg) * 100 : 0
+    percentChange = clampPercent(percentChange)
+    percentChange = validateChangePercent(metricType as MetricType, percentChange, window >= 7 ? 'weekly' : 'daily')
 
     // Consistency: fraction of day-over-day changes in same direction
     let sameDir = 0

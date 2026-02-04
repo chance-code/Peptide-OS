@@ -2,6 +2,7 @@
 // Computes personal baselines with rolling windows and robust statistics
 
 import { subDays, differenceInDays, parseISO, format } from 'date-fns'
+import { clampPercent, validateChangePercent, type MetricType } from './health-constants'
 
 export interface MetricBaseline {
   metricType: string
@@ -187,7 +188,8 @@ export interface TrendMomentum {
 
 export function calculateMomentum(
   values: DailyMetricValue[],
-  polarity: 'higher_better' | 'lower_better' = 'higher_better'
+  polarity: 'higher_better' | 'lower_better' = 'higher_better',
+  metricType?: string
 ): TrendMomentum | null {
   if (values.length < 21) return null
 
@@ -207,8 +209,14 @@ export function calculateMomentum(
   const older = sorted.slice(-21, -14)
   const olderAvg = older.reduce((s, v) => s + v.value, 0) / older.length
 
-  const currentTrend = ((recentAvg - middleAvg) / middleAvg) * 100
-  const previousTrend = ((middleAvg - olderAvg) / olderAvg) * 100
+  let currentTrend = middleAvg !== 0 ? clampPercent(((recentAvg - middleAvg) / middleAvg) * 100) : 0
+  let previousTrend = olderAvg !== 0 ? clampPercent(((middleAvg - olderAvg) / olderAvg) * 100) : 0
+
+  // Validate change percents if metric type is provided
+  if (metricType) {
+    currentTrend = validateChangePercent(metricType as MetricType, currentTrend, 'weekly')
+    previousTrend = validateChangePercent(metricType as MetricType, previousTrend, 'weekly')
+  }
 
   const trendDiff = currentTrend - previousTrend
 
@@ -307,6 +315,8 @@ function round(value: number, decimals: number): number {
   const factor = Math.pow(10, decimals)
   return Math.round(value * factor) / factor
 }
+
+// Note: clampPercent is imported from health-constants.ts
 
 // ─── Signal Classification ────────────────────────────────────────────
 
