@@ -3,18 +3,33 @@
 import { useState } from 'react'
 import { ChevronRight, Info, TrendingUp, TrendingDown, Minus, ArrowUpRight, ArrowDownRight, ArrowRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { HealthTrajectory, CategoryTrajectory, TrajectoryDirection, TrajectoryConfidence } from '@/lib/health-trajectory'
+import type { HealthTrajectory, CategoryTrajectory, TrajectoryDirection, TrajectoryConfidence, TimeWindow } from '@/lib/health-trajectory'
 
 // ─── Trajectory Hero (new primary component) ─────────────────────────
 
 interface TrajectoryHeroProps {
   trajectory: HealthTrajectory
+  timeWindow: TimeWindow
+  onTimeWindowChange: (window: TimeWindow) => void
   onExplain?: () => void
   className?: string
 }
 
+const TIME_WINDOW_OPTIONS: { value: TimeWindow; label: string }[] = [
+  { value: 7, label: '7d' },
+  { value: 30, label: '30d' },
+  { value: 90, label: '90d' },
+]
+
+const WINDOW_HELPER_TEXT: Partial<Record<TimeWindow, string>> = {
+  7: 'Shorter windows are more volatile.',
+  90: 'Best for evaluating protocol effects.',
+}
+
 export function TrajectoryHero({
   trajectory,
+  timeWindow,
+  onTimeWindowChange,
   onExplain,
   className
 }: TrajectoryHeroProps) {
@@ -71,18 +86,44 @@ export function TrajectoryHero({
 
       <div className="relative z-10">
         {/* Header */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-1">
           <h2 className="text-sm font-medium text-[var(--muted-foreground)] uppercase tracking-wider">
-            Your Health Trajectory
+            Health Trajectory — Last {timeWindow} Days
           </h2>
           {trajectory.confidence !== 'insufficient' && (
             <span className={cn(
-              'px-2 py-0.5 rounded-full text-xs font-medium',
+              'px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0',
               trajectory.confidence === 'high' ? 'bg-emerald-500/20 text-emerald-400' :
               trajectory.confidence === 'moderate' ? 'bg-[var(--accent-muted)] text-[var(--accent)]' :
               'bg-[var(--muted-foreground)]/20 text-[var(--muted-foreground)]'
             )}>
               {confidenceLabel}
+            </span>
+          )}
+        </div>
+
+        {/* Time window selector */}
+        <div className="flex items-center gap-2 mb-4">
+          <div className="inline-flex rounded-lg bg-[var(--muted)] p-0.5 border border-[var(--border)]">
+            {TIME_WINDOW_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => onTimeWindowChange(opt.value)}
+                className={cn(
+                  'px-3 py-1 rounded-md text-xs font-medium transition-colors',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/50',
+                  timeWindow === opt.value
+                    ? 'bg-[var(--card)] text-[var(--foreground)] shadow-sm'
+                    : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                )}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          {WINDOW_HELPER_TEXT[timeWindow] && (
+            <span className="text-[10px] text-[var(--muted-foreground)] italic">
+              {WINDOW_HELPER_TEXT[timeWindow]}
             </span>
           )}
         </div>

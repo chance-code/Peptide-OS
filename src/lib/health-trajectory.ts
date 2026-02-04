@@ -10,12 +10,13 @@ import type { SeedMetric } from './demo-data/seed-metrics'
 
 export type TrajectoryDirection = 'improving' | 'stable' | 'declining'
 export type TrajectoryConfidence = 'high' | 'moderate' | 'low' | 'insufficient'
+export type TimeWindow = 7 | 30 | 90
 
 export interface HealthTrajectory {
   direction: TrajectoryDirection
   confidence: TrajectoryConfidence
   confidenceScore: number           // 0-100
-  window: 7 | 14 | 30              // days used
+  window: 7 | 14 | 30 | 90         // days used
   headline: string                  // "Sleep and recovery driving steady improvement"
   signals: TrajectorySignal[]
   sleep: CategoryTrajectory
@@ -24,6 +25,8 @@ export interface HealthTrajectory {
   bodyComp: CategoryTrajectory | null
   dataState: 'rich' | 'adequate' | 'sparse' | 'insufficient'
   daysOfData: number
+  timeWindow: TimeWindow            // user-selected window (7/30/90)
+  windowLabel: string               // "Short-term signal" | "Balanced signal" | "Long-term trend"
 }
 
 export interface CategoryTrajectory {
@@ -98,21 +101,38 @@ const CATEGORY_WEIGHTS = {
   bodyComp: 0.15,
 }
 
+// ─── Window semantics ───────────────────────────────────────────────
+
+const WINDOW_SEMANTICS: Record<TimeWindow, { label: string; confidenceBonus: number }> = {
+  7:  { label: 'Short-term signal',  confidenceBonus: 10 },
+  30: { label: 'Balanced signal',    confidenceBonus: 30 },
+  90: { label: 'Long-term trend',    confidenceBonus: 40 },
+}
+
 // ─── Main Functions ──────────────────────────────────────────────────
 
 export function computeTrajectory(
   metrics: SeedMetric[],
-  baselines: Map<string, MetricBaseline>
+  baselines: Map<string, MetricBaseline>,
+  timeWindow: TimeWindow = 30
 ): HealthTrajectory {
-  // Step 1: Window selection
-  const { window, dataState, daysOfData } = selectWindow(metrics)
+  // Step 1: Window selection — use explicit timeWindow, fall back to auto if insufficient data
+  const { window: autoWindow, dataState, daysOfData } = selectWindow(metrics)
 
   if (dataState === 'insufficient') {
-    return makeInsufficientTrajectory(daysOfData)
+    return makeInsufficientTrajectory(daysOfData, timeWindow)
   }
 
-  // Step 2: Per-metric trend signals
-  const signals = computePerMetricSignals(metrics, window)
+  // Use the user-selected window, but clamp down if we don't have enough data
+  const effectiveWindow: 7 | 14 | 30 | 90 = daysOfData < timeWindow
+    ? autoWindow  // not enough data for the requested window
+    : timeWindow
+
+  // Step 2: Per-metric trend signals (with smoothing for 90d)
+  const processedMetrics = effectiveWindow === 90
+    ? smoothMetrics(metrics, 3)  // 3-day rolling average for 90d
+    : metrics
+  const signals = computePerMetricSignals(processedMetrics, effectiveWindow)
 
   // Step 3: Category aggregation
   const sleep = aggregateCategory(signals, 'sleep')
@@ -124,8 +144,8 @@ export function computeTrajectory(
   // Step 4: Overall direction (weighted vote)
   const direction = computeOverallDirection(sleep, recovery, activity, bodyComp)
 
-  // Step 5: Confidence score
-  const confidenceScore = computeConfidenceScore(signals, window, sleep, recovery, activity, bodyComp)
+  // Step 5: Confidence score — uses window-specific contribution
+  const confidenceScore = computeConfidenceScore(signals, effectiveWindow, sleep, recovery, activity, bodyComp)
   const confidence: TrajectoryConfidence =
     confidenceScore >= 70 ? 'high' :
     confidenceScore >= 45 ? 'moderate' :
@@ -134,11 +154,13 @@ export function computeTrajectory(
   // Step 6: Headline
   const headline = generateHeadline(direction, sleep, recovery, activity, bodyComp)
 
+  const semantics = WINDOW_SEMANTICS[timeWindow]
+
   return {
     direction,
     confidence,
     confidenceScore,
-    window,
+    window: effectiveWindow,
     headline,
     signals,
     sleep,
@@ -147,6 +169,8 @@ export function computeTrajectory(
     bodyComp,
     dataState,
     daysOfData,
+    timeWindow,
+    windowLabel: semantics.label,
   }
 }
 
@@ -266,7 +290,7 @@ function selectWindow(metrics: SeedMetric[]): {
   return { window: 7, dataState: 'insufficient', daysOfData }
 }
 
-function computePerMetricSignals(metrics: SeedMetric[], window: 7 | 14 | 30): TrajectorySignal[] {
+function computePerMetricSignals(metrics: SeedMetric[], window: 7 | 14 | 30 | 90): TrajectorySignal[] {
   const signals: TrajectorySignal[] = []
   const today = new Date()
   const windowStart = subDays(today, window)
@@ -425,7 +449,7 @@ function computeOverallDirection(
 
 function computeConfidenceScore(
   signals: TrajectorySignal[],
-  window: 7 | 14 | 30,
+  window: 7 | 14 | 30 | 90,
   sleep: CategoryTrajectory,
   recovery: CategoryTrajectory,
   activity: CategoryTrajectory,
@@ -433,8 +457,9 @@ function computeConfidenceScore(
 ): number {
   let score = 0
 
-  // Data contribution
-  if (window >= 30) score += 30
+  // Data contribution — longer windows yield higher confidence
+  if (window >= 90) score += 40
+  else if (window >= 30) score += 30
   else if (window >= 14) score += 20
   else score += 10
 
@@ -505,7 +530,7 @@ function generateHeadline(
   return 'Health metrics holding steady'
 }
 
-function makeInsufficientTrajectory(daysOfData: number): HealthTrajectory {
+function makeInsufficientTrajectory(daysOfData: number, timeWindow: TimeWindow = 30): HealthTrajectory {
   return {
     direction: 'stable',
     confidence: 'insufficient',
@@ -519,7 +544,32 @@ function makeInsufficientTrajectory(daysOfData: number): HealthTrajectory {
     bodyComp: null,
     dataState: 'insufficient',
     daysOfData,
+    timeWindow,
+    windowLabel: WINDOW_SEMANTICS[timeWindow].label,
   }
+}
+
+// Smooth metrics with a rolling average to dampen short-term noise (used for 90d)
+function smoothMetrics(metrics: SeedMetric[], windowSize: number): SeedMetric[] {
+  // Group by metric type
+  const byType = new Map<string, SeedMetric[]>()
+  for (const m of metrics) {
+    if (!byType.has(m.metricType)) byType.set(m.metricType, [])
+    byType.get(m.metricType)!.push(m)
+  }
+
+  const smoothed: SeedMetric[] = []
+  for (const [, values] of byType) {
+    const sorted = [...values].sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime())
+    for (let i = 0; i < sorted.length; i++) {
+      const start = Math.max(0, i - Math.floor(windowSize / 2))
+      const end = Math.min(sorted.length, i + Math.ceil(windowSize / 2))
+      const slice = sorted.slice(start, end)
+      const avg = slice.reduce((s, v) => s + v.value, 0) / slice.length
+      smoothed.push({ ...sorted[i], value: avg })
+    }
+  }
+  return smoothed
 }
 
 function capitalizeFirst(s: string): string {

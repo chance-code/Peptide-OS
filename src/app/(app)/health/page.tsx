@@ -59,7 +59,8 @@ import {
   computeTrajectory,
   computeBodyCompState,
   type HealthTrajectory,
-  type BodyCompState
+  type BodyCompState,
+  type TimeWindow
 } from '@/lib/health-trajectory'
 import {
   computeProtocolEvidence,
@@ -110,6 +111,17 @@ export default function HealthDashboardNew() {
   const [showWhyModal, setShowWhyModal] = useState(false)
   const [eightSleepReauth, setEightSleepReauth] = useState<{ show: boolean; email: string; password: string; error: string | null; loading: boolean }>({ show: false, email: '', password: '', error: null, loading: false })
   const [selectedDelta, setSelectedDelta] = useState<DeltaItem | null>(null)
+  const [timeWindow, setTimeWindow] = useState<TimeWindow>(() => {
+    if (typeof window === 'undefined') return 30
+    const stored = localStorage.getItem('arc-trajectory-window')
+    if (stored === '7' || stored === '90') return Number(stored) as TimeWindow
+    return 30
+  })
+
+  const handleTimeWindowChange = useCallback((w: TimeWindow) => {
+    setTimeWindow(w)
+    localStorage.setItem('arc-trajectory-window', String(w))
+  }, [])
 
   // Check connected integrations
   const { data: integrations, refetch: refetchIntegrations } = useQuery({
@@ -255,7 +267,7 @@ export default function HealthDashboardNew() {
     queryFn: async () => {
       if (!currentUserId) return null
       const endDate = new Date().toISOString()
-      const startDate = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString()
+      const startDate = new Date(Date.now() - 95 * 24 * 60 * 60 * 1000).toISOString()
       const res = await fetch(`/api/health/metrics?startDate=${startDate}&endDate=${endDate}`)
       if (!res.ok) return null
       const data = await res.json()
@@ -372,8 +384,8 @@ export default function HealthDashboardNew() {
   // ── Trajectory + body composition ──
   const trajectory = useMemo(() => {
     if (!dataSource || !baselines) return null
-    return computeTrajectory(dataSource.metrics, baselines)
-  }, [dataSource, baselines])
+    return computeTrajectory(dataSource.metrics, baselines, timeWindow)
+  }, [dataSource, baselines, timeWindow])
 
   const bodyCompState = useMemo(() => {
     if (!dataSource) return null
@@ -1069,6 +1081,8 @@ export default function HealthDashboardNew() {
             {/* 1. Trajectory Hero */}
             <TrajectoryHero
               trajectory={processedData.trajectory}
+              timeWindow={timeWindow}
+              onTimeWindowChange={handleTimeWindowChange}
               onExplain={handleExplainScore}
             />
 
