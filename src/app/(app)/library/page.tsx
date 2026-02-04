@@ -29,6 +29,31 @@ interface UserProtocol {
   }
 }
 
+// Health integration response type
+interface HealthIntegrationResponse {
+  name: string
+  displayName: string
+  supportedMetrics: string[]
+  integration: {
+    isConnected: boolean
+    lastSyncAt: string | null
+    metricSyncState: Record<string, {
+      lastSyncAt: string | null
+      status: string
+      dataPoints?: number
+    }>
+  } | null
+}
+
+// Outcome name → health metric types + display label
+const OUTCOME_METRICS: Record<string, { metrics: string[]; label: string }> = {
+  'Sleep': { metrics: ['sleep_duration', 'sleep_score'], label: 'Sleep duration & score' },
+  'Recovery': { metrics: ['hrv', 'rhr'], label: 'HRV & resting heart rate' },
+  'Body composition': { metrics: ['weight', 'body_fat_percentage', 'lean_body_mass'], label: 'Weight & body composition' },
+  'Inflammation': { metrics: ['hrv', 'rhr'], label: 'HRV & heart rate trends' },
+  'Cognition': { metrics: [], label: 'No automated tracking' },
+}
+
 // Cycle phase calculation
 interface CyclePhase {
   phase: 'mid-cycle' | 'end-of-cycle' | 'past-end' | 'ongoing'
@@ -91,6 +116,31 @@ function getCyclePhase(startDate: string, endDate: string | null): CyclePhase {
   }
 }
 
+// Parse the starting week number from a phase string like "Week 3–5" or "Day 1"
+function parseWeekFromPhase(phase: string): number {
+  const weekMatch = phase.match(/Week\s+(\d+)/i)
+  if (weekMatch) return parseInt(weekMatch[1])
+  const dayMatch = phase.match(/Day\s+(\d+)/i)
+  if (dayMatch) return 0
+  return 0
+}
+
+// Find which time-to-effect phase the user is currently in based on days elapsed
+function getCurrentEffectPhaseIndex(
+  timeToEffect: { phase: string; description: string }[],
+  daysIn: number,
+): number {
+  const weeksIn = daysIn / 7
+  let currentIndex = -1
+  for (let i = 0; i < timeToEffect.length; i++) {
+    const startWeek = parseWeekFromPhase(timeToEffect[i].phase)
+    if (weeksIn >= startWeek) {
+      currentIndex = i
+    }
+  }
+  return currentIndex
+}
+
 const CATEGORY_INFO: Record<string, { label: string; icon: typeof Pill; color: string }> = {
   healing: { label: 'Healing', icon: Heart, color: 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300' },
   'growth-hormone': { label: 'Growth Hormone', icon: Zap, color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300' },
@@ -132,9 +182,13 @@ function formatCycleSummary(g: CycleGuidance): string {
   return parts.join(' · ')
 }
 
-function ProtocolContext({ protocol }: { protocol: UserProtocol }) {
-  const phase = getCyclePhase(protocol.startDate, protocol.endDate)
-
+function ProtocolContext({ protocol, cyclePhase, guidance, availableMetrics, effectPhaseIndex }: {
+  protocol: UserProtocol
+  cyclePhase: CyclePhase
+  guidance?: CycleGuidance
+  availableMetrics: Set<string>
+  effectPhaseIndex?: number
+}) {
   const phaseColors: Record<CyclePhase['phase'], string> = {
     'mid-cycle': 'text-blue-400',
     'end-of-cycle': 'text-amber-400',
@@ -149,9 +203,12 @@ function ProtocolContext({ protocol }: { protocol: UserProtocol }) {
     'ongoing': 'Ongoing',
   }
 
-  const barColor = phase.phase === 'past-end' ? 'bg-red-400'
-    : phase.phase === 'end-of-cycle' ? 'bg-amber-400'
+  const barColor = cyclePhase.phase === 'past-end' ? 'bg-red-400'
+    : cyclePhase.phase === 'end-of-cycle' ? 'bg-amber-400'
     : 'bg-[var(--accent)]'
+
+  const hasTimeToEffect = guidance?.timeToEffect && guidance.timeToEffect.length > 0
+  const hasOutcomes = guidance?.primaryOutcomes && guidance.primaryOutcomes.length > 0
 
   return (
     <div className="mt-2 mb-3 p-3 rounded-xl bg-blue-500/5 border border-blue-500/15">
@@ -161,29 +218,81 @@ function ProtocolContext({ protocol }: { protocol: UserProtocol }) {
       </div>
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
         <span className="font-medium text-[var(--foreground)]">
-          Day {phase.daysIn}{phase.daysTotal ? ` of ${phase.daysTotal}` : ''}
+          Day {cyclePhase.daysIn}{cyclePhase.daysTotal ? ` of ${cyclePhase.daysTotal}` : ''}
         </span>
-        <span className={cn('text-xs font-medium', phaseColors[phase.phase])}>
-          {phaseLabels[phase.phase]}
+        <span className={cn('text-xs font-medium', phaseColors[cyclePhase.phase])}>
+          {phaseLabels[cyclePhase.phase]}
         </span>
         <span className="text-xs text-[var(--muted-foreground)]">
           {protocol.doseAmount} {protocol.doseUnit} · {protocol.frequency}
         </span>
       </div>
-      {phase.progress !== null && (
+      {cyclePhase.progress !== null && (
         <div className="mt-2 h-1.5 rounded-full bg-[var(--muted)] overflow-hidden">
           <div
             className={cn('h-full rounded-full transition-all', barColor)}
-            style={{ width: `${Math.min(Math.round(phase.progress * 100), 100)}%` }}
+            style={{ width: `${Math.min(Math.round(cyclePhase.progress * 100), 100)}%` }}
           />
         </div>
       )}
-      <p className="text-xs text-[var(--muted-foreground)] mt-2">{phase.message}</p>
+      <p className="text-xs text-[var(--muted-foreground)] mt-2">{cyclePhase.message}</p>
+
+      {/* In your data so far */}
+      {hasTimeToEffect && (
+        <div className="mt-3 pt-3 border-t border-blue-500/10">
+          <div className="text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-wide mb-1.5">In your data so far</div>
+          {effectPhaseIndex == null || effectPhaseIndex < 0 ? (
+            <p className="text-sm text-[var(--muted-foreground)]">
+              Too early to tell — effects typically begin around {guidance!.timeToEffect[0].phase.toLowerCase()}
+            </p>
+          ) : (
+            <p className="text-sm text-[var(--foreground)]">
+              <span className="font-medium text-[var(--accent)]">{guidance!.timeToEffect[effectPhaseIndex].phase}</span>
+              {' — '}{guidance!.timeToEffect[effectPhaseIndex].description}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Metrics to watch */}
+      {hasOutcomes && (
+        <div className="mt-3 pt-3 border-t border-blue-500/10">
+          <div className="text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-wide mb-1.5">Metrics to watch</div>
+          <div className="space-y-1">
+            {guidance!.primaryOutcomes.map(o => {
+              const metricInfo = OUTCOME_METRICS[o.outcome]
+              if (!metricInfo) return (
+                <div key={o.outcome} className="flex items-center justify-between text-sm">
+                  <span className="text-[var(--muted-foreground)]">{o.outcome}</span>
+                  <span className="text-xs text-[var(--muted-foreground)]">—</span>
+                </div>
+              )
+              const hasTrackableMetrics = metricInfo.metrics.length > 0
+              const isConnected = hasTrackableMetrics && metricInfo.metrics.some(m => availableMetrics.has(m))
+              return (
+                <div key={o.outcome} className="flex items-center justify-between text-sm gap-2">
+                  <span className="text-[var(--muted-foreground)] truncate">{o.outcome} <span className="text-xs">({metricInfo.label})</span></span>
+                  {!hasTrackableMetrics ? (
+                    <span className="text-xs text-[var(--muted-foreground)] whitespace-nowrap">—</span>
+                  ) : isConnected ? (
+                    <span className="text-xs text-emerald-400 whitespace-nowrap">&#10003; Connected</span>
+                  ) : (
+                    <span className="text-xs text-[var(--muted-foreground)] whitespace-nowrap">— Not connected</span>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+          {availableMetrics.size === 0 && (
+            <p className="text-xs text-[var(--muted-foreground)] mt-2 opacity-75">Connect Apple Health or Oura to track automatically</p>
+          )}
+        </div>
+      )}
     </div>
   )
 }
 
-function GuidanceContent({ guidance }: { guidance: CycleGuidance }) {
+function GuidanceContent({ guidance, activePhaseIndex }: { guidance: CycleGuidance; activePhaseIndex?: number }) {
   return (
     <>
       {/* Cycle Guidance Block */}
@@ -258,12 +367,26 @@ function GuidanceContent({ guidance }: { guidance: CycleGuidance }) {
             <span className="text-xs text-[var(--muted-foreground)] uppercase tracking-wide">Time to Effect</span>
           </div>
           <div className="space-y-1">
-            {guidance.timeToEffect.map((t, i) => (
-              <div key={i} className="flex items-baseline gap-2 text-sm">
-                <span className="text-xs font-medium text-[var(--accent)] whitespace-nowrap min-w-[70px]">{t.phase}</span>
-                <span className="text-[var(--muted-foreground)]">{t.description}</span>
-              </div>
-            ))}
+            {guidance.timeToEffect.map((t, i) => {
+              const isActive = activePhaseIndex != null && activePhaseIndex === i
+              return (
+                <div
+                  key={i}
+                  className={cn(
+                    'flex items-baseline gap-2 text-sm rounded-lg px-2 py-0.5 -mx-2',
+                    isActive && 'bg-[var(--accent)]/10 border-l-2 border-[var(--accent)] pl-2',
+                  )}
+                >
+                  <span className={cn(
+                    'text-xs font-medium whitespace-nowrap min-w-[70px]',
+                    isActive ? 'text-[var(--foreground)]' : 'text-[var(--accent)]',
+                  )}>{t.phase}</span>
+                  <span className={cn(
+                    isActive ? 'text-[var(--foreground)] font-medium' : 'text-[var(--muted-foreground)]',
+                  )}>{t.description}</span>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}
@@ -289,10 +412,19 @@ function GuidanceContent({ guidance }: { guidance: CycleGuidance }) {
   )
 }
 
-function PeptideCard({ peptide, protocol }: { peptide: PeptideReference; protocol?: UserProtocol }) {
+function PeptideCard({ peptide, protocol, availableMetrics }: {
+  peptide: PeptideReference
+  protocol?: UserProtocol
+  availableMetrics: Set<string>
+}) {
   const [isExpanded, setIsExpanded] = useState(false)
   const categoryInfo = CATEGORY_INFO[peptide.category] || CATEGORY_INFO.other
   const CategoryIcon = categoryInfo.icon
+
+  const cyclePhase = protocol ? getCyclePhase(protocol.startDate, protocol.endDate) : null
+  const effectPhaseIndex = cyclePhase && peptide.guidance?.timeToEffect
+    ? getCurrentEffectPhaseIndex(peptide.guidance.timeToEffect, cyclePhase.daysIn)
+    : undefined
 
   return (
     <Card className="overflow-hidden" interactive>
@@ -343,10 +475,23 @@ function PeptideCard({ peptide, protocol }: { peptide: PeptideReference; protoco
           )}
 
           {/* User protocol context — shown first when running */}
-          {protocol && <ProtocolContext protocol={protocol} />}
+          {protocol && cyclePhase && (
+            <ProtocolContext
+              protocol={protocol}
+              cyclePhase={cyclePhase}
+              guidance={peptide.guidance}
+              availableMetrics={availableMetrics}
+              effectPhaseIndex={effectPhaseIndex}
+            />
+          )}
 
           {/* Guidance sections (cycle, outcomes, timeline, stop signals) */}
-          {peptide.guidance && <GuidanceContent guidance={peptide.guidance} />}
+          {peptide.guidance && (
+            <GuidanceContent
+              guidance={peptide.guidance}
+              activePhaseIndex={protocol ? effectPhaseIndex : undefined}
+            />
+          )}
 
           {/* Dosing details */}
           <div className="grid grid-cols-2 gap-3 pt-2">
@@ -383,10 +528,19 @@ function PeptideCard({ peptide, protocol }: { peptide: PeptideReference; protoco
   )
 }
 
-function SupplementCard({ supplement, protocol }: { supplement: SupplementReference; protocol?: UserProtocol }) {
+function SupplementCard({ supplement, protocol, availableMetrics }: {
+  supplement: SupplementReference
+  protocol?: UserProtocol
+  availableMetrics: Set<string>
+}) {
   const [isExpanded, setIsExpanded] = useState(false)
   const hasGuidance = !!supplement.guidance
   const isExpandable = hasGuidance || !!protocol
+
+  const cyclePhase = protocol ? getCyclePhase(protocol.startDate, protocol.endDate) : null
+  const effectPhaseIndex = cyclePhase && supplement.guidance?.timeToEffect
+    ? getCurrentEffectPhaseIndex(supplement.guidance.timeToEffect, cyclePhase.daysIn)
+    : undefined
 
   return (
     <Card className="overflow-hidden" interactive={isExpandable}>
@@ -430,10 +584,23 @@ function SupplementCard({ supplement, protocol }: { supplement: SupplementRefere
         <div className="px-4 pb-4 pt-0 border-t border-[var(--border)] bg-[var(--muted)]/50">
           <div className="pt-3">
             {/* User protocol context */}
-            {protocol && <ProtocolContext protocol={protocol} />}
+            {protocol && cyclePhase && (
+              <ProtocolContext
+                protocol={protocol}
+                cyclePhase={cyclePhase}
+                guidance={supplement.guidance}
+                availableMetrics={availableMetrics}
+                effectPhaseIndex={effectPhaseIndex}
+              />
+            )}
 
             {/* Guidance sections */}
-            {supplement.guidance && <GuidanceContent guidance={supplement.guidance} />}
+            {supplement.guidance && (
+              <GuidanceContent
+                guidance={supplement.guidance}
+                activePhaseIndex={protocol ? effectPhaseIndex : undefined}
+              />
+            )}
           </div>
           {supplement.aliases && supplement.aliases.length > 0 && (
             <div className="pt-1">
@@ -459,7 +626,6 @@ function ReconstitutionCalculator() {
   const [targetUnit, setTargetUnit] = useState<DoseUnit>('mcg')
   const [result, setResult] = useState<ReconstitutionResult | null>(null)
 
-  // Auto-select a peptide to prefill
   const [selectedPeptide, setSelectedPeptide] = useState<string>('')
 
   function handlePeptideSelect(name: string) {
@@ -498,7 +664,6 @@ function ReconstitutionCalculator() {
 
   return (
     <div className="space-y-4">
-      {/* Peptide quick-select */}
       <Card>
         <CardContent className="p-4">
           <label className="text-xs text-[var(--muted-foreground)] uppercase tracking-wide mb-2 block">
@@ -517,7 +682,6 @@ function ReconstitutionCalculator() {
         </CardContent>
       </Card>
 
-      {/* Input fields */}
       <Card>
         <CardContent className="p-4 space-y-4">
           <div className="text-sm font-semibold text-[var(--foreground)] flex items-center gap-2">
@@ -561,7 +725,6 @@ function ReconstitutionCalculator() {
         </CardContent>
       </Card>
 
-      {/* Target dose (optional) */}
       <Card>
         <CardContent className="p-4 space-y-4">
           <div className="text-sm font-semibold text-[var(--foreground)] flex items-center gap-2">
@@ -594,7 +757,6 @@ function ReconstitutionCalculator() {
         </CardContent>
       </Card>
 
-      {/* Calculate button */}
       <button
         onClick={handleCalculate}
         disabled={!canCalculate}
@@ -609,13 +771,11 @@ function ReconstitutionCalculator() {
         <ArrowRight className="w-4 h-4" />
       </button>
 
-      {/* Results */}
       {result && (
         <Card>
           <CardContent className="p-4 space-y-4">
             <div className="text-sm font-semibold text-[var(--foreground)]">Results</div>
 
-            {/* Key numbers */}
             <div className="grid grid-cols-2 gap-3">
               <div className="p-3 rounded-xl bg-[var(--accent)]/10 border border-[var(--accent)]/20">
                 <div className="text-xs text-[var(--muted-foreground)] mb-1">Concentration</div>
@@ -650,7 +810,6 @@ function ReconstitutionCalculator() {
               )}
             </div>
 
-            {/* Step-by-step math */}
             <div>
               <div className="text-xs text-[var(--muted-foreground)] uppercase tracking-wide mb-2">
                 Step-by-step
@@ -690,11 +849,23 @@ export default function LibraryPage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const { currentUserId } = useAppStore()
 
-  // Fetch user's active protocols to connect Library to user data
+  // Fetch user's active protocols
   const { data: userProtocols = [] } = useQuery<UserProtocol[]>({
     queryKey: ['protocols', currentUserId, 'active'],
     queryFn: async () => {
       const res = await fetch(`/api/protocols?userId=${currentUserId}&status=active`)
+      if (!res.ok) return []
+      return res.json()
+    },
+    enabled: !!currentUserId,
+    staleTime: 1000 * 60 * 5,
+  })
+
+  // Fetch health integration status to know which metrics are connected
+  const { data: healthIntegrations = [] } = useQuery<HealthIntegrationResponse[]>({
+    queryKey: ['health-integrations', currentUserId],
+    queryFn: async () => {
+      const res = await fetch(`/api/health/integrations?userId=${currentUserId}`)
       if (!res.ok) return []
       return res.json()
     },
@@ -710,6 +881,21 @@ export default function LibraryPage() {
     }
     return map
   }, [userProtocols])
+
+  // Derive which health metrics have data from any connected provider
+  const availableMetrics = useMemo(() => {
+    const metrics = new Set<string>()
+    for (const provider of healthIntegrations) {
+      if (provider.integration?.isConnected && provider.integration.metricSyncState) {
+        for (const [metric, state] of Object.entries(provider.integration.metricSyncState)) {
+          if (state.status === 'ok' && (state.dataPoints ?? 0) > 0) {
+            metrics.add(metric)
+          }
+        }
+      }
+    }
+    return metrics
+  }, [healthIntegrations])
 
   const isSupplementsView = selectedCategory === 'supplements'
 
@@ -750,7 +936,6 @@ export default function LibraryPage() {
       })
     }
 
-    // Sort: supplements with guidance first, then alphabetical
     supplements.sort((a, b) => {
       if (a.guidance && !b.guidance) return -1
       if (!a.guidance && b.guidance) return 1
@@ -774,7 +959,6 @@ export default function LibraryPage() {
     <div className="p-4 pb-4">
       <h2 className="text-xl font-semibold text-[var(--foreground)] mb-4">Library</h2>
 
-      {/* Tab switcher */}
       <div className="flex gap-1 p-1 rounded-xl bg-[var(--muted)] mb-4">
         {tabs.map(tab => {
           const Icon = tab.icon
@@ -798,7 +982,6 @@ export default function LibraryPage() {
 
       {activeTab === 'reference' ? (
         <>
-          {/* Search */}
           <div className="relative mb-4">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted-foreground)]" />
             <Input
@@ -809,7 +992,6 @@ export default function LibraryPage() {
             />
           </div>
 
-          {/* Category filters */}
           <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
             <button
               onClick={() => setSelectedCategory(null)}
@@ -838,12 +1020,10 @@ export default function LibraryPage() {
             ))}
           </div>
 
-          {/* Results count */}
           <div className="text-sm text-[var(--muted-foreground)] mb-3">
             {itemCount} {itemLabel}{itemCount !== 1 ? 's' : ''}
           </div>
 
-          {/* Item list */}
           <div className="space-y-3">
             {isSupplementsView ? (
               filteredSupplements.map((supplement, index) => (
@@ -851,6 +1031,7 @@ export default function LibraryPage() {
                   <SupplementCard
                     supplement={supplement}
                     protocol={protocolsByName.get(supplement.name.toLowerCase())}
+                    availableMetrics={availableMetrics}
                   />
                 </div>
               ))
@@ -860,6 +1041,7 @@ export default function LibraryPage() {
                   <PeptideCard
                     peptide={peptide}
                     protocol={protocolsByName.get(peptide.name.toLowerCase())}
+                    availableMetrics={availableMetrics}
                   />
                 </div>
               ))
@@ -875,7 +1057,6 @@ export default function LibraryPage() {
             )}
           </div>
 
-          {/* Info note */}
           <div className="mt-6 text-center text-xs text-[var(--muted-foreground)]">
             {isSupplementsView
               ? 'Tap a supplement for cycle guidance'
