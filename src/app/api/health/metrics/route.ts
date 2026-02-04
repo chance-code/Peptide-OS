@@ -20,11 +20,11 @@ export async function GET(request: NextRequest) {
     const metricTypesStr = searchParams.get('metricTypes')
     const provider = searchParams.get('provider')
 
-    // Default to last 30 days
+    // Default to last 180 days
     const endDate = endDateStr ? new Date(endDateStr) : new Date()
     const startDate = startDateStr
       ? new Date(startDateStr)
-      : new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000)
+      : new Date(endDate.getTime() - 180 * 24 * 60 * 60 * 1000)
 
     // Build query
     const where: {

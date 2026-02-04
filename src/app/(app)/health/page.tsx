@@ -168,7 +168,7 @@ export default function HealthDashboardNew() {
     if (syncingProvider === 'apple_health') return
     setSyncingProvider('apple_health')
     try {
-      const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+      const since = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000)
       const result = await fetchAppleHealthWithStatus('', since)
 
       const res = await fetch('/api/health/ingest/apple-health', {
@@ -267,7 +267,7 @@ export default function HealthDashboardNew() {
     queryFn: async () => {
       if (!currentUserId) return null
       const endDate = new Date().toISOString()
-      const startDate = new Date(Date.now() - 95 * 24 * 60 * 60 * 1000).toISOString()
+      const startDate = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString()
       const res = await fetch(`/api/health/metrics?startDate=${startDate}&endDate=${endDate}`)
       if (!res.ok) return null
       const data = await res.json()
@@ -530,127 +530,9 @@ export default function HealthDashboardNew() {
     }
   }, [dataSource, baselines, trajectory, bodyCompState, todayDeltas, claimsData, protocolEvidence, dataStatus])
 
-  // Loading state: queries still in flight and user has connected integrations
-  if (!processedData && isLoadingMetrics && hasConnectedIntegrations) {
-    return (
-      <div className="bg-[var(--background)] pb-24">
-        <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
-          <h1 className="text-lg font-semibold text-[var(--foreground)]">Health</h1>
-          <Loader2 className="w-4 h-4 animate-spin text-[var(--muted-foreground)]" />
-        </div>
-        <div className="max-w-lg mx-auto px-4 py-6 space-y-6">
-          {/* Trajectory skeleton */}
-          <div className="rounded-2xl bg-[var(--card)] border border-[var(--border)] p-6 space-y-4">
-            <div className="h-4 w-40 bg-[var(--muted)] rounded animate-pulse" />
-            <div className="h-8 w-32 bg-[var(--muted)] rounded animate-pulse" />
-            <div className="h-4 w-64 bg-[var(--muted)] rounded animate-pulse" />
-            <div className="flex gap-3 mt-4">
-              <div className="h-10 flex-1 bg-[var(--muted)] rounded-lg animate-pulse" />
-              <div className="h-10 flex-1 bg-[var(--muted)] rounded-lg animate-pulse" />
-              <div className="h-10 flex-1 bg-[var(--muted)] rounded-lg animate-pulse" />
-            </div>
-          </div>
-          {/* Category cards skeleton */}
-          <div className="grid grid-cols-3 gap-3">
-            {[0, 1, 2].map(i => (
-              <div key={i} className="rounded-xl bg-[var(--card)] border border-[var(--border)] p-3 space-y-2">
-                <div className="h-3 w-12 bg-[var(--muted)] rounded animate-pulse" />
-                <div className="h-5 w-16 bg-[var(--muted)] rounded animate-pulse" />
-              </div>
-            ))}
-          </div>
-          {/* What matters skeleton */}
-          <div className="rounded-xl bg-[var(--card)] border border-[var(--border)] p-5 space-y-3">
-            <div className="h-3 w-32 bg-[var(--muted)] rounded animate-pulse" />
-            {[0, 1, 2].map(i => (
-              <div key={i} className="flex items-center gap-4 py-2">
-                <div className="w-8 h-8 bg-[var(--muted)] rounded-full animate-pulse" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 w-24 bg-[var(--muted)] rounded animate-pulse" />
-                  <div className="h-3 w-48 bg-[var(--muted)] rounded animate-pulse" />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // No data state: queries resolved but no connected integrations or insufficient data
-  if (!processedData) {
-    const appleHealthIntegration = integrations?.find((i: Integration) => i.provider === 'apple_health')
-
-    return (
-      <div className="bg-[var(--background)] p-4">
-        <div className="max-w-lg mx-auto pt-8">
-          <div className="text-center mb-8">
-            <Activity className="w-12 h-12 text-[var(--muted-foreground)] mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-[var(--foreground)] mb-2">Connect Apple Health</h2>
-            <p className="text-[var(--muted-foreground)]">
-              Apple Health provides everything you need — sleep, HRV, activity, body composition, and more. Connect it to get started.
-            </p>
-          </div>
-
-          <div className="space-y-3 mb-6">
-            <div className="p-4 rounded-xl bg-[var(--card)] border border-[var(--border)]">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center">
-                    <Heart className="w-5 h-5 text-red-400" />
-                  </div>
-                  <div>
-                    <div className="font-medium text-[var(--foreground)]">Apple Health</div>
-                    <div className="text-xs text-[var(--muted-foreground)]">
-                      {appleHealthIntegration?.isConnected
-                        ? appleHealthIntegration.lastSyncAt
-                          ? `Last sync: ${format(new Date(appleHealthIntegration.lastSyncAt), 'MMM d, h:mm a')}`
-                          : 'Connected'
-                        : 'Not connected'}
-                    </div>
-                  </div>
-                </div>
-                {appleHealthIntegration?.isConnected ? (
-                  <button
-                    onClick={() => syncAppleHealth()}
-                    disabled={syncingProvider === 'apple_health'}
-                    className={cn(
-                      'px-3 py-1.5 rounded-lg text-sm font-medium',
-                      'bg-indigo-600 hover:bg-indigo-500 text-white',
-                      'disabled:opacity-50'
-                    )}
-                  >
-                    {syncingProvider === 'apple_health' ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : 'Sync'}
-                  </button>
-                ) : (
-                  <button
-                    onClick={connectAppleHealth}
-                    className="px-3 py-1.5 rounded-lg text-sm font-medium bg-emerald-600 hover:bg-emerald-500 text-white"
-                  >
-                    Connect
-                  </button>
-                )}
-              </div>
-              {appleHealthIntegration?.syncError && (
-                <div className="mt-2 text-xs text-red-400">
-                  Error: {appleHealthIntegration.syncError}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="text-xs text-[var(--muted-foreground)] p-3 bg-[var(--muted)] rounded-lg">
-            <div>User ID: {currentUserId || 'Not logged in'}</div>
-            <div>Integrations: {integrations?.length || 0}</div>
-            <div>Connected: {hasConnectedIntegrations ? 'Yes' : 'No'}</div>
-            <div>Metrics: {realMetrics?.length || 0}</div>
-          </div>
-        </div>
-      </div>
-    )
-  }
+  // Determine page state — used for single-return rendering
+  const isLoading = !processedData && isLoadingMetrics && hasConnectedIntegrations
+  const isNoData = !processedData && !isLoading
 
   return (
     <div className="bg-[var(--background)] pb-4">
@@ -659,6 +541,9 @@ export default function HealthDashboardNew() {
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
           <h1 className="text-lg font-semibold text-[var(--foreground)]">Health</h1>
           <div className="flex items-center gap-2">
+            {isLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin text-[var(--muted-foreground)]" />
+            ) : (<>
             {(() => {
               if (useDemoData) {
                 return (
@@ -733,6 +618,7 @@ export default function HealthDashboardNew() {
             >
               <RefreshCw className={cn("w-5 h-5", (syncMutation.isPending || syncingProvider === 'apple_health') && "animate-spin")} />
             </button>
+            </>)}
           </div>
         </div>
 
@@ -1046,35 +932,148 @@ export default function HealthDashboardNew() {
         )}
       </div>
 
-      {/* Permission-denied banner — shown above fold */}
-      {(() => {
-        if (useDemoData) return null
-        const connectedWithState = integrations?.find((i: Integration) => i.isConnected && i.metricSyncState)
-        const syncState = connectedWithState?.metricSyncState
-        const deniedList = syncState
-          ? Object.entries(syncState).filter(([, s]) => s.status === 'permission_denied')
-          : []
-        if (deniedList.length === 0) return null
-        return (
-          <div className="max-w-lg mx-auto px-4 pt-4">
-            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-[var(--foreground)]">
-                  {deniedList.length} metric{deniedList.length > 1 ? 's' : ''} need{deniedList.length === 1 ? 's' : ''} permission
+      {/* Permission-denied banner — stable container, always in DOM */}
+      <div className="max-w-lg mx-auto px-4">
+        {(() => {
+          if (useDemoData || !processedData) return null
+          const connectedWithState = integrations?.find((i: Integration) => i.isConnected && i.metricSyncState)
+          const syncState = connectedWithState?.metricSyncState
+          const deniedList = syncState
+            ? Object.entries(syncState).filter(([, s]) => s.status === 'permission_denied')
+            : []
+          if (deniedList.length === 0) return null
+          return (
+            <div className="pt-4">
+              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-[var(--foreground)]">
+                    {deniedList.length} metric{deniedList.length > 1 ? 's' : ''} need{deniedList.length === 1 ? 's' : ''} permission
+                  </div>
+                  <p className="text-xs text-[var(--muted-foreground)] mt-0.5">
+                    Open Settings &gt; Privacy &gt; Health &gt; Arc Protocol to enable: {deniedList.map(([mt]) => getMetricDisplayName(mt)).join(', ')}
+                  </p>
                 </div>
-                <p className="text-xs text-[var(--muted-foreground)] mt-0.5">
-                  Open Settings &gt; Privacy &gt; Health &gt; Arc Protocol to enable: {deniedList.map(([mt]) => getMetricDisplayName(mt)).join(', ')}
-                </p>
               </div>
             </div>
-          </div>
-        )
-      })()}
+          )
+        })()}
+      </div>
 
       <div className="max-w-lg mx-auto px-4 pt-3 pb-6 space-y-6">
+        {/* ═══════════════ LOADING STATE ═══════════════ */}
+        {isLoading && (
+          <>
+            {/* Trajectory skeleton */}
+            <div className="rounded-2xl bg-[var(--card)] border border-[var(--border)] p-6 space-y-4">
+              <div className="h-4 w-40 bg-[var(--muted)] rounded animate-pulse" />
+              <div className="h-8 w-32 bg-[var(--muted)] rounded animate-pulse" />
+              <div className="h-4 w-64 bg-[var(--muted)] rounded animate-pulse" />
+              <div className="flex gap-3 mt-4">
+                <div className="h-10 flex-1 bg-[var(--muted)] rounded-lg animate-pulse" />
+                <div className="h-10 flex-1 bg-[var(--muted)] rounded-lg animate-pulse" />
+                <div className="h-10 flex-1 bg-[var(--muted)] rounded-lg animate-pulse" />
+              </div>
+            </div>
+            {/* Category cards skeleton */}
+            <div className="grid grid-cols-3 gap-3">
+              {[0, 1, 2].map(i => (
+                <div key={i} className="rounded-xl bg-[var(--card)] border border-[var(--border)] p-3 space-y-2">
+                  <div className="h-3 w-12 bg-[var(--muted)] rounded animate-pulse" />
+                  <div className="h-5 w-16 bg-[var(--muted)] rounded animate-pulse" />
+                </div>
+              ))}
+            </div>
+            {/* What matters skeleton */}
+            <div className="rounded-xl bg-[var(--card)] border border-[var(--border)] p-5 space-y-3">
+              <div className="h-3 w-32 bg-[var(--muted)] rounded animate-pulse" />
+              {[0, 1, 2].map(i => (
+                <div key={i} className="flex items-center gap-4 py-2">
+                  <div className="w-8 h-8 bg-[var(--muted)] rounded-full animate-pulse" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 w-24 bg-[var(--muted)] rounded animate-pulse" />
+                    <div className="h-3 w-48 bg-[var(--muted)] rounded animate-pulse" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* ═══════════════ NO DATA STATE ═══════════════ */}
+        {isNoData && (() => {
+          const appleHealthIntegration = integrations?.find((i: Integration) => i.provider === 'apple_health')
+          return (
+            <div className="pt-6">
+              <div className="text-center mb-8">
+                <Activity className="w-12 h-12 text-[var(--muted-foreground)] mx-auto mb-4" />
+                <h2 className="text-xl font-semibold text-[var(--foreground)] mb-2">Connect Apple Health</h2>
+                <p className="text-[var(--muted-foreground)]">
+                  Apple Health provides everything you need — sleep, HRV, activity, body composition, and more. Connect it to get started.
+                </p>
+              </div>
+
+              <div className="space-y-3 mb-6">
+                <div className="p-4 rounded-xl bg-[var(--card)] border border-[var(--border)]">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center">
+                        <Heart className="w-5 h-5 text-red-400" />
+                      </div>
+                      <div>
+                        <div className="font-medium text-[var(--foreground)]">Apple Health</div>
+                        <div className="text-xs text-[var(--muted-foreground)]">
+                          {appleHealthIntegration?.isConnected
+                            ? appleHealthIntegration.lastSyncAt
+                              ? `Last sync: ${format(new Date(appleHealthIntegration.lastSyncAt), 'MMM d, h:mm a')}`
+                              : 'Connected'
+                            : 'Not connected'}
+                        </div>
+                      </div>
+                    </div>
+                    {appleHealthIntegration?.isConnected ? (
+                      <button
+                        onClick={() => syncAppleHealth()}
+                        disabled={syncingProvider === 'apple_health'}
+                        className={cn(
+                          'px-3 py-1.5 rounded-lg text-sm font-medium',
+                          'bg-indigo-600 hover:bg-indigo-500 text-white',
+                          'disabled:opacity-50'
+                        )}
+                      >
+                        {syncingProvider === 'apple_health' ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : 'Sync'}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={connectAppleHealth}
+                        className="px-3 py-1.5 rounded-lg text-sm font-medium bg-emerald-600 hover:bg-emerald-500 text-white"
+                      >
+                        Connect
+                      </button>
+                    )}
+                  </div>
+                  {appleHealthIntegration?.syncError && (
+                    <div className="mt-2 text-xs text-red-400">
+                      Error: {appleHealthIntegration.syncError}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="text-xs text-[var(--muted-foreground)] p-3 bg-[var(--muted)] rounded-lg">
+                <div>User ID: {currentUserId || 'Not logged in'}</div>
+                <div>Integrations: {integrations?.length || 0}</div>
+                <div>Connected: {hasConnectedIntegrations ? 'Yes' : 'No'}</div>
+                <div>Metrics: {realMetrics?.length || 0}</div>
+              </div>
+            </div>
+          )
+        })()}
+
         {/* ═══════════════ TODAY TAB ═══════════════ */}
-        {selectedSection === 'overview' && (
+        {processedData && selectedSection === 'overview' && (
           <>
             {/* 1. Trajectory Hero */}
             <TrajectoryHero
@@ -1112,51 +1111,60 @@ export default function HealthDashboardNew() {
               />
             </div>
 
-            {/* 3. Body Composition Card */}
-            {processedData.bodyCompState.recompStatus !== 'insufficient_data' && (
-              <div className="rounded-xl bg-[var(--card)] border border-[var(--border)] p-4">
-                <div className="flex items-center gap-2 mb-3">
+            {/* 3. Body Composition Card — always rendered for layout stability */}
+            <div className="rounded-xl bg-[var(--card)] border border-[var(--border)] p-4">
+              {processedData.bodyCompState.recompStatus !== 'insufficient_data' ? (
+                <>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Scale className="w-4 h-4 text-[var(--muted-foreground)]" />
+                    <h3 className="text-sm font-medium text-[var(--muted-foreground)] uppercase tracking-wider">
+                      Body Composition
+                    </h3>
+                    <span className={cn(
+                      'text-xs px-1.5 py-0.5 rounded',
+                      processedData.bodyCompState.confidence === 'high' ? 'bg-emerald-500/20 text-emerald-400' :
+                      processedData.bodyCompState.confidence === 'medium' ? 'bg-amber-500/20 text-amber-400' :
+                      'bg-[var(--muted-foreground)]/20 text-[var(--muted-foreground)]'
+                    )}>
+                      {processedData.bodyCompState.confidence}
+                    </span>
+                  </div>
+                  <p className="text-base font-medium text-[var(--foreground)] mb-1">
+                    {processedData.bodyCompState.headline}
+                  </p>
+                  <p className="text-sm text-[var(--muted-foreground)] mb-3">
+                    {processedData.bodyCompState.detail}
+                  </p>
+                  <div className="flex gap-3">
+                    {processedData.bodyCompState.weight && (
+                      <TrendPill
+                        label="Weight"
+                        direction={processedData.bodyCompState.trend.weightDir}
+                      />
+                    )}
+                    {processedData.bodyCompState.bodyFatPct && (
+                      <TrendPill
+                        label="Body Fat"
+                        direction={processedData.bodyCompState.trend.fatDir}
+                      />
+                    )}
+                    {(processedData.bodyCompState.muscleMass || processedData.bodyCompState.leanMass) && (
+                      <TrendPill
+                        label={processedData.bodyCompState.muscleMass ? 'Muscle' : 'Lean Mass'}
+                        direction={processedData.bodyCompState.trend.massDir}
+                      />
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center gap-2">
                   <Scale className="w-4 h-4 text-[var(--muted-foreground)]" />
-                  <h3 className="text-sm font-medium text-[var(--muted-foreground)] uppercase tracking-wider">
-                    Body Composition
-                  </h3>
-                  <span className={cn(
-                    'text-xs px-1.5 py-0.5 rounded',
-                    processedData.bodyCompState.confidence === 'high' ? 'bg-emerald-500/20 text-emerald-400' :
-                    processedData.bodyCompState.confidence === 'medium' ? 'bg-amber-500/20 text-amber-400' :
-                    'bg-[var(--muted-foreground)]/20 text-[var(--muted-foreground)]'
-                  )}>
-                    {processedData.bodyCompState.confidence}
+                  <span className="text-sm text-[var(--muted-foreground)]">
+                    Body composition data accumulating...
                   </span>
                 </div>
-                <p className="text-base font-medium text-[var(--foreground)] mb-1">
-                  {processedData.bodyCompState.headline}
-                </p>
-                <p className="text-sm text-[var(--muted-foreground)] mb-3">
-                  {processedData.bodyCompState.detail}
-                </p>
-                <div className="flex gap-3">
-                  {processedData.bodyCompState.weight && (
-                    <TrendPill
-                      label="Weight"
-                      direction={processedData.bodyCompState.trend.weightDir}
-                    />
-                  )}
-                  {processedData.bodyCompState.bodyFatPct && (
-                    <TrendPill
-                      label="Body Fat"
-                      direction={processedData.bodyCompState.trend.fatDir}
-                    />
-                  )}
-                  {(processedData.bodyCompState.muscleMass || processedData.bodyCompState.leanMass) && (
-                    <TrendPill
-                      label={processedData.bodyCompState.muscleMass ? 'Muscle' : 'Lean Mass'}
-                      direction={processedData.bodyCompState.trend.massDir}
-                    />
-                  )}
-                </div>
-              </div>
-            )}
+              )}
+            </div>
 
             {/* 4. What Matters Today (signal-classified + top recommendation integrated) */}
             <WhatChangedCard
@@ -1166,21 +1174,23 @@ export default function HealthDashboardNew() {
               onWhyClick={handleWhyClick}
             />
 
-            {/* 5. Quick Protocol Status */}
-            {processedData.protocolEvidence.length > 0 && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-medium text-[var(--muted-foreground)] uppercase tracking-wider">
-                    Protocol Status
-                  </h2>
+            {/* 5. Quick Protocol Status — always rendered for layout stability */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-medium text-[var(--muted-foreground)] uppercase tracking-wider">
+                  Protocol Status
+                </h2>
+                {processedData.protocolEvidence.length > 0 && (
                   <button
                     onClick={() => setSelectedSection('evidence')}
                     className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
                   >
                     View All <ChevronRight className="w-3 h-3" />
                   </button>
-                </div>
-                {processedData.protocolEvidence.slice(0, 2).map((evidence) => (
+                )}
+              </div>
+              {processedData.protocolEvidence.length > 0 ? (
+                processedData.protocolEvidence.slice(0, 2).map((evidence) => (
                   <QuickVerdictBadge
                     key={evidence.protocolId}
                     protocolName={evidence.protocolName}
@@ -1188,9 +1198,13 @@ export default function HealthDashboardNew() {
                     daysOnProtocol={evidence.daysOnProtocol}
                     onClick={() => setSelectedSection('evidence')}
                   />
-                ))}
-              </div>
-            )}
+                ))
+              ) : (
+                <p className="text-sm text-[var(--muted-foreground)]">
+                  No active protocols to evaluate yet
+                </p>
+              )}
+            </div>
 
             {/* Data Status (collapsible) */}
             {(() => {
@@ -1347,7 +1361,7 @@ export default function HealthDashboardNew() {
         )}
 
         {/* ═══════════════ EVIDENCE TAB ═══════════════ */}
-        {selectedSection === 'evidence' && (
+        {processedData && selectedSection === 'evidence' && (
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-[var(--muted-foreground)] mb-2">
               <Beaker className="w-5 h-5" />
@@ -1371,7 +1385,7 @@ export default function HealthDashboardNew() {
         )}
 
         {/* ═══════════════ INSIGHTS TAB ═══════════════ */}
-        {selectedSection === 'insights' && (
+        {processedData && selectedSection === 'insights' && (
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-[var(--muted-foreground)] mb-2">
               <Sparkles className="w-5 h-5" />
@@ -1427,10 +1441,10 @@ export default function HealthDashboardNew() {
             </div>
             <div>
               <div className="text-lg font-bold text-[var(--foreground)]">
-                {processedData.trajectory.direction.charAt(0).toUpperCase() + processedData.trajectory.direction.slice(1)}
+                {processedData?.trajectory.direction.charAt(0).toUpperCase()}{processedData?.trajectory.direction.slice(1)}
               </div>
               <div className="text-sm text-[var(--muted-foreground)]">
-                {processedData.trajectory.window}-day window · {processedData.trajectory.confidence} confidence
+                {processedData?.trajectory.window}-day window · {processedData?.trajectory.confidence} confidence
               </div>
             </div>
           </div>
@@ -1479,12 +1493,12 @@ export default function HealthDashboardNew() {
           </div>
 
           <div className="p-4 rounded-xl bg-[var(--muted)] border border-[var(--border)]">
-            <h4 className="font-medium text-[var(--foreground)] mb-2">Data: {processedData.trajectory.daysOfData} days</h4>
+            <h4 className="font-medium text-[var(--foreground)] mb-2">Data: {processedData?.trajectory.daysOfData} days</h4>
             <p className="text-sm text-[var(--muted-foreground)]">
-              Using a {processedData.trajectory.window}-day analysis window.
-              {processedData.trajectory.dataState === 'rich' ? ' Plenty of data for high confidence.' :
-               processedData.trajectory.dataState === 'adequate' ? ' Adequate data — confidence improves with more days.' :
-               processedData.trajectory.dataState === 'sparse' ? ' Limited data — results are directional, not definitive.' :
+              Using a {processedData?.trajectory.window}-day analysis window.
+              {processedData?.trajectory.dataState === 'rich' ? ' Plenty of data for high confidence.' :
+               processedData?.trajectory.dataState === 'adequate' ? ' Adequate data — confidence improves with more days.' :
+               processedData?.trajectory.dataState === 'sparse' ? ' Limited data — results are directional, not definitive.' :
                ' Need more data before trajectory is meaningful.'}
             </p>
           </div>
@@ -1524,7 +1538,7 @@ export default function HealthDashboardNew() {
           <div className="space-y-3">
             <h4 className="font-medium text-[var(--foreground)]">Possible explanations:</h4>
             <div className="space-y-2">
-              {processedData.interventions.slice(0, 3).map((intervention) => (
+              {processedData?.interventions.slice(0, 3).map((intervention) => (
                 <div
                   key={intervention.id}
                   className="p-3 rounded-lg bg-[var(--muted)] border border-[var(--border)]"

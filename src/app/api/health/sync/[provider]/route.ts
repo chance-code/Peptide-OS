@@ -139,7 +139,7 @@ export async function POST(
     const syncState = parseSyncState(integration.enabledMetrics)
 
     // Determine sync window — use oldest per-metric lastSyncAt or global lastSyncAt or 30 days
-    const defaultSince = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+    const defaultSince = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000)
     const since = integration.lastSyncAt || defaultSince
 
     try {
