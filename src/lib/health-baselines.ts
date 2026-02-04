@@ -96,7 +96,7 @@ export function compareToBaseline(
 ): BaselineDelta {
   const absoluteDelta = current - baseline.mean
   const percentDelta = baseline.mean !== 0
-    ? (absoluteDelta / baseline.mean) * 100
+    ? clampPercent((absoluteDelta / baseline.mean) * 100)
     : 0
 
   // Z-score (how many standard deviations from mean)

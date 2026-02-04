@@ -3,6 +3,7 @@
 
 import { prisma } from './prisma'
 import { MetricType, getMetricDisplayName, formatMetricValue } from './health-providers'
+import { clampPercent } from './health-constants'
 
 export interface CorrelationResult {
   protocolId: string
@@ -126,7 +127,7 @@ export async function calculateCorrelations(
 
       // Calculate delta and percent change
       const delta = afterAvg - beforeAvg
-      const percentChange = beforeAvg !== 0 ? (delta / beforeAvg) * 100 : 0
+      const percentChange = beforeAvg !== 0 ? clampPercent((delta / beforeAvg) * 100) : 0
 
       // Determine confidence based on data points
       const totalPoints = beforeMetrics.length + afterMetrics.length
