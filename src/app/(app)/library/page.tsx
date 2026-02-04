@@ -1,12 +1,13 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Search, ChevronDown, ChevronUp, Pill, Sparkles, Scale, Heart, Zap, Beaker, BookOpen, FlaskConical, ArrowRight } from 'lucide-react'
+import { Search, ChevronDown, ChevronUp, Pill, Sparkles, Scale, Heart, Zap, Beaker, BookOpen, FlaskConical, ArrowRight, Clock, AlertTriangle, Target, RefreshCw } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
-import { PEPTIDE_REFERENCE, type PeptideReference } from '@/lib/peptide-reference'
+import { PEPTIDE_REFERENCE, type PeptideReference, type CycleGuidance } from '@/lib/peptide-reference'
+import { SUPPLEMENT_REFERENCE, type SupplementReference } from '@/lib/supplement-reference'
 import { calculateReconstitution, mlToUnits } from '@/lib/reconstitution'
 import type { DoseUnit, ReconstitutionResult } from '@/types'
 
@@ -16,6 +17,145 @@ const CATEGORY_INFO: Record<string, { label: string; icon: typeof Pill; color: s
   'weight-loss': { label: 'Weight Loss', icon: Scale, color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300' },
   cosmetic: { label: 'Cosmetic', icon: Sparkles, color: 'bg-pink-100 text-pink-800 dark:bg-pink-900/50 dark:text-pink-300' },
   other: { label: 'Other', icon: Pill, color: 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300' },
+  supplements: { label: 'Supplements', icon: Pill, color: 'bg-teal-100 text-teal-800 dark:bg-teal-900/50 dark:text-teal-300' },
+}
+
+function formatCycleSummary(g: CycleGuidance): string {
+  const parts: string[] = []
+
+  if (g.cycleType === 'continuous') {
+    parts.push('Continuous')
+  } else if (g.cycleType === 'pulse') {
+    parts.push('As needed')
+  } else if (g.cycleLengthWeeks) {
+    parts.push(`${g.cycleLengthWeeks.min}–${g.cycleLengthWeeks.max} wk cycle`)
+  }
+
+  if (g.offCycleLengthWeeks) {
+    if (g.offCycleLengthWeeks.min === g.offCycleLengthWeeks.max) {
+      parts.push(`${g.offCycleLengthWeeks.min} wk off`)
+    } else {
+      parts.push(`${g.offCycleLengthWeeks.min}–${g.offCycleLengthWeeks.max} wk off`)
+    }
+  }
+
+  if (g.reassessmentNote) {
+    parts.push(`Reassess: ${g.reassessmentNote}`)
+  } else if (g.reassessment === 'end_of_cycle') {
+    parts.push('Reassess: End of cycle')
+  } else if (g.reassessment === 'periodic') {
+    parts.push('Reassess: Periodic')
+  } else {
+    parts.push('Reassess: Symptom-driven')
+  }
+
+  return parts.join(' · ')
+}
+
+function GuidanceContent({ guidance }: { guidance: CycleGuidance }) {
+  return (
+    <>
+      {/* Cycle Guidance Block */}
+      <div className="mt-2 mb-3 p-3 rounded-xl bg-[var(--card)] border border-[var(--border)]">
+        <div className="flex items-center gap-1.5 mb-2">
+          <RefreshCw className="w-3.5 h-3.5 text-[var(--accent)]" />
+          <span className="text-xs font-semibold text-[var(--foreground)] uppercase tracking-wide">Cycle Guidance</span>
+        </div>
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+          <div>
+            <span className="text-[var(--muted-foreground)]">Cycle: </span>
+            <span className="font-medium text-[var(--foreground)]">
+              {guidance.cycleType === 'continuous' ? 'Continuous'
+                : guidance.cycleType === 'pulse' ? 'As needed'
+                : guidance.cycleLengthWeeks
+                  ? `${guidance.cycleLengthWeeks.min}–${guidance.cycleLengthWeeks.max} weeks`
+                  : 'Varies'}
+            </span>
+          </div>
+          {guidance.offCycleLengthWeeks && (
+            <div>
+              <span className="text-[var(--muted-foreground)]">Off: </span>
+              <span className="font-medium text-[var(--foreground)]">
+                {guidance.offCycleLengthWeeks.min === guidance.offCycleLengthWeeks.max
+                  ? `${guidance.offCycleLengthWeeks.min} weeks`
+                  : `${guidance.offCycleLengthWeeks.min}–${guidance.offCycleLengthWeeks.max} weeks`}
+              </span>
+            </div>
+          )}
+          <div>
+            <span className="text-[var(--muted-foreground)]">Reassess: </span>
+            <span className="font-medium text-[var(--foreground)]">
+              {guidance.reassessmentNote
+                || (guidance.reassessment === 'end_of_cycle' ? 'End of cycle'
+                  : guidance.reassessment === 'periodic' ? 'Periodic'
+                  : 'Symptom-driven')}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Primary Outcomes */}
+      {guidance.primaryOutcomes && guidance.primaryOutcomes.length > 0 && (
+        <div className="mb-3">
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <Target className="w-3.5 h-3.5 text-[var(--muted-foreground)]" />
+            <span className="text-xs text-[var(--muted-foreground)] uppercase tracking-wide">Expected Outcomes</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {guidance.primaryOutcomes.map(o => (
+              <span
+                key={o.outcome}
+                className={cn(
+                  'px-2 py-0.5 rounded-md text-xs font-medium border',
+                  o.confidence === 'high' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                    : o.confidence === 'medium' ? 'bg-amber-500/10 border-amber-500/20 text-amber-400'
+                    : 'bg-[var(--muted)] border-[var(--border)] text-[var(--muted-foreground)]'
+                )}
+              >
+                {o.outcome} ({o.confidence})
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Time to Effect */}
+      {guidance.timeToEffect && guidance.timeToEffect.length > 0 && (
+        <div className="mb-3">
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <Clock className="w-3.5 h-3.5 text-[var(--muted-foreground)]" />
+            <span className="text-xs text-[var(--muted-foreground)] uppercase tracking-wide">Time to Effect</span>
+          </div>
+          <div className="space-y-1">
+            {guidance.timeToEffect.map((t, i) => (
+              <div key={i} className="flex items-baseline gap-2 text-sm">
+                <span className="text-xs font-medium text-[var(--accent)] whitespace-nowrap min-w-[70px]">{t.phase}</span>
+                <span className="text-[var(--muted-foreground)]">{t.description}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Stop Signals */}
+      {guidance.stopSignals && guidance.stopSignals.length > 0 && (
+        <div className="mb-3">
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+            <span className="text-xs text-[var(--muted-foreground)] uppercase tracking-wide">Reassess if</span>
+          </div>
+          <ul className="space-y-0.5">
+            {guidance.stopSignals.map((s, i) => (
+              <li key={i} className="text-sm text-[var(--muted-foreground)] flex items-start gap-1.5">
+                <span className="text-[var(--border)] mt-1.5">•</span>
+                {s}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </>
+  )
 }
 
 function PeptideCard({ peptide }: { peptide: PeptideReference }) {
@@ -43,6 +183,11 @@ function PeptideCard({ peptide }: { peptide: PeptideReference }) {
               {peptide.description && !isExpanded && (
                 <p className="text-sm text-[var(--muted-foreground)] line-clamp-1">{peptide.description}</p>
               )}
+              {!isExpanded && peptide.guidance && (
+                <p className="text-xs text-[var(--muted-foreground)] mt-0.5">
+                  {formatCycleSummary(peptide.guidance)}
+                </p>
+              )}
             </div>
             <div className="ml-2 text-[var(--muted-foreground)]">
               {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
@@ -59,6 +204,11 @@ function PeptideCard({ peptide }: { peptide: PeptideReference }) {
               {peptide.description}
             </p>
           )}
+
+          {/* Guidance sections (cycle, outcomes, timeline, stop signals) */}
+          {peptide.guidance && <GuidanceContent guidance={peptide.guidance} />}
+
+          {/* Dosing details */}
           <div className="grid grid-cols-2 gap-3 pt-2">
             <div>
               <div className="text-xs text-[var(--muted-foreground)] uppercase tracking-wide mb-1">Typical Dose</div>
@@ -87,6 +237,61 @@ function PeptideCard({ peptide }: { peptide: PeptideReference }) {
               </div>
             )}
           </div>
+        </div>
+      )}
+    </Card>
+  )
+}
+
+function SupplementCard({ supplement }: { supplement: SupplementReference }) {
+  const [isExpanded, setIsExpanded] = useState(false)
+  const hasGuidance = !!supplement.guidance
+
+  return (
+    <Card className="overflow-hidden" interactive={hasGuidance}>
+      <button
+        type="button"
+        className={cn('w-full text-left', hasGuidance ? 'cursor-pointer' : 'cursor-default')}
+        onClick={() => hasGuidance && setIsExpanded(!isExpanded)}
+      >
+        <CardContent className="p-4">
+          <div className="flex items-start justify-between">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="font-semibold text-[var(--foreground)]">{supplement.name}</span>
+                <Badge className="text-xs bg-teal-100 text-teal-800 dark:bg-teal-900/50 dark:text-teal-300">
+                  <Pill className="w-3 h-3 mr-1" />
+                  {supplement.benefit}
+                </Badge>
+              </div>
+              {!isExpanded && supplement.guidance && (
+                <p className="text-xs text-[var(--muted-foreground)] mt-0.5">
+                  {formatCycleSummary(supplement.guidance)}
+                </p>
+              )}
+            </div>
+            {hasGuidance && (
+              <div className="ml-2 text-[var(--muted-foreground)]">
+                {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </button>
+
+      {isExpanded && supplement.guidance && (
+        <div className="px-4 pb-4 pt-0 border-t border-[var(--border)] bg-[var(--muted)]/50">
+          <div className="pt-3">
+            <GuidanceContent guidance={supplement.guidance} />
+          </div>
+          {supplement.aliases && supplement.aliases.length > 0 && (
+            <div className="pt-1">
+              <div className="text-xs text-[var(--muted-foreground)] uppercase tracking-wide mb-1">Also Known As</div>
+              <div className="font-medium text-[var(--foreground)] text-sm">
+                {supplement.aliases.slice(0, 3).join(', ')}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </Card>
@@ -333,7 +538,11 @@ export default function LibraryPage() {
   const [search, setSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
 
+  const isSupplementsView = selectedCategory === 'supplements'
+
   const filteredPeptides = useMemo(() => {
+    if (isSupplementsView) return []
+
     let peptides = PEPTIDE_REFERENCE
 
     if (selectedCategory) {
@@ -351,7 +560,32 @@ export default function LibraryPage() {
     }
 
     return peptides
-  }, [search, selectedCategory])
+  }, [search, selectedCategory, isSupplementsView])
+
+  const filteredSupplements = useMemo(() => {
+    if (!isSupplementsView) return []
+
+    let supplements = [...SUPPLEMENT_REFERENCE]
+
+    if (search.trim()) {
+      const searchLower = search.toLowerCase().trim()
+      supplements = supplements.filter(s => {
+        if (s.name.toLowerCase().includes(searchLower)) return true
+        if (s.benefit.toLowerCase().includes(searchLower)) return true
+        if (s.aliases?.some(a => a.toLowerCase().includes(searchLower))) return true
+        return false
+      })
+    }
+
+    // Sort: supplements with guidance first, then alphabetical
+    supplements.sort((a, b) => {
+      if (a.guidance && !b.guidance) return -1
+      if (!a.guidance && b.guidance) return 1
+      return a.name.localeCompare(b.name)
+    })
+
+    return supplements
+  }, [search, isSupplementsView])
 
   const categories = Object.entries(CATEGORY_INFO)
 
@@ -359,6 +593,9 @@ export default function LibraryPage() {
     { key: 'reference', label: 'Reference', icon: BookOpen },
     { key: 'calculator', label: 'Calculator', icon: Beaker },
   ]
+
+  const itemCount = isSupplementsView ? filteredSupplements.length : filteredPeptides.length
+  const itemLabel = isSupplementsView ? 'supplement' : 'peptide'
 
   return (
     <div className="p-4 pb-4">
@@ -392,7 +629,7 @@ export default function LibraryPage() {
           <div className="relative mb-4">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted-foreground)]" />
             <Input
-              placeholder="Search peptides..."
+              placeholder={isSupplementsView ? 'Search supplements...' : 'Search peptides...'}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-10"
@@ -430,21 +667,29 @@ export default function LibraryPage() {
 
           {/* Results count */}
           <div className="text-sm text-[var(--muted-foreground)] mb-3">
-            {filteredPeptides.length} peptide{filteredPeptides.length !== 1 ? 's' : ''}
+            {itemCount} {itemLabel}{itemCount !== 1 ? 's' : ''}
           </div>
 
-          {/* Peptide list */}
+          {/* Item list */}
           <div className="space-y-3">
-            {filteredPeptides.map((peptide, index) => (
-              <div key={peptide.name} className={cn('animate-card-in', `stagger-${Math.min(index + 1, 10)}`)}>
-                <PeptideCard peptide={peptide} />
-              </div>
-            ))}
+            {isSupplementsView ? (
+              filteredSupplements.map((supplement, index) => (
+                <div key={supplement.name} className={cn('animate-card-in', `stagger-${Math.min(index + 1, 10)}`)}>
+                  <SupplementCard supplement={supplement} />
+                </div>
+              ))
+            ) : (
+              filteredPeptides.map((peptide, index) => (
+                <div key={peptide.name} className={cn('animate-card-in', `stagger-${Math.min(index + 1, 10)}`)}>
+                  <PeptideCard peptide={peptide} />
+                </div>
+              ))
+            )}
 
-            {filteredPeptides.length === 0 && (
+            {itemCount === 0 && (
               <Card>
                 <CardContent className="py-8 text-center">
-                  <p className="text-[var(--muted-foreground)]">No peptides found</p>
+                  <p className="text-[var(--muted-foreground)]">No {itemLabel}s found</p>
                   <p className="text-sm text-[var(--muted-foreground)] mt-1">Try a different search term</p>
                 </CardContent>
               </Card>
@@ -453,7 +698,9 @@ export default function LibraryPage() {
 
           {/* Info note */}
           <div className="mt-6 text-center text-xs text-[var(--muted-foreground)]">
-            Tap a peptide for dosing details
+            {isSupplementsView
+              ? 'Tap a supplement for cycle guidance'
+              : 'Tap a peptide for dosing details'}
           </div>
         </>
       ) : (
