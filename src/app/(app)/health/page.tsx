@@ -534,7 +534,7 @@ export default function HealthDashboardNew() {
   if (!processedData && isLoadingMetrics && hasConnectedIntegrations) {
     return (
       <div className="min-h-screen bg-[var(--background)] pb-24">
-        <div className="glass border-b border-[var(--border)]">
+        <div className="sticky top-0 z-30 glass border-b border-[var(--border)]">
           <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
             <h1 className="text-lg font-semibold text-[var(--foreground)]">Health</h1>
             <Loader2 className="w-4 h-4 animate-spin text-[var(--muted-foreground)]" />
@@ -656,8 +656,8 @@ export default function HealthDashboardNew() {
 
   return (
     <div className="min-h-full bg-[var(--background)] pb-4">
-      {/* Header */}
-      <div className="glass border-b border-[var(--border)]">
+      {/* Header — sticky within main scroll container */}
+      <div className="sticky top-0 z-30 glass border-b border-[var(--border)]">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
           <h1 className="text-lg font-semibold text-[var(--foreground)]">Health</h1>
           <div className="flex items-center gap-2">
@@ -1074,7 +1074,7 @@ export default function HealthDashboardNew() {
         )
       })()}
 
-      <div className="max-w-lg mx-auto px-4 py-6 space-y-6">
+      <div className="max-w-lg mx-auto px-4 pt-3 pb-6 space-y-6">
         {/* ═══════════════ TODAY TAB ═══════════════ */}
         {selectedSection === 'overview' && (
           <>
