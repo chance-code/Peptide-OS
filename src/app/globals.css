@@ -286,6 +286,17 @@ input[type='number'] {
 }
 
 /* ========================================
+   SCROLL ARCHITECTURE INVARIANTS
+   ========================================
+   1. Exactly ONE vertical scroll container per screen: <main data-scroll-container>
+   2. No child page or component may create a competing overflow-auto/overflow-y-auto
+   3. PullToRefresh does NOT create a scroll container — it delegates to <main>
+   4. Headers must be sticky (inside main) or fixed (outside main), never both
+   5. Safe area insets applied once: top in TopHeader, bottom in <main> padding
+   6. Pages must NOT use min-h-screen or min-h-full — flex-1 on <main> handles sizing
+   ======================================== */
+
+/* ========================================
    GLASSMORPHISM - Enhanced
    ======================================== */
 

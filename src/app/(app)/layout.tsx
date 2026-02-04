@@ -96,7 +96,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="h-dvh flex flex-col bg-[var(--background)]">
       <TopHeader />
-      <main className="flex-1 pb-[calc(4rem+env(safe-area-inset-bottom))] max-w-lg mx-auto w-full overflow-auto animate-page-in">{children}</main>
+      {/* SCROLL INVARIANT: This is the ONE vertical scroll container for the entire app.
+          No child page or component may create a competing vertical scroll container.
+          PullToRefresh, page content, and all tab views scroll through this element. */}
+      <main
+        data-scroll-container
+        className="flex-1 pb-[calc(4rem+env(safe-area-inset-bottom))] max-w-lg mx-auto w-full overflow-auto overscroll-none animate-page-in"
+      >{children}</main>
       <BottomNav />
     </div>
   )

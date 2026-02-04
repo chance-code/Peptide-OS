@@ -533,7 +533,7 @@ export default function HealthDashboardNew() {
   // Loading state: queries still in flight and user has connected integrations
   if (!processedData && isLoadingMetrics && hasConnectedIntegrations) {
     return (
-      <div className="min-h-screen bg-[var(--background)] pb-24">
+      <div className="bg-[var(--background)] pb-24">
         <div className="sticky top-0 z-30 glass border-b border-[var(--border)]">
           <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
             <h1 className="text-lg font-semibold text-[var(--foreground)]">Health</h1>
@@ -584,7 +584,7 @@ export default function HealthDashboardNew() {
     const appleHealthIntegration = integrations?.find((i: Integration) => i.provider === 'apple_health')
 
     return (
-      <div className="min-h-full bg-[var(--background)] p-4">
+      <div className="bg-[var(--background)] p-4">
         <div className="max-w-lg mx-auto pt-8">
           <div className="text-center mb-8">
             <Activity className="w-12 h-12 text-[var(--muted-foreground)] mx-auto mb-4" />
@@ -655,7 +655,7 @@ export default function HealthDashboardNew() {
   }
 
   return (
-    <div className="min-h-full bg-[var(--background)] pb-4">
+    <div className="bg-[var(--background)] pb-4">
       {/* Header — sticky within main scroll container */}
       <div className="sticky top-0 z-30 glass border-b border-[var(--border)]">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
@@ -767,7 +767,7 @@ export default function HealthDashboardNew() {
 
         {/* Integrations panel (collapsible, height-constrained) */}
         {showIntegrations && (
-          <div className="max-w-lg mx-auto px-4 pb-4 border-t border-[var(--border)] pt-4 max-h-[50vh] overflow-y-auto">
+          <div className="max-w-lg mx-auto px-4 pb-4 border-t border-[var(--border)] pt-4">
             <div className="text-xs text-[var(--muted-foreground)] uppercase tracking-wider mb-3">Data Sources</div>
             <div className="space-y-3">
               {/* Apple Health */}
