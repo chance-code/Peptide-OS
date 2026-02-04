@@ -140,12 +140,51 @@ export function generateClaims(input: ClaimGeneratorInput): Claim[] {
   claims.push(...availabilityClaims)
 
   // Sort by priority and confidence
-  return claims.sort((a, b) => {
+  claims.sort((a, b) => {
     const priorityOrder = { high: 0, medium: 1, low: 2 }
     const priorityDiff = priorityOrder[a.priority] - priorityOrder[b.priority]
     if (priorityDiff !== 0) return priorityDiff
     return b.confidence.score - a.confidence.score
   })
+
+  // Deduplicate conflicting directional claims per metric.
+  // When multiple claims for the same metric disagree on direction
+  // (e.g. "HRV up today" + "HRV trending down 30d"), keep only the
+  // highest-priority/confidence one to avoid contradictory display.
+  return deduplicateConflictingClaims(claims)
+}
+
+function deduplicateConflictingClaims(claims: Claim[]): Claim[] {
+  const directionTypes = new Set(['improvement', 'decline', 'warning'])
+  const kept = new Map<string, Claim>()  // metricType → first directional claim
+  const result: Claim[] = []
+
+  for (const claim of claims) {
+    if (!claim.metricType || !directionTypes.has(claim.type)) {
+      result.push(claim)
+      continue
+    }
+
+    const existing = kept.get(claim.metricType)
+    if (!existing) {
+      kept.set(claim.metricType, claim)
+      result.push(claim)
+      continue
+    }
+
+    // Same direction → keep both (reinforcing signals are fine)
+    const existingDir = existing.type === 'improvement' ? 'up' : 'down'
+    const claimDir = claim.type === 'improvement' ? 'up' : 'down'
+    if (existingDir === claimDir) {
+      result.push(claim)
+      continue
+    }
+
+    // Conflicting direction → suppress the lower-confidence one.
+    // The existing claim already won (it was sorted first), so skip this one.
+  }
+
+  return result
 }
 
 // Generate claims for a specific intervention
