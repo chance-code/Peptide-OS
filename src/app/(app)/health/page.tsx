@@ -1441,31 +1441,31 @@ export default function HealthDashboardNew() {
             <h4 className="font-medium text-[var(--foreground)]">What goes into your trajectory:</h4>
             <div className="space-y-2 text-sm text-[var(--muted-foreground)]">
               <div className="flex items-start gap-2">
+                <Scale className="w-4 h-4 mt-0.5 text-cyan-400" />
+                <div>
+                  <span className="text-[var(--foreground)] font-medium">Body Comp ({timeWindow === 7 ? '40' : timeWindow === 30 ? '55' : '70'}%)</span>
+                  <p>Weight, body fat, and lean mass trends when available. Primary signal.</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
                 <Moon className="w-4 h-4 mt-0.5 text-indigo-400" />
                 <div>
-                  <span className="text-[var(--foreground)] font-medium">Sleep (35%)</span>
+                  <span className="text-[var(--foreground)] font-medium">Sleep ({timeWindow === 7 ? '17.5' : timeWindow === 30 ? '15' : '10'}%)</span>
                   <p>Duration, deep sleep, efficiency, and sleep score trends.</p>
                 </div>
               </div>
               <div className="flex items-start gap-2">
                 <Heart className="w-4 h-4 mt-0.5 text-emerald-400" />
                 <div>
-                  <span className="text-[var(--foreground)] font-medium">Recovery (30%)</span>
+                  <span className="text-[var(--foreground)] font-medium">Recovery ({timeWindow === 7 ? '17.5' : timeWindow === 30 ? '15' : '10'}%)</span>
                   <p>HRV, resting heart rate, and readiness trends.</p>
                 </div>
               </div>
               <div className="flex items-start gap-2">
                 <Footprints className="w-4 h-4 mt-0.5 text-amber-400" />
                 <div>
-                  <span className="text-[var(--foreground)] font-medium">Activity (20%)</span>
+                  <span className="text-[var(--foreground)] font-medium">Activity ({timeWindow === 7 ? '25' : timeWindow === 30 ? '15' : '10'}%)</span>
                   <p>Steps, exercise, and activity consistency.</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-2">
-                <Scale className="w-4 h-4 mt-0.5 text-cyan-400" />
-                <div>
-                  <span className="text-[var(--foreground)] font-medium">Body Comp (15%)</span>
-                  <p>Weight, body fat, and lean mass trends when available.</p>
                 </div>
               </div>
             </div>

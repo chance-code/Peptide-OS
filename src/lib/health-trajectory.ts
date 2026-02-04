@@ -94,11 +94,19 @@ const METRIC_CATEGORIES: Record<string, 'sleep' | 'recovery' | 'activity' | 'bod
   body_water: 'bodyComp',
 }
 
-const CATEGORY_WEIGHTS = {
-  sleep: 0.35,
-  recovery: 0.30,
-  activity: 0.20,
-  bodyComp: 0.15,
+// Window-aware category weights — body composition is the primary signal,
+// especially at longer windows where protocol effects manifest in composition.
+// "Sleep & Recovery" is split evenly between the two sub-categories.
+const WINDOW_CATEGORY_WEIGHTS: Record<TimeWindow, {
+  sleep: number; recovery: number; activity: number; bodyComp: number
+}> = {
+  7:  { sleep: 0.175, recovery: 0.175, activity: 0.25,  bodyComp: 0.40 },
+  30: { sleep: 0.15,  recovery: 0.15,  activity: 0.15,  bodyComp: 0.55 },
+  90: { sleep: 0.10,  recovery: 0.10,  activity: 0.10,  bodyComp: 0.70 },
+}
+
+function getCategoryWeights(timeWindow: TimeWindow) {
+  return WINDOW_CATEGORY_WEIGHTS[timeWindow]
 }
 
 // ─── Window semantics ───────────────────────────────────────────────
@@ -135,15 +143,15 @@ export function computeTrajectory(
     : metrics
   const signals = computePerMetricSignals(processedMetrics, effectiveWindow)
 
-  // Step 3: Category aggregation
-  const sleep = aggregateCategory(signals, 'sleep')
-  const recovery = aggregateCategory(signals, 'recovery')
-  const activity = aggregateCategory(signals, 'activity')
+  // Step 3: Category aggregation (window-aware weights)
+  const sleep = aggregateCategory(signals, 'sleep', timeWindow)
+  const recovery = aggregateCategory(signals, 'recovery', timeWindow)
+  const activity = aggregateCategory(signals, 'activity', timeWindow)
   const bodyCompSignals = signals.filter(s => s.category === 'bodyComp')
-  const bodyComp = bodyCompSignals.length >= 1 ? aggregateCategory(signals, 'bodyComp') : null
+  const bodyComp = bodyCompSignals.length >= 1 ? aggregateCategory(signals, 'bodyComp', timeWindow) : null
 
-  // Step 4: Overall direction (weighted vote)
-  const direction = computeOverallDirection(sleep, recovery, activity, bodyComp)
+  // Step 4: Overall direction (weighted vote, window-aware)
+  const direction = computeOverallDirection(sleep, recovery, activity, bodyComp, timeWindow)
 
   // Step 5: Confidence score — uses window-specific contribution
   const confidenceScore = computeConfidenceScore(signals, effectiveWindow, sleep, recovery, activity, bodyComp)
@@ -366,13 +374,14 @@ function computePerMetricSignals(metrics: SeedMetric[], window: 7 | 14 | 30 | 90
   return signals
 }
 
-function aggregateCategory(signals: TrajectorySignal[], category: 'sleep' | 'recovery' | 'activity' | 'bodyComp'): CategoryTrajectory {
+function aggregateCategory(signals: TrajectorySignal[], category: 'sleep' | 'recovery' | 'activity' | 'bodyComp', timeWindow: TimeWindow = 30): CategoryTrajectory {
+  const weights = getCategoryWeights(timeWindow)
   const catSignals = signals.filter(s => s.category === category)
 
   if (catSignals.length === 0) {
     return {
       direction: 'stable',
-      weight: CATEGORY_WEIGHTS[category],
+      weight: weights[category],
       topMetric: '',
       topMetricChange: 0,
       momentum: 'steady',
@@ -406,7 +415,7 @@ function aggregateCategory(signals: TrajectorySignal[], category: 'sleep' | 'rec
 
   return {
     direction,
-    weight: CATEGORY_WEIGHTS[category],
+    weight: weights[category],
     topMetric,
     topMetricChange: Math.round(topMetricChange * 10) / 10,
     momentum,
@@ -417,8 +426,10 @@ function computeOverallDirection(
   sleep: CategoryTrajectory,
   recovery: CategoryTrajectory,
   activity: CategoryTrajectory,
-  bodyComp: CategoryTrajectory | null
+  bodyComp: CategoryTrajectory | null,
+  timeWindow: TimeWindow = 30
 ): TrajectoryDirection {
+  const weights = getCategoryWeights(timeWindow)
   const dirScore = (d: TrajectoryDirection) =>
     d === 'improving' ? 1 : d === 'declining' ? -1 : 0
 
@@ -426,26 +437,36 @@ function computeOverallDirection(
   let weightedScore: number
 
   if (bodyComp) {
-    totalWeight = CATEGORY_WEIGHTS.sleep + CATEGORY_WEIGHTS.recovery + CATEGORY_WEIGHTS.activity + CATEGORY_WEIGHTS.bodyComp
+    totalWeight = weights.sleep + weights.recovery + weights.activity + weights.bodyComp
     weightedScore =
-      dirScore(sleep.direction) * CATEGORY_WEIGHTS.sleep +
-      dirScore(recovery.direction) * CATEGORY_WEIGHTS.recovery +
-      dirScore(activity.direction) * CATEGORY_WEIGHTS.activity +
-      dirScore(bodyComp.direction) * CATEGORY_WEIGHTS.bodyComp
+      dirScore(sleep.direction) * weights.sleep +
+      dirScore(recovery.direction) * weights.recovery +
+      dirScore(activity.direction) * weights.activity +
+      dirScore(bodyComp.direction) * weights.bodyComp
   } else {
-    // Reweight without bodyComp
-    const factor = 1 / (CATEGORY_WEIGHTS.sleep + CATEGORY_WEIGHTS.recovery + CATEGORY_WEIGHTS.activity)
+    // Reweight without bodyComp — redistribute proportionally among remaining categories
+    const factor = 1 / (weights.sleep + weights.recovery + weights.activity)
     totalWeight = 1
     weightedScore =
-      dirScore(sleep.direction) * CATEGORY_WEIGHTS.sleep * factor +
-      dirScore(recovery.direction) * CATEGORY_WEIGHTS.recovery * factor +
-      dirScore(activity.direction) * CATEGORY_WEIGHTS.activity * factor
+      dirScore(sleep.direction) * weights.sleep * factor +
+      dirScore(recovery.direction) * weights.recovery * factor +
+      dirScore(activity.direction) * weights.activity * factor
   }
 
   const normalized = weightedScore / totalWeight
-  if (normalized > 0.15) return 'improving'
-  if (normalized < -0.15) return 'declining'
-  return 'stable'
+  let direction: TrajectoryDirection
+  if (normalized > 0.15) direction = 'improving'
+  else if (normalized < -0.15) direction = 'declining'
+  else direction = 'stable'
+
+  // 90d override: can't be "declining" if body comp is improving.
+  // Body comp is the dominant long-term signal — improving composition
+  // means the protocol is working even if sleep/activity dip.
+  if (timeWindow === 90 && direction === 'declining' && bodyComp?.direction === 'improving') {
+    direction = 'stable'
+  }
+
+  return direction
 }
 
 function computeConfidenceScore(
@@ -476,6 +497,11 @@ function computeConfidenceScore(
     : 0
   if (avgConsistency > 0.7) score += 15
 
+  // Body comp presence bonus — body comp data improves trajectory reliability
+  if (bodyComp) {
+    score += 10
+  }
+
   // Volatility penalty — check coefficient of variation of signal strengths
   if (signals.length > 2) {
     const strengths = signals.map(s => s.strength)
@@ -498,12 +524,14 @@ function generateHeadline(
   bodyComp: CategoryTrajectory | null
 ): string {
   // Find the strongest improving or declining categories
-  const categories = [
+  // Body comp listed first — it's the primary signal
+  const categories: { name: string; cat: CategoryTrajectory }[] = []
+  if (bodyComp) categories.push({ name: 'Body comp', cat: bodyComp })
+  categories.push(
     { name: 'Sleep', cat: sleep },
     { name: 'Recovery', cat: recovery },
     { name: 'Activity', cat: activity },
-  ]
-  if (bodyComp) categories.push({ name: 'Body comp', cat: bodyComp })
+  )
 
   const improving = categories.filter(c => c.cat.direction === 'improving')
   const declining = categories.filter(c => c.cat.direction === 'declining')
@@ -532,6 +560,7 @@ function generateHeadline(
 }
 
 function makeInsufficientTrajectory(daysOfData: number, timeWindow: TimeWindow = 30): HealthTrajectory {
+  const weights = getCategoryWeights(timeWindow)
   return {
     direction: 'stable',
     confidence: 'insufficient',
@@ -539,9 +568,9 @@ function makeInsufficientTrajectory(daysOfData: number, timeWindow: TimeWindow =
     window: 7,
     headline: `Need more data — ${daysOfData} day${daysOfData === 1 ? '' : 's'} tracked so far`,
     signals: [],
-    sleep: { direction: 'stable', weight: 0.35, topMetric: '', topMetricChange: 0, momentum: 'steady' },
-    recovery: { direction: 'stable', weight: 0.30, topMetric: '', topMetricChange: 0, momentum: 'steady' },
-    activity: { direction: 'stable', weight: 0.20, topMetric: '', topMetricChange: 0, momentum: 'steady' },
+    sleep: { direction: 'stable', weight: weights.sleep, topMetric: '', topMetricChange: 0, momentum: 'steady' },
+    recovery: { direction: 'stable', weight: weights.recovery, topMetric: '', topMetricChange: 0, momentum: 'steady' },
+    activity: { direction: 'stable', weight: weights.activity, topMetric: '', topMetricChange: 0, momentum: 'steady' },
     bodyComp: null,
     dataState: 'insufficient',
     daysOfData,
