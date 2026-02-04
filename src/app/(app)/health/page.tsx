@@ -534,11 +534,9 @@ export default function HealthDashboardNew() {
   if (!processedData && isLoadingMetrics && hasConnectedIntegrations) {
     return (
       <div className="bg-[var(--background)] pb-24">
-        <div className="sticky top-0 z-30 glass border-b border-[var(--border)]">
-          <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
-            <h1 className="text-lg font-semibold text-[var(--foreground)]">Health</h1>
-            <Loader2 className="w-4 h-4 animate-spin text-[var(--muted-foreground)]" />
-          </div>
+        <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
+          <h1 className="text-lg font-semibold text-[var(--foreground)]">Health</h1>
+          <Loader2 className="w-4 h-4 animate-spin text-[var(--muted-foreground)]" />
         </div>
         <div className="max-w-lg mx-auto px-4 py-6 space-y-6">
           {/* Trajectory skeleton */}
@@ -656,8 +654,8 @@ export default function HealthDashboardNew() {
 
   return (
     <div className="bg-[var(--background)] pb-4">
-      {/* Header — sticky within main scroll container */}
-      <div className="sticky top-0 z-30 glass border-b border-[var(--border)]">
+      {/* Header — scrolls with content, same as all other tabs */}
+      <div>
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
           <h1 className="text-lg font-semibold text-[var(--foreground)]">Health</h1>
           <div className="flex items-center gap-2">
