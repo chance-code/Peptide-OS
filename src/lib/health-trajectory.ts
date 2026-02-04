@@ -116,17 +116,18 @@ export function computeTrajectory(
   baselines: Map<string, MetricBaseline>,
   timeWindow: TimeWindow = 30
 ): HealthTrajectory {
-  // Step 1: Window selection — use explicit timeWindow, fall back to auto if insufficient data
-  const { window: autoWindow, dataState, daysOfData } = selectWindow(metrics)
+  // Step 1: Check data sufficiency
+  const { dataState, daysOfData } = selectWindow(metrics)
 
   if (dataState === 'insufficient') {
     return makeInsufficientTrajectory(daysOfData, timeWindow)
   }
 
-  // Use the user-selected window, but clamp down if we don't have enough data
-  const effectiveWindow: 7 | 14 | 30 | 90 = daysOfData < timeWindow
-    ? autoWindow  // not enough data for the requested window
-    : timeWindow
+  // Always use the user-selected window. The window controls which
+  // date range computePerMetricSignals filters to — it doesn't require
+  // that many days of data to exist. Even a 90-day window works fine
+  // with 25 days of data: it just uses whatever falls within that range.
+  const effectiveWindow = timeWindow
 
   // Step 2: Per-metric trend signals (with smoothing for 90d)
   const processedMetrics = effectiveWindow === 90
