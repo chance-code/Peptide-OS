@@ -69,7 +69,8 @@ function fmtVO2(value: number): string {
 }
 
 function fmtKm(value: number): string {
-  return `${value.toFixed(2)} km`
+  const km = value * 1.60934
+  return `${km.toFixed(2)} km`
 }
 
 function fmtBreaths(value: number): string {

@@ -41,14 +41,14 @@ export async function GET(request: NextRequest) {
       userId: string
       recordedAt: { gte: Date; lte: Date }
       metricType?: { in: string[] }
-      provider?: string | { not: string }
+      provider?: string
     } = {
       userId,
       recordedAt: {
         gte: startDate,
         lte: endDate
       },
-      provider: provider || { not: 'eight_sleep' }
+      ...(provider ? { provider } : {})
     }
 
     if (metricTypesStr) {

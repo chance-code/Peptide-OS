@@ -28,19 +28,19 @@ function clampPercent(pct: number): number {
 // ============================================================================
 
 const SOURCE_PRIORITY: Record<MetricType, string[]> = {
-  // Sleep - prefer Oura for sleep metrics (more accurate than Apple Health aggregation)
-  sleep_duration: ['oura', 'apple_health'],
-  rem_sleep: ['oura', 'apple_health'],
-  deep_sleep: ['oura', 'apple_health'],
-  sleep_score: ['oura', 'apple_health'],
-  sleep_efficiency: ['oura', 'apple_health'],
-  waso: ['oura', 'apple_health'],
-  sleep_latency: ['oura', 'apple_health'],
-  bed_temperature: ['oura', 'apple_health'],
-  time_in_bed: ['oura', 'apple_health'],
-  // Heart & HRV
-  hrv: ['apple_health', 'oura'],
-  rhr: ['apple_health', 'oura'],
+  // Sleep - prefer Oura > Eight Sleep (bed sensor) > Apple Health (watch aggregation)
+  sleep_duration: ['oura', 'eight_sleep', 'apple_health'],
+  rem_sleep: ['oura', 'eight_sleep', 'apple_health'],
+  deep_sleep: ['oura', 'eight_sleep', 'apple_health'],
+  sleep_score: ['oura', 'eight_sleep', 'apple_health'],
+  sleep_efficiency: ['oura', 'eight_sleep', 'apple_health'],
+  waso: ['oura', 'eight_sleep', 'apple_health'],
+  sleep_latency: ['oura', 'eight_sleep', 'apple_health'],
+  bed_temperature: ['oura', 'eight_sleep', 'apple_health'],
+  time_in_bed: ['oura', 'eight_sleep', 'apple_health'],
+  // Heart & HRV - Apple Watch > Oura > Eight Sleep (bed sensor less accurate for heart)
+  hrv: ['apple_health', 'oura', 'eight_sleep'],
+  rhr: ['apple_health', 'oura', 'eight_sleep'],
   // Body Composition (primarily from scales via Apple Health)
   weight: ['apple_health', 'oura'],
   body_fat_percentage: ['apple_health'],
@@ -251,12 +251,9 @@ export async function getUnifiedMetrics(
     userId: string
     recordedAt: { gte: Date; lte: Date }
     metricType?: { in: string[] }
-    provider?: { not: string }
   } = {
     userId,
     recordedAt: { gte: startDate, lte: endDate },
-    // Exclude Eight Sleep data — removed as a provider due to duplicate sleep metrics
-    provider: { not: 'eight_sleep' }
   }
 
   if (metricTypes) {
