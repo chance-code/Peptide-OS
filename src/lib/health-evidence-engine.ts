@@ -16,6 +16,7 @@ import { differenceInDays, format, subDays, startOfDay } from 'date-fns'
 import { prisma } from './prisma'
 import { METRIC_POLARITY } from './health-baselines'
 import { MetricType, getMetricDisplayName } from './health-providers'
+import { normalizeProtocolName } from './supplement-normalization'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -822,6 +823,9 @@ async function computeSingleProtocolEvidence(
   const startDate = protocol.startDate
   const daysOnProtocol = differenceInDays(today, startDate)
 
+  // Normalize protocol name so mechanism lookups always resolve correctly
+  const { canonical: normalizedName } = normalizeProtocolName(protocol.peptide.name)
+
   // Determine ramp phase
   const rampPhase: RampPhase =
     daysOnProtocol <= 7 ? 'loading' :
@@ -833,12 +837,12 @@ async function computeSingleProtocolEvidence(
 
   // Early return for too_early
   if (daysOnProtocol < 7) {
-    return createEarlyEvidence(protocol, daysOnProtocol, rampPhase, confoundAnalysis)
+    return createEarlyEvidence(protocol, normalizedName, daysOnProtocol, rampPhase, confoundAnalysis)
   }
 
   // Early return for confounded
   if (confoundAnalysis.impact === 'high') {
-    return createConfoundedEvidence(protocol, daysOnProtocol, rampPhase, confoundAnalysis)
+    return createConfoundedEvidence(protocol, normalizedName, daysOnProtocol, rampPhase, confoundAnalysis)
   }
 
   // Compute signals for all metrics
@@ -870,14 +874,14 @@ async function computeSingleProtocolEvidence(
     dataQuality
   )
 
-  // Determine verdict
+  // Determine verdict (use normalized name for consistent display in explanations)
   const { verdict, verdictScore, verdictExplanation } = determineVerdict(
     daysOnProtocol,
     rampPhase,
     positiveSignals,
     adverseSignals,
     confidence,
-    protocol.peptide.name
+    normalizedName
   )
 
   // Determine overall direction
@@ -897,7 +901,7 @@ async function computeSingleProtocolEvidence(
 
   return {
     protocolId: protocol.id,
-    protocolName: protocol.peptide.name,
+    protocolName: normalizedName,
     protocolType: protocol.peptide.type as 'peptide' | 'supplement',
     peptideCategory: protocol.peptide.category || undefined,
 
@@ -1502,13 +1506,14 @@ function determineVerdictFromSignals(
  */
 function createEarlyEvidence(
   protocol: ProtocolWithDetails,
+  normalizedName: string,
   daysOnProtocol: number,
   rampPhase: RampPhase,
   confounds: PremiumProtocolEvidence['confounds']
 ): PremiumProtocolEvidence {
   return {
     protocolId: protocol.id,
-    protocolName: protocol.peptide.name,
+    protocolName: normalizedName,
     protocolType: protocol.peptide.type as 'peptide' | 'supplement',
     peptideCategory: protocol.peptide.category || undefined,
 
@@ -1518,7 +1523,7 @@ function createEarlyEvidence(
     rampExplanation: RAMP_EXPLANATIONS[rampPhase],
 
     verdict: 'too_early',
-    verdictExplanation: `Only ${daysOnProtocol} day${daysOnProtocol === 1 ? '' : 's'} on ${protocol.peptide.name}. Need at least 7 days before evaluating.`,
+    verdictExplanation: `Only ${daysOnProtocol} day${daysOnProtocol === 1 ? '' : 's'} on ${normalizedName}. Need at least 7 days before evaluating.`,
     verdictScore: 20,
 
     effects: {
@@ -1552,13 +1557,14 @@ function createEarlyEvidence(
  */
 function createConfoundedEvidence(
   protocol: ProtocolWithDetails,
+  normalizedName: string,
   daysOnProtocol: number,
   rampPhase: RampPhase,
   confounds: PremiumProtocolEvidence['confounds']
 ): PremiumProtocolEvidence {
   return {
     protocolId: protocol.id,
-    protocolName: protocol.peptide.name,
+    protocolName: normalizedName,
     protocolType: protocol.peptide.type as 'peptide' | 'supplement',
     peptideCategory: protocol.peptide.category || undefined,
 
@@ -1568,7 +1574,7 @@ function createConfoundedEvidence(
     rampExplanation: RAMP_EXPLANATIONS[rampPhase],
 
     verdict: 'confounded',
-    verdictExplanation: `${confounds.totalDays} of ${daysOnProtocol} days had confounding events (${confounds.breakdown.map(b => b.type).join(', ')}). Cannot reliably attribute changes to ${protocol.peptide.name}.`,
+    verdictExplanation: `${confounds.totalDays} of ${daysOnProtocol} days had confounding events (${confounds.breakdown.map(b => b.type).join(', ')}). Cannot reliably attribute changes to ${normalizedName}.`,
     verdictScore: 25,
 
     effects: {

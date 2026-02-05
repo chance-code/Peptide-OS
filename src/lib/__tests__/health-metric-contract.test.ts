@@ -23,7 +23,7 @@ describe('METRIC_REGISTRY', () => {
     expect(allKeys.length).toBeGreaterThanOrEqual(35)
   })
 
-  it('every metric has required fields', () => {
+  it('every metric has required fields (displayName, unit, bounds, polarity)', () => {
     for (const key of allKeys) {
       const def = METRIC_REGISTRY[key]
       expect(def.key, `${key}: missing key`).toBe(key)
@@ -41,6 +41,13 @@ describe('METRIC_REGISTRY', () => {
     }
   })
 
+  it('every metric has valid bounds (min < max)', () => {
+    for (const key of allKeys) {
+      const def = METRIC_REGISTRY[key]
+      expect(def.bounds.min, `${key}: min should be less than max`).toBeLessThan(def.bounds.max)
+    }
+  })
+
   it('every metric with optimalRange has valid min < optimal < max', () => {
     for (const key of allKeys) {
       const def = METRIC_REGISTRY[key]
@@ -48,6 +55,14 @@ describe('METRIC_REGISTRY', () => {
         expect(def.optimalRange.min, `${key}: optimal.min`).toBeLessThanOrEqual(def.optimalRange.optimal)
         expect(def.optimalRange.optimal, `${key}: optimal.optimal`).toBeLessThanOrEqual(def.optimalRange.max)
       }
+    }
+  })
+
+  it('polarity values are only higher_better, lower_better, or neutral', () => {
+    const validPolarities = ['higher_better', 'lower_better', 'neutral']
+    for (const key of allKeys) {
+      const def = METRIC_REGISTRY[key]
+      expect(validPolarities, `${key} has invalid polarity: ${def.polarity}`).toContain(def.polarity)
     }
   })
 
@@ -96,12 +111,23 @@ describe('getMetricsByCategory', () => {
     expect(sleepMetrics.every(m => m.category === 'sleep')).toBe(true)
   })
 
-  it('returns recovery metrics', () => {
-    const recovery = getMetricsByCategory('recovery')
-    expect(recovery.length).toBeGreaterThan(0)
-    const keys = recovery.map(m => m.key)
-    expect(keys).toContain('hrv')
-    expect(keys).toContain('resting_heart_rate')
+  it('returns correct metrics for each category', () => {
+    const categories: MetricCategory[] = ['sleep', 'recovery', 'activity', 'bodyComp', 'vitals', 'readiness']
+    for (const cat of categories) {
+      const metrics = getMetricsByCategory(cat)
+      // Every returned metric must belong to the requested category
+      for (const m of metrics) {
+        expect(m.category, `${m.key} should be in category ${cat}`).toBe(cat)
+      }
+    }
+    // Verify specific known metrics are in their categories
+    const recoveryKeys = getMetricsByCategory('recovery').map(m => m.key)
+    expect(recoveryKeys).toContain('hrv')
+    expect(recoveryKeys).toContain('resting_heart_rate')
+
+    const activityKeys = getMetricsByCategory('activity').map(m => m.key)
+    expect(activityKeys).toContain('steps')
+    expect(activityKeys).toContain('active_calories')
   })
 
   it('returns empty array for nonexistent category', () => {
@@ -114,6 +140,7 @@ describe('getMetricsByCategory', () => {
 describe('formatMetric', () => {
   it('formats sleep duration as hours + minutes', () => {
     expect(formatMetric('sleep_duration', 450)).toBe('7h 30m')
+    expect(formatMetric('sleep_duration', 432)).toBe('7h 12m')
     expect(formatMetric('sleep_duration', 30)).toBe('30m')
   })
 

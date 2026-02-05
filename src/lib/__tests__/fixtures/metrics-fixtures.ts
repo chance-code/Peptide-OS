@@ -119,6 +119,101 @@ export const NO_EFFECT_DATA = {
   after: [61, 59, 63, 60, 62, 58, 61, 63, 60, 62],
 }
 
+// ─── Simple {date, value}[] Format Data ─────────────────────────
+
+/** Helper to create {date, value}[] arrays */
+function dateValueSeries(values: number[], startDaysAgo?: number): { date: string; value: number }[] {
+  const start = startDaysAgo ?? values.length - 1
+  return values.map((value, i) => ({
+    date: format(subDays(new Date(), start - i), 'yyyy-MM-dd'),
+    value,
+  }))
+}
+
+/** Generate values with gaussian-like noise around a mean */
+function generateNoisyData(count: number, mean: number, stddev: number, seed: number = 42): number[] {
+  const values: number[] = []
+  // Simple seeded pseudo-random using a linear congruential generator
+  let state = seed
+  const nextRandom = () => {
+    state = (state * 1103515245 + 12345) & 0x7fffffff
+    return state / 0x7fffffff
+  }
+  for (let i = 0; i < count; i++) {
+    // Box-Muller transform for normal distribution approximation
+    const u1 = nextRandom() || 0.001
+    const u2 = nextRandom()
+    const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2)
+    values.push(Math.round((mean + z * stddev) * 100) / 100)
+  }
+  return values
+}
+
+/** 30 days of HRV values: mean ~45ms, stddev ~8 */
+export const BASELINE_HRV_DATA: { date: string; value: number }[] =
+  dateValueSeries(generateNoisyData(30, 45, 8, 101))
+
+/** 30 days of RHR values: mean ~62bpm, stddev ~3 */
+export const BASELINE_RHR_DATA: { date: string; value: number }[] =
+  dateValueSeries(generateNoisyData(30, 62, 3, 202))
+
+/** 30 days of sleep duration: mean ~432min (7.2hrs), stddev ~30min */
+export const BASELINE_SLEEP_DATA: { date: string; value: number }[] =
+  dateValueSeries(generateNoisyData(30, 432, 30, 303))
+
+/** 30 days where last 7 HRV values trend upward (days 0-22 stable ~42, last 7 rising to ~55) */
+export const IMPROVING_HRV_DATA: { date: string; value: number }[] = dateValueSeries([
+  // Days 1-23: stable around 42ms
+  41, 43, 40, 44, 42, 43, 41, 42, 44, 40,
+  43, 41, 42, 43, 41, 42, 40, 43, 44, 41,
+  42, 43, 41,
+  // Days 24-30: trending upward
+  46, 48, 50, 52, 54, 55, 57,
+])
+
+/** 30 days where last 7 sleep values trend downward */
+export const DECLINING_SLEEP_DATA: { date: string; value: number }[] = dateValueSeries([
+  // Days 1-23: stable around 440min
+  440, 435, 445, 438, 442, 437, 443, 440, 436, 444,
+  439, 441, 437, 443, 440, 438, 442, 436, 444, 440,
+  441, 437, 443,
+  // Days 24-30: declining to ~380min
+  425, 410, 400, 395, 385, 380, 370,
+])
+
+/** Body recomp in {date, value}[] format: weight stable, body fat decreasing, lean mass increasing */
+export const BODY_COMP_RECOMP: {
+  weight: { date: string; value: number }[]
+  bodyFat: { date: string; value: number }[]
+  leanMass: { date: string; value: number }[]
+} = {
+  weight: dateValueSeries([180, 180.2, 179.8, 180.1, 179.9, 180, 180.1, 179.8, 180, 180.1]),
+  bodyFat: dateValueSeries([20, 19.8, 19.5, 19.3, 19.1, 18.9, 18.7, 18.5, 18.3, 18.1]),
+  leanMass: dateValueSeries([144, 144.5, 145, 145.3, 145.6, 146, 146.3, 146.6, 147, 147.3]),
+}
+
+/** Body fat loss in {date, value}[] format: weight decreasing, body fat decreasing */
+export const BODY_COMP_FAT_LOSS: {
+  weight: { date: string; value: number }[]
+  bodyFat: { date: string; value: number }[]
+} = {
+  weight: dateValueSeries([185, 184, 183, 182.5, 182, 181, 180.5, 180, 179, 178.5]),
+  bodyFat: dateValueSeries([22, 21.5, 21, 20.8, 20.5, 20.2, 19.8, 19.5, 19.2, 19]),
+}
+
+/** Empty data arrays */
+export const EMPTY_DATA: { date: string; value: number }[] = []
+
+/** Single data point */
+export const SINGLE_POINT_DATA: { date: string; value: number }[] = [
+  { date: format(new Date(), 'yyyy-MM-dd'), value: 45 },
+]
+
+/** Data with NaN/Infinity values mixed in */
+export const NAN_DATA: { date: string; value: number }[] = dateValueSeries([
+  45, NaN, 43, Infinity, 44, -Infinity, 46, NaN, 42, 47,
+])
+
 // ─── Empty / Edge Cases ──────────────────────────────────────────────
 
 export const EMPTY_METRICS: SeedMetric[] = []

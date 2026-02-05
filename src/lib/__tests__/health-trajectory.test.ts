@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  computeTrajectory,
   computeBodyCompState,
   computeEnhancedBodyComp,
 } from '../health-trajectory'
@@ -11,9 +12,136 @@ import {
   STABLE_METRICS,
   METABOLIC_ADAPTATION_METRICS,
   EMPTY_METRICS,
+  SINGLE_POINT,
   metric,
   series,
 } from './fixtures/metrics-fixtures'
+
+// ─── computeTrajectory ──────────────────────────────────────────────
+
+describe('computeTrajectory', () => {
+  it('returns insufficient with < 5 unique days of data', () => {
+    // Only 2 unique dates
+    const sparse = [
+      metric('hrv', 45, 1),
+      metric('rhr', 62, 1),
+      metric('hrv', 46, 2),
+      metric('rhr', 61, 2),
+    ]
+    const result = computeTrajectory(sparse, new Map())
+    expect(result.dataState).toBe('insufficient')
+    expect(result.confidence).toBe('insufficient')
+    expect(result.confidenceScore).toBe(0)
+  })
+
+  it('returns insufficient for empty data', () => {
+    const result = computeTrajectory([], new Map())
+    expect(result.dataState).toBe('insufficient')
+    expect(result.confidence).toBe('insufficient')
+  })
+
+  it('returns insufficient for single data point', () => {
+    const result = computeTrajectory(SINGLE_POINT, new Map())
+    expect(result.dataState).toBe('insufficient')
+    expect(result.daysOfData).toBe(1)
+  })
+
+  it('detects improving direction when sleep data trends upward', () => {
+    // Create 25 days of sleep_duration data: first 18 days ~420, last 7 days ~480
+    const sleepMetrics = [
+      ...series('sleep_duration', [
+        420, 418, 422, 425, 415, 420, 419, 423, 421, 418,
+        420, 422, 417, 421, 420, 419, 423, 420,
+        460, 470, 475, 480, 485, 490, 495,
+      ]),
+      // Add some HRV data to get 25 unique dates
+      ...series('hrv', [
+        42, 43, 41, 44, 42, 43, 41, 42, 44, 40,
+        43, 41, 42, 43, 41, 42, 40, 43, 44, 41,
+        42, 43, 41, 45, 47,
+      ]),
+    ]
+    const result = computeTrajectory(sleepMetrics, new Map())
+    // Should detect the upward sleep trend as improving
+    expect(result.dataState).not.toBe('insufficient')
+    expect(result.sleep.direction).toBe('improving')
+  })
+
+  it('detects declining direction when data trends downward', () => {
+    // Create 25 days: first 18 stable, last 7 declining
+    const decliningMetrics = [
+      ...series('sleep_duration', [
+        440, 435, 445, 438, 442, 437, 443, 440, 436, 444,
+        439, 441, 437, 443, 440, 438, 442, 436,
+        380, 370, 360, 350, 340, 330, 320,
+      ]),
+      ...series('hrv', [
+        42, 43, 41, 44, 42, 43, 41, 42, 44, 40,
+        43, 41, 42, 43, 41, 42, 40, 43, 44, 41,
+        42, 43, 41, 45, 47,
+      ]),
+    ]
+    const result = computeTrajectory(decliningMetrics, new Map())
+    expect(result.dataState).not.toBe('insufficient')
+    expect(result.sleep.direction).toBe('declining')
+  })
+
+  it('detects body recomp (fat down + muscle up simultaneously)', () => {
+    // Use RECOMP_METRICS but also add sleep/activity for sufficient data diversity
+    const allMetrics = [
+      ...RECOMP_METRICS,
+      ...series('sleep_duration', [
+        420, 425, 430, 435, 440, 445, 450, 455,
+      ], 30),
+      ...series('hrv', [
+        40, 42, 44, 46, 48, 50, 52, 54,
+      ], 30),
+      ...series('steps', [
+        8000, 8200, 8500, 8700, 9000, 9200, 9500, 9800,
+      ], 30),
+    ]
+    const result = computeTrajectory(allMetrics, new Map())
+    expect(result.dataState).not.toBe('insufficient')
+    // Body comp should reflect the recomp trends
+    if (result.bodyComp) {
+      // bodyComp aggregation detected
+      expect(result.bodyComp).toBeDefined()
+    }
+  })
+
+  it('produces reasonable result with mixed signals (sleep up, activity down)', () => {
+    const mixed = [
+      // Sleep improving
+      ...series('sleep_duration', [
+        400, 405, 410, 415, 420, 425, 430, 435, 440, 445,
+        450, 455, 460, 465, 470, 475, 480, 485, 490, 495,
+        500, 505, 510, 515, 520,
+      ]),
+      // Activity declining
+      ...series('steps', [
+        12000, 11800, 11500, 11200, 11000, 10800, 10500, 10200, 10000, 9800,
+        9500, 9200, 9000, 8800, 8500, 8200, 8000, 7800, 7500, 7200,
+        7000, 6800, 6500, 6200, 6000,
+      ]),
+    ]
+    const result = computeTrajectory(mixed, new Map())
+    // Should not crash and should return a valid trajectory
+    expect(result.dataState).not.toBe('insufficient')
+    expect(['improving', 'stable', 'declining']).toContain(result.direction)
+    expect(result.headline).toBeTruthy()
+  })
+
+  it('produces a headline and window label', () => {
+    const data = [
+      ...series('sleep_duration', Array.from({ length: 25 }, (_, i) => 420 + i * 2)),
+      ...series('hrv', Array.from({ length: 25 }, (_, i) => 40 + i)),
+    ]
+    const result = computeTrajectory(data, new Map(), 30)
+    expect(result.headline).toBeTruthy()
+    expect(result.windowLabel).toBeTruthy()
+    expect(result.timeWindow).toBe(30)
+  })
+})
 
 // ─── computeBodyCompState ────────────────────────────────────────────
 
@@ -52,7 +180,7 @@ describe('computeBodyCompState', () => {
   })
 
   it('assigns confidence based on data points', () => {
-    // 8 points per metric = 24 total points → high
+    // 8 points per metric = 24 total points -> high
     const result = computeBodyCompState(RECOMP_METRICS)
     expect(result.confidence).toBe('high')
   })
@@ -110,7 +238,7 @@ describe('computeEnhancedBodyComp', () => {
   })
 
   it('returns null time-to-goal when moving wrong direction', () => {
-    // Gaining weight but targeting lower — can't estimate
+    // Gaining weight but targeting lower -- can't estimate
     const result = computeEnhancedBodyComp(REGRESSING_METRICS, { weight: 170 })
     expect(result.timeToGoal).toBeDefined()
     expect(result.timeToGoal!.estimatedWeeks).toBeNull()

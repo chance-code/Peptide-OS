@@ -34,6 +34,7 @@ const EXTENDED_ALIASES: Record<string, string> = {
   'thymosin': 'TB-500',
   'thymosin beta': 'TB-500',
   'thymosin beta 4': 'TB-500',
+  'thymosin beta-4': 'TB-500',
   'thymosin beta4': 'TB-500',
   'thymosin b4': 'TB-500',
   'tβ4': 'TB-500',
@@ -42,7 +43,9 @@ const EXTENDED_ALIASES: Record<string, string> = {
   'ghk': 'GHK-Cu',
   'ghkcu': 'GHK-Cu',
   'ghk cu': 'GHK-Cu',
+  'ghk copper': 'GHK-Cu',
   'copper peptide': 'GHK-Cu',
+  'copper peptide ghk': 'GHK-Cu',
   'copper tripeptide': 'GHK-Cu',
 
   // Semaglutide variations
@@ -72,6 +75,7 @@ const EXTENDED_ALIASES: Record<string, string> = {
   'modified grf 129': 'CJC-1295',
   'mod grf': 'CJC-1295',
   'mod grf 129': 'CJC-1295',
+  'mod grf 1-29': 'CJC-1295',
 
   // Ipamorelin variations
   'ipa': 'Ipamorelin',
@@ -89,12 +93,32 @@ const EXTENDED_ALIASES: Record<string, string> = {
   'cjc/ipa': 'Ipamorelin + CJC-1295',
   'ipam cjc': 'Ipamorelin + CJC-1295',
 
+  // MK-677 variations
+  'mk-677': 'MK-677',
+  'mk677': 'MK-677',
+  'mk 677': 'MK-677',
+  'ibutamoren': 'MK-677',
+  'nutrobal': 'MK-677',
+
+  // BPC-157 + TB-500 combo ("Wolverine stack")
+  'bpc-157 + tb-500': 'BPC-157 + TB-500',
+  'bpc157 tb500': 'BPC-157 + TB-500',
+  'bpc tb': 'BPC-157 + TB-500',
+  'bpc tb combo': 'BPC-157 + TB-500',
+  'wolverine': 'BPC-157 + TB-500',
+  'wolverine stack': 'BPC-157 + TB-500',
+  'wolverine peptide': 'BPC-157 + TB-500',
+
   // Semax variations
   'semax': 'Semax',
   'nasemax': 'Semax',
+  'n-acetyl semax': 'Semax',
+  'n acetyl semax': 'Semax',
+  'na semax': 'Semax',
 
   // Selank variations
   'selank': 'Selank',
+  'selanc': 'Selank',
 
   // NAD+ variations
   'nad': 'NAD+',
@@ -130,6 +154,7 @@ const EXTENDED_ALIASES: Record<string, string> = {
   'mag threonate': 'Magnesium',
   'magtein': 'Magnesium',
   'magnesium bisglycinate': 'Magnesium',
+  'mag bisgly': 'Magnesium',
   'magnesium citrate': 'Magnesium',
   'magnesium oxide': 'Magnesium',
   'magnesium taurate': 'Magnesium',
@@ -142,6 +167,15 @@ const EXTENDED_ALIASES: Record<string, string> = {
   'vit d3': 'Vitamin D',
   'd3': 'Vitamin D',
   'cholecalciferol': 'Vitamin D',
+
+  // Ashwagandha variations
+  'ashwagandha': 'Ashwagandha',
+  'ksm-66': 'Ashwagandha',
+  'ksm66': 'Ashwagandha',
+  'ksm 66': 'Ashwagandha',
+  'sensoril': 'Ashwagandha',
+  'withania somnifera': 'Ashwagandha',
+  'withania': 'Ashwagandha',
 
   // Omega-3 variations
   'omega 3': 'Omega-3',
