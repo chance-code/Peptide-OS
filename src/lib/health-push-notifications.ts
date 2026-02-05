@@ -4,6 +4,7 @@
  * Generates health-specific notification payloads:
  * - Morning health briefings with score and key metric changes
  * - Evidence milestone notifications when protocol verdicts change
+ * - Weekly digest notifications with review summary
  *
  * Uses the existing health synthesis and evidence engines (read-only).
  * Stores evidence snapshots in the Note model (entityType: 'evidence_snapshot')
@@ -13,19 +14,27 @@
 import { prisma } from './prisma'
 import { calculateHealthScore, calculateHealthTrends } from './health-synthesis'
 import { computePremiumEvidence, type EvidenceVerdict } from './health-evidence-engine'
+import { getDailyStatus } from './health-daily-status'
+import { generateWeeklyReview } from './health-weekly-review'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface MorningBriefingPayload {
   title: string
   body: string
-  data: { type: 'health_briefing'; tab: 'today' }
+  data: { type: 'health_briefing'; tab: 'today'; deepLink?: string }
 }
 
 interface EvidenceMilestonePayload {
   title: string
   body: string
   data: { type: 'evidence_milestone'; protocolId: string; tab: 'evidence' }
+}
+
+interface WeeklyDigestPayload {
+  title: string
+  body: string
+  data: { type: 'weekly_digest'; deepLink: string }
 }
 
 interface StoredVerdicts {
@@ -55,16 +64,18 @@ const NOTABLE_TRANSITIONS: Array<{ from: EvidenceVerdict; to: EvidenceVerdict; l
 /**
  * Generate a concise morning health briefing notification.
  *
- * Fetches the user's health score and top trend, then builds a short message.
+ * Fetches the user's health score, top trend, and daily status, then builds
+ * a short message.
  * Returns null if there is no meaningful data to report.
  */
 export async function generateMorningBriefing(
   userId: string
 ): Promise<MorningBriefingPayload | null> {
   try {
-    const [score, trends] = await Promise.all([
+    const [score, trends, dailyStatus] = await Promise.all([
       calculateHealthScore(userId),
       calculateHealthTrends(userId, 7),
+      getDailyStatus(userId),
     ])
 
     // If there is no overall score, we have nothing meaningful to send
@@ -93,15 +104,46 @@ export async function generateMorningBriefing(
       parts.push('Recovery strong')
     }
 
-    const body = `Morning: ${parts.join('. ')}.`
+    // Use daily status title and subtitle for the notification
+    const title = dailyStatus.title
+    const body = `${dailyStatus.subtitle}. ${parts.join('. ')}.`
 
     return {
-      title: 'Health Briefing',
+      title,
       body,
-      data: { type: 'health_briefing', tab: 'today' },
+      data: { type: 'health_briefing', tab: 'today', deepLink: 'arcprotocol://health' },
     }
   } catch (error) {
     console.error(`[health-push] Error generating morning briefing for ${userId}:`, error)
+    return null
+  }
+}
+
+// ─── Weekly Digest ───────────────────────────────────────────────────────────
+
+/**
+ * Generate a weekly digest notification with review highlights.
+ *
+ * Calls the weekly review engine and builds a concise notification payload.
+ * Returns null if the review generation fails or has no data.
+ */
+export async function generateWeeklyDigest(
+  userId: string
+): Promise<WeeklyDigestPayload | null> {
+  try {
+    const review = await generateWeeklyReview(userId)
+
+    if (!review || (!review.topWins.length && !review.needsAttention.length)) {
+      return null
+    }
+
+    return {
+      title: 'Weekly Review',
+      body: `${review.headline}. ${review.topWins.length} wins, ${review.needsAttention.length} to watch.`,
+      data: { type: 'weekly_digest', deepLink: 'arcprotocol://health' },
+    }
+  } catch (error) {
+    console.error(`[health-push] Error generating weekly digest for ${userId}:`, error)
     return null
   }
 }

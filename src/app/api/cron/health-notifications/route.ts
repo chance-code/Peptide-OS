@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { sendAPNsNotification, isAPNsConfigured } from '@/lib/native-push'
-import { generateMorningBriefing, checkEvidenceMilestones } from '@/lib/health-push-notifications'
+import { generateMorningBriefing, checkEvidenceMilestones, generateWeeklyDigest } from '@/lib/health-push-notifications'
 
 // Vercel Cron: runs daily
-// Sends health briefings and evidence milestone notifications to users
+// Sends health briefings, evidence milestone notifications, and weekly digests to users
 // with active health integrations and registered device tokens.
 
 export async function GET(request: NextRequest) {
@@ -167,6 +167,70 @@ export async function GET(request: NextRequest) {
           }
         }
       }
+
+      // 3. Weekly digest (Mondays only)
+      const isMonday = new Date().getDay() === 1
+      if (isMonday) {
+        const digest = await generateWeeklyDigest(userId)
+
+        if (digest) {
+          // Send to iOS devices
+          for (const dt of deviceTokens) {
+            if (dt.platform === 'ios' && isAPNsConfigured()) {
+              const result = await sendAPNsNotification(
+                dt.token,
+                digest.title,
+                digest.body,
+                digest.data
+              )
+              sentResults.push({
+                userId,
+                type: 'weekly_digest',
+                platform: 'ios',
+                success: result.success,
+              })
+            }
+          }
+
+          // Send to web push subscriptions
+          for (const sub of webSubscriptions) {
+            try {
+              const webPush = await import('web-push')
+              webPush.setVapidDetails(
+                process.env.VAPID_SUBJECT || 'mailto:admin@localhost',
+                process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || '',
+                process.env.VAPID_PRIVATE_KEY || ''
+              )
+
+              await webPush.sendNotification(
+                {
+                  endpoint: sub.endpoint,
+                  keys: { p256dh: sub.p256dh, auth: sub.auth },
+                },
+                JSON.stringify({
+                  title: digest.title,
+                  body: digest.body,
+                  url: '/health',
+                  data: digest.data,
+                })
+              )
+              sentResults.push({
+                userId,
+                type: 'weekly_digest',
+                platform: 'web',
+                success: true,
+              })
+            } catch {
+              sentResults.push({
+                userId,
+                type: 'weekly_digest',
+                platform: 'web',
+                success: false,
+              })
+            }
+          }
+        }
+      }
     }
 
     return NextResponse.json({
@@ -177,6 +241,7 @@ export async function GET(request: NextRequest) {
       breakdown: {
         briefings: sentResults.filter(r => r.type === 'health_briefing' && r.success).length,
         milestones: sentResults.filter(r => r.type === 'evidence_milestone' && r.success).length,
+        weeklyDigests: sentResults.filter(r => r.type === 'weekly_digest' && r.success).length,
       },
     })
   } catch (error) {
