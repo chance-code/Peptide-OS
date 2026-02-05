@@ -186,7 +186,7 @@ export default function PrivacyPolicyPage() {
           <h2 className="text-lg font-semibold text-[var(--foreground)] mb-2">Contact</h2>
           <p className="text-[var(--muted-foreground)] mb-4">
             For privacy-related questions, data requests, or to exercise your rights, contact us at:{' '}
-            <a href="mailto:privacy@arcprotocol.app" className="text-blue-600 underline">
+            <a href="mailto:privacy@arcprotocol.app" className="text-[var(--accent)] underline">
               privacy@arcprotocol.app
             </a>
           </p>

@@ -66,7 +66,7 @@ function getItemLabel(name: string, itemType?: string | null): { label: string; 
   if (itemType === 'supplement') {
     const benefit = getSupplementBenefit(name)
     if (benefit) {
-      return { label: benefit, color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300' }
+      return { label: benefit, color: 'bg-[var(--success-muted)] text-[var(--success)]' }
     }
     return { label: 'Supplement', color: 'bg-[var(--muted)] text-[var(--muted-foreground)]' }
   }
@@ -106,11 +106,11 @@ function getItemLabel(name: string, itemType?: string | null): { label: string; 
   }
 
   const colors: Record<string, string> = {
-    'healing': 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300',
-    'growth-hormone': 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300',
-    'weight-loss': 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300',
-    'cosmetic': 'bg-pink-100 text-pink-800 dark:bg-pink-900/50 dark:text-pink-300',
-    'other': 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300',
+    'healing': 'bg-[var(--success-muted)] text-[var(--success)]',
+    'growth-hormone': 'bg-[rgba(155,125,212,0.12)] text-[var(--tier-3)]',
+    'weight-loss': 'bg-[var(--evidence-muted)] text-[var(--evidence)]',
+    'cosmetic': 'bg-[var(--warning-muted)] text-[var(--warning)]',
+    'other': 'bg-[var(--accent-muted)] text-[var(--accent)]',
   }
 
   return { label, color: colors[category] || colors.other }
@@ -247,7 +247,7 @@ export default function ProtocolsPage() {
       <div className="p-4 pb-20">
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-[var(--foreground)]">Protocols</h2>
+          <h2 className="text-display text-[var(--foreground)]">Protocols</h2>
           <Link href="/protocols/new">
             <Button size="sm">
               <Plus className="w-4 h-4 mr-1" />
@@ -350,7 +350,7 @@ export default function ProtocolsPage() {
                               {label}
                             </span>
                             {penUnits && (
-                              <span className="bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 text-xs font-semibold px-2 py-0.5 rounded-full">
+                              <span className="bg-[var(--evidence-muted)] text-[var(--evidence)] text-xs font-semibold px-2 py-0.5 rounded-full">
                                 {penUnits}u
                               </span>
                             )}
@@ -395,7 +395,7 @@ export default function ProtocolsPage() {
 
                       {/* Progress */}
                       <div className="flex items-center gap-4 text-xs text-[var(--muted-foreground)] mt-3">
-                        <span>Day {stats.daysCompleted}</span>
+                        <span className="text-data-sm">Day {stats.daysCompleted}</span>
                         {stats.daysRemaining !== null && stats.totalWeeks !== null ? (
                           <>
                             <span className="text-[var(--border)]">•</span>
@@ -416,7 +416,7 @@ export default function ProtocolsPage() {
                       {stats.progress !== null && (
                         <div className="mt-2 h-1.5 bg-[var(--muted)] rounded-full overflow-hidden">
                           <div
-                            className="h-full bg-green-500 rounded-full transition-all"
+                            className="h-full bg-[var(--accent)] rounded-full transition-all"
                             style={{ width: `${stats.progress}%` }}
                           />
                         </div>

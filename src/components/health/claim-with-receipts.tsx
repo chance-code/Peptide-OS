@@ -36,11 +36,11 @@ export function ClaimWithReceipts({
   const [showFilters, setShowFilters] = useState(false)
 
   const typeConfig = {
-    improvement: { icon: TrendingUp, color: 'text-emerald-400', bg: 'bg-emerald-500/20' },
-    decline: { icon: TrendingDown, color: 'text-rose-400', bg: 'bg-rose-500/20' },
-    correlation: { icon: Activity, color: 'text-cyan-400', bg: 'bg-cyan-500/20' },
-    warning: { icon: AlertTriangle, color: 'text-amber-400', bg: 'bg-amber-500/20' },
-    recommendation: { icon: Lightbulb, color: 'text-violet-400', bg: 'bg-violet-500/20' },
+    improvement: { icon: TrendingUp, color: 'text-[var(--success)]', bg: 'bg-[var(--success-muted)]' },
+    decline: { icon: TrendingDown, color: 'text-[var(--error)]', bg: 'bg-[var(--error-muted)]' },
+    correlation: { icon: Activity, color: 'text-[var(--evidence)]', bg: 'bg-[var(--evidence-muted)]' },
+    warning: { icon: AlertTriangle, color: 'text-[var(--warning)]', bg: 'bg-[var(--warning-muted)]' },
+    recommendation: { icon: Lightbulb, color: 'text-[var(--tier-3)]', bg: 'bg-[rgba(155,125,212,0.12)]' },
     observation: { icon: Activity, color: 'text-[var(--muted-foreground)]', bg: 'bg-[var(--muted-foreground)]/20' }
   }
 
@@ -135,7 +135,7 @@ export function ClaimWithReceipts({
                 {claim.receipt.confoundsPresent.map((c) => (
                   <span
                     key={c}
-                    className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400"
+                    className="text-xs px-2 py-0.5 rounded-full bg-[var(--warning-muted)] text-[var(--warning)]"
                   >
                     {c}
                   </span>
@@ -232,8 +232,8 @@ export function ClaimWithReceipts({
 // Confidence badge component
 function ConfidenceBadge({ confidence }: { confidence: ConfidenceLevel }) {
   const colors = {
-    high: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-    medium: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+    high: 'bg-[var(--success-muted)] text-[var(--success)] border-[var(--success)]/30',
+    medium: 'bg-[var(--warning-muted)] text-[var(--warning)] border-[var(--warning)]/30',
     low: 'bg-[var(--muted-foreground)]/20 text-[var(--muted-foreground)] border-[var(--muted-foreground)]/30'
   }
 
@@ -337,13 +337,13 @@ const THEME_ICONS: Record<InsightThemeType, typeof AlertTriangle> = {
 }
 
 const THEME_COLORS: Record<InsightThemeType, { icon: string; border: string }> = {
-  recovery_state: { icon: 'text-cyan-400 bg-cyan-500/20', border: 'border-cyan-500/30' },
-  sleep_architecture: { icon: 'text-indigo-400 bg-indigo-500/20', border: 'border-indigo-500/30' },
-  body_composition: { icon: 'text-amber-400 bg-amber-500/20', border: 'border-amber-500/30' },
-  training_response: { icon: 'text-orange-400 bg-orange-500/20', border: 'border-orange-500/30' },
-  protocol_evidence: { icon: 'text-violet-400 bg-violet-500/20', border: 'border-violet-500/30' },
-  lifestyle_impact: { icon: 'text-emerald-400 bg-emerald-500/20', border: 'border-emerald-500/30' },
-  risk_alert: { icon: 'text-rose-400 bg-rose-500/20', border: 'border-rose-500/30' },
+  recovery_state: { icon: 'text-[var(--evidence)] bg-[var(--evidence-muted)]', border: 'border-[var(--evidence)]/30' },
+  sleep_architecture: { icon: 'text-[var(--evidence)] bg-[var(--evidence-muted)]', border: 'border-[var(--evidence)]/30' },
+  body_composition: { icon: 'text-[var(--warning)] bg-[var(--warning-muted)]', border: 'border-[var(--warning)]/30' },
+  training_response: { icon: 'text-[var(--accent)] bg-[var(--accent-muted)]', border: 'border-[var(--accent)]/30' },
+  protocol_evidence: { icon: 'text-[var(--tier-3)] bg-[rgba(155,125,212,0.12)]', border: 'border-[var(--tier-3)]/30' },
+  lifestyle_impact: { icon: 'text-[var(--success)] bg-[var(--success-muted)]', border: 'border-[var(--success)]/30' },
+  risk_alert: { icon: 'text-[var(--error)] bg-[var(--error-muted)]', border: 'border-[var(--error)]/30' },
 }
 
 interface InsightThemeCardProps {
@@ -358,8 +358,8 @@ export function InsightThemeCard({ theme, onClaimClick, className }: InsightThem
   const colors = THEME_COLORS[theme.type]
 
   const priorityColors = {
-    high: 'border-l-rose-400',
-    medium: 'border-l-amber-400',
+    high: 'border-l-[var(--error)]',
+    medium: 'border-l-[var(--warning)]',
     low: 'border-l-[var(--border)]',
   }
 
@@ -381,7 +381,7 @@ export function InsightThemeCard({ theme, onClaimClick, className }: InsightThem
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <h3 className="text-base font-medium text-[var(--foreground)] truncate">
+              <h3 className="text-title text-base text-[var(--foreground)] truncate">
                 {theme.title}
               </h3>
               <span className="text-xs text-[var(--muted-foreground)]">

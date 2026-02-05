@@ -52,9 +52,9 @@ export function BottomNav() {
           />
 
           {/* Hub Sheet */}
-          <div className="absolute bottom-0 left-0 right-0 bg-[var(--card)] rounded-t-2xl border-t border-[var(--border)] pb-[env(safe-area-inset-bottom)] animate-slide-up">
+          <div className="absolute bottom-0 left-0 right-0 bg-[var(--surface-1)] rounded-t-2xl border-t border-[var(--border-subtle)] pb-[env(safe-area-inset-bottom)] animate-slide-up">
             <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
-              <h2 className="text-lg font-semibold text-[var(--foreground)]">More</h2>
+              <h2 className="text-display text-[var(--foreground)]">More</h2>
               <button
                 onClick={() => setShowHub(false)}
                 className="w-8 h-8 rounded-full bg-[var(--muted)] flex items-center justify-center"
@@ -196,7 +196,7 @@ export function TopHeader({
     )}>
       {hasContent && (
         <div className="flex items-center justify-between h-12 px-4 max-w-lg mx-auto">
-          <h1 className="text-lg font-semibold tracking-tight text-[var(--foreground)]">
+          <h1 className="text-title text-[var(--foreground)]">
             {title}
           </h1>
           <div className="flex items-center gap-2">

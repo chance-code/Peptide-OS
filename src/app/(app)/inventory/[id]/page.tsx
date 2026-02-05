@@ -328,7 +328,7 @@ export default function EditInventoryPage({
         </div>
 
         {/* Delete Section */}
-        <Card className="border-red-200">
+        <Card className="border-[var(--error)]/30">
           <CardContent className="pt-4">
             {!showDeleteConfirm ? (
               <Button

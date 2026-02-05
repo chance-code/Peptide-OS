@@ -80,7 +80,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   if (isLoading || sessionStatus === 'loading') {
     return (
       <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
-        <div className="text-[var(--muted-foreground)]">Loading...</div>
+        <div className="text-[var(--muted-foreground)] animate-blur-reveal">Loading...</div>
       </div>
     )
   }
@@ -88,7 +88,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   if (!currentUserId) {
     return (
       <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
-        <div className="text-[var(--muted-foreground)]">Setting up your profile...</div>
+        <div className="text-[var(--muted-foreground)] animate-blur-reveal">Setting up your profile...</div>
       </div>
     )
   }

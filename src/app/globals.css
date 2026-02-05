@@ -4,128 +4,172 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* ========================================
-   PREMIUM DESIGN SYSTEM - Phase 1
-   Inspired by Oura
+   ARC PROTOCOL — "CLINICAL INTIMACY" DESIGN SYSTEM
+   Dark-first. Warm obsidian base. Amber/gold accent.
+   Precision without coldness. Data density without clutter.
    ======================================== */
 
 :root {
-  /* === SURFACES === */
-  --background: #F8FAFC;
-  --background-secondary: #F1F5F9;
-  --foreground: #111827;
+  /* === SURFACES (Light — warm cream/stone) === */
+  --background: #FAF8F5;
+  --background-secondary: #F5F0EB;
+  --foreground: #1C1917;
 
-  /* Card system */
   --card: #FFFFFF;
-  --card-foreground: #111827;
-  --card-hover: #F8FAFC;
+  --card-foreground: #1C1917;
+  --card-hover: #FAF8F5;
 
-  /* Muted/subtle */
-  --muted: #F1F5F9;
-  --muted-foreground: #6B7280;
+  --muted: #F5F0EB;
+  --muted-foreground: #6B6460;
 
-  /* === BORDERS === */
-  --border: #E5E7EB;
-  --border-subtle: #F3F4F6;
-  --border-strong: #D1D5DB;
-  --ring: #4B5563;
+  /* Layered surfaces (light) */
+  --surface-1: #FFFFFF;
+  --surface-2: #FAF8F5;
+  --surface-3: #F5F0EB;
+
+  /* === BORDERS (warm) === */
+  --border: #E8E2DA;
+  --border-subtle: #F0EBE5;
+  --border-strong: #D4CFC8;
+  --ring: #6B6460;
 
   /* === SEMANTIC === */
-  --success: #059669;
-  --success-muted: #ECFDF5;
-  --warning: #D97706;
-  --warning-muted: #FFFBEB;
-  --error: #DC2626;
-  --error-muted: #FEF2F2;
-  --info: #6B7280;
-  --info-muted: #F3F4F6;
+  --success: #5C8A58;
+  --success-muted: #F0F5EF;
+  --warning: #B8884D;
+  --warning-muted: #FBF6F0;
+  --error: #A85454;
+  --error-muted: #FAF0F0;
+  --info: #6B6460;
+  --info-muted: #F5F0EB;
 
-  /* === ACCENT (Indigo) === */
-  --accent: #4F46E5;
+  /* === ACCENT (Warm amber/gold) === */
+  --accent: #B8884D;
   --accent-foreground: #FFFFFF;
-  --accent-muted: #EEF2FF;
-  --accent-secondary: #0EA5E9;
-  --accent-secondary-muted: #E0F2FE;
+  --accent-muted: #FBF6F0;
+  --accent-secondary: #5E83A8;
+  --accent-secondary-muted: #EEF3F8;
+
+  /* === EVIDENCE (Steel blue — science color) === */
+  --evidence: #5E83A8;
+  --evidence-muted: #EEF3F8;
+
+  /* === TIER COLORS === */
+  --tier-1: #6B8A63;
+  --tier-2: #B8884D;
+  --tier-3: #7B62B8;
+  --tier-4: #5E83A8;
 
   /* === HEALTH TAB SURFACES (Light) === */
-  --health-bg: linear-gradient(to bottom, #F1F5F9, #EEF2FF);
+  --health-bg: linear-gradient(to bottom, #FAF8F5, #FBF6F0);
   --health-card: #FFFFFF;
-  --health-card-border: #E5E7EB;
-  --health-hero-bg: linear-gradient(135deg, #F8FAFC 0%, #EEF2FF 50%, #E0F2FE 100%);
-  --health-score-ring: #4F46E5;
-  --health-text-primary: #111827;
-  --health-text-secondary: #4B5563;
-  --health-text-muted: #9CA3AF;
+  --health-card-border: #E8E2DA;
+  --health-hero-bg: linear-gradient(135deg, #FAF8F5 0%, #FBF6F0 50%, #EEF3F8 100%);
+  --health-score-ring: #B8884D;
+  --health-text-primary: #1C1917;
+  --health-text-secondary: #6B6460;
+  --health-text-muted: #A89E94;
 
   /* === EFFECTS === */
-  --glow-success: 0 0 20px rgba(5, 150, 105, 0.2);
-  --glow-accent: 0 0 20px rgba(79, 70, 229, 0.2);
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
-  --shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.06), 0 2px 4px rgba(0, 0, 0, 0.03);
-  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.08);
+  --glow-success: 0 0 20px rgba(92, 138, 88, 0.2);
+  --glow-accent: 0 0 20px rgba(184, 136, 77, 0.2);
+  --glow-primary: 0 0 24px rgba(184, 136, 77, 0.15);
+  --glow-evidence: 0 0 20px rgba(94, 131, 168, 0.15);
+  --glow-error: 0 0 20px rgba(168, 84, 84, 0.15);
+  --shadow-sm: 0 1px 2px rgba(28, 25, 23, 0.04);
+  --shadow-card: 0 1px 3px rgba(28, 25, 23, 0.04), 0 1px 2px rgba(28, 25, 23, 0.02);
+  --shadow-card-hover: 0 4px 12px rgba(28, 25, 23, 0.06), 0 2px 4px rgba(28, 25, 23, 0.03);
+  --shadow-lg: 0 12px 32px rgba(28, 25, 23, 0.08);
+
+  /* === MOTION === */
+  --ease-settle: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-micro: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-enter: 400ms;
+  --duration-exit: 200ms;
+  --duration-micro: 150ms;
+  --duration-data: 600ms;
+  --duration-status: 500ms;
 }
 
 .dark {
-  /* === SURFACES (Dark) === */
-  --background: #0B1220;
-  --background-secondary: #111827;
-  --foreground: #F9FAFB;
+  /* === SURFACES (Dark — warm obsidian) === */
+  --background: #121010;
+  --background-secondary: #1C1917;
+  --foreground: #F5F0EB;
 
-  /* Dark card system */
-  --card: #111827;
-  --card-foreground: #F9FAFB;
-  --card-hover: #1F2937;
+  --card: #1C1917;
+  --card-foreground: #F5F0EB;
+  --card-hover: #252220;
 
-  /* Muted dark */
-  --muted: #1F2937;
-  --muted-foreground: #9CA3AF;
+  --muted: #252220;
+  --muted-foreground: #A89E94;
 
-  /* === BORDERS (Dark) === */
-  --border: #374151;
-  --border-subtle: #1F2937;
-  --border-strong: #4B5563;
-  --ring: #9CA3AF;
+  /* Layered surfaces */
+  --surface-1: #1C1917;
+  --surface-2: #252220;
+  --surface-3: #2F2B29;
+
+  /* === BORDERS (Dark — warm) === */
+  --border: #3D3835;
+  --border-subtle: #252220;
+  --border-strong: #524D49;
+  --ring: #A89E94;
 
   /* === SEMANTIC (Dark) === */
-  --success: #34D399;
-  --success-muted: rgba(52, 211, 153, 0.12);
-  --warning: #FBBF24;
-  --warning-muted: rgba(251, 191, 36, 0.12);
-  --error: #F87171;
-  --error-muted: rgba(248, 113, 113, 0.12);
-  --info: #9CA3AF;
-  --info-muted: rgba(156, 163, 175, 0.12);
+  --success: #7EAE7B;
+  --success-muted: rgba(126, 174, 123, 0.12);
+  --warning: #D4A574;
+  --warning-muted: rgba(212, 165, 116, 0.12);
+  --error: #C47070;
+  --error-muted: rgba(196, 112, 112, 0.12);
+  --info: #A89E94;
+  --info-muted: rgba(168, 158, 148, 0.12);
 
-  /* === ACCENT (Dark) === */
-  --accent: #818CF8;
-  --accent-foreground: #111827;
-  --accent-muted: rgba(129, 140, 248, 0.15);
-  --accent-secondary: #38BDF8;
-  --accent-secondary-muted: rgba(56, 189, 248, 0.15);
+  /* === ACCENT (Dark — warm amber/gold) === */
+  --accent: #D4A574;
+  --accent-foreground: #121010;
+  --accent-muted: rgba(212, 165, 116, 0.15);
+  --accent-secondary: #7CA5D4;
+  --accent-secondary-muted: rgba(124, 165, 212, 0.15);
+
+  /* === EVIDENCE (Dark) === */
+  --evidence: #7CA5D4;
+  --evidence-muted: rgba(124, 165, 212, 0.12);
+
+  /* === TIER COLORS (Dark) === */
+  --tier-1: #8B9E7C;
+  --tier-2: #D4A574;
+  --tier-3: #9B7DD4;
+  --tier-4: #7CA5D4;
 
   /* === HEALTH TAB SURFACES (Dark) === */
-  --health-bg: linear-gradient(to bottom, #0B1220, #1E1B4B);
-  --health-card: #1F2937;
-  --health-card-border: #374151;
-  --health-hero-bg: linear-gradient(135deg, #0F172A 0%, #1E1B4B 50%, #172554 100%);
-  --health-score-ring: #818CF8;
-  --health-text-primary: #F9FAFB;
-  --health-text-secondary: #D1D5DB;
-  --health-text-muted: #6B7280;
+  --health-bg: linear-gradient(to bottom, #121010, #1C1917);
+  --health-card: #1C1917;
+  --health-card-border: #3D3835;
+  --health-hero-bg: linear-gradient(135deg, #121010 0%, #1C1917 50%, #1A2030 100%);
+  --health-score-ring: #D4A574;
+  --health-text-primary: #F5F0EB;
+  --health-text-secondary: #A89E94;
+  --health-text-muted: #6B6460;
 
   /* === EFFECTS (Dark) === */
-  --glow-success: 0 0 24px rgba(52, 211, 153, 0.25);
-  --glow-accent: 0 0 24px rgba(129, 140, 248, 0.25);
+  --glow-success: 0 0 24px rgba(126, 174, 123, 0.25);
+  --glow-accent: 0 0 24px rgba(212, 165, 116, 0.25);
+  --glow-primary: 0 0 30px rgba(212, 165, 116, 0.2);
+  --glow-evidence: 0 0 24px rgba(124, 165, 212, 0.2);
+  --glow-error: 0 0 24px rgba(196, 112, 112, 0.2);
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.02);
-  --shadow-card-hover: 0 8px 25px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(245, 240, 235, 0.03);
+  --shadow-card-hover: 0 8px 25px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(245, 240, 235, 0.05);
   --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-inter);
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display);
+  --font-mono: var(--font-mono);
 }
 
 body {
@@ -177,11 +221,11 @@ html.theme-transition *::after {
   outline-offset: 2px;
 }
 
-/* Smooth theme transitions - only apply to specific elements, not inputs */
+/* Smooth transitions on interactive elements */
 button, a, [role="button"], .transition-colors {
-  transition-property: background-color, border-color, color, fill, stroke, box-shadow;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 150ms;
+  transition-property: background-color, border-color, color, fill, stroke, box-shadow, transform;
+  transition-timing-function: var(--ease-settle);
+  transition-duration: var(--duration-micro);
 }
 
 /* Remove input number spinners */
@@ -196,47 +240,145 @@ input[type='number'] {
 }
 
 /* ========================================
-   ANIMATIONS
+   TYPOGRAPHY — Three-Font System
+   Display: DM Serif Display (editorial warmth)
+   Body: Plus Jakarta Sans (clean precision)
+   Mono: JetBrains Mono (data clarity)
    ======================================== */
 
-/* Checkmark completion animation */
+/* Display XL — Status words, major verdicts */
+.text-display-xl {
+  font-family: var(--font-display), Georgia, 'Times New Roman', serif;
+  font-size: 2.75rem;
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+/* Display — Screen titles, protocol names in detail */
+.text-display {
+  font-family: var(--font-display), Georgia, 'Times New Roman', serif;
+  font-size: 1.75rem;
+  font-weight: 400;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+/* Title — Section headers, card titles */
+.text-title {
+  font-size: 1.375rem;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
+/* Data — Numbers, percentages, scores (mono) */
+.text-data {
+  font-family: var(--font-mono), 'Courier New', monospace;
+  font-size: 1.125rem;
+  font-weight: 500;
+  line-height: 1;
+  font-feature-settings: "tnum" 1;
+}
+
+.text-data-sm {
+  font-family: var(--font-mono), 'Courier New', monospace;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1;
+  font-feature-settings: "tnum" 1;
+}
+
+.text-data-lg {
+  font-family: var(--font-mono), 'Courier New', monospace;
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1;
+  font-feature-settings: "tnum" 1;
+}
+
+/* Hero numbers — for scores and key metrics */
+.text-hero {
+  font-family: var(--font-display), Georgia, 'Times New Roman', serif;
+  font-size: 3rem;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.text-hero-sm {
+  font-family: var(--font-display), Georgia, 'Times New Roman', serif;
+  font-size: 2rem;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+/* Tabular numbers for data */
+.tabular-nums {
+  font-feature-settings: "tnum" 1;
+}
+
+/* Premium label style */
+.text-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted-foreground);
+}
+
+/* Caption — timestamps, tertiary labels */
+.text-caption {
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 1.4;
+  letter-spacing: 0.04em;
+  color: var(--muted-foreground);
+}
+
+/* ========================================
+   ANIMATIONS — Precision Settle
+   Fast start, slow settle. Purposeful, not bouncy.
+   ======================================== */
+
+/* Checkmark completion animation — confident, not bouncy */
 @keyframes checkPop {
-  0% { transform: scale(0.5); }
-  40% { transform: scale(1.3); }
-  70% { transform: scale(0.95); }
-  100% { transform: scale(1); }
+  0% { transform: scale(0.5); opacity: 0; }
+  60% { transform: scale(1.06); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
 }
 
 @keyframes checkDraw {
-  0% { transform: scale(0) rotate(-90deg); opacity: 0; }
-  60% { transform: scale(1.3) rotate(10deg); opacity: 1; }
+  0% { transform: scale(0) rotate(-45deg); opacity: 0; }
+  60% { transform: scale(1.06) rotate(0deg); opacity: 1; }
   100% { transform: scale(1) rotate(0deg); opacity: 1; }
 }
 
-/* Staggered card entrance animation */
+/* Card entrance — fade + translate up */
 @keyframes cardSlideIn {
-  0% { opacity: 0; transform: translateY(12px) scale(0.98); }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
+  0% { opacity: 0; transform: translateY(12px); }
+  100% { opacity: 1; transform: translateY(0); }
 }
 
 .animate-card-in {
-  animation: cardSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: cardSlideIn var(--duration-enter) var(--ease-settle) forwards;
   opacity: 0;
 }
 
-/* Stagger delays for list items */
+/* Stagger delays for list items (80ms intervals) */
 .stagger-1 { animation-delay: 0ms; }
-.stagger-2 { animation-delay: 40ms; }
-.stagger-3 { animation-delay: 80ms; }
-.stagger-4 { animation-delay: 120ms; }
-.stagger-5 { animation-delay: 160ms; }
-.stagger-6 { animation-delay: 200ms; }
-.stagger-7 { animation-delay: 240ms; }
-.stagger-8 { animation-delay: 280ms; }
-.stagger-9 { animation-delay: 320ms; }
-.stagger-10 { animation-delay: 360ms; }
+.stagger-2 { animation-delay: 80ms; }
+.stagger-3 { animation-delay: 160ms; }
+.stagger-4 { animation-delay: 240ms; }
+.stagger-5 { animation-delay: 320ms; }
+.stagger-6 { animation-delay: 400ms; }
+.stagger-7 { animation-delay: 480ms; }
+.stagger-8 { animation-delay: 560ms; }
+.stagger-9 { animation-delay: 640ms; }
+.stagger-10 { animation-delay: 720ms; }
 
-/* Page transition animations */
+/* Page transitions */
 @keyframes pageIn {
   0% { opacity: 0; transform: translateY(8px); }
   100% { opacity: 1; transform: translateY(0); }
@@ -248,21 +390,21 @@ input[type='number'] {
 }
 
 .animate-page-in {
-  animation: pageIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: pageIn 0.3s var(--ease-settle) forwards;
 }
 
 .animate-fade-in {
-  animation: pageFadeIn 0.2s ease-out forwards;
+  animation: pageFadeIn var(--duration-exit) ease-out forwards;
 }
 
-/* Hub slide up animation */
+/* Hub slide up */
 @keyframes slideUp {
   0% { transform: translateY(100%); }
   100% { transform: translateY(0); }
 }
 
 .animate-slide-up {
-  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: slideUp 0.3s var(--ease-settle) forwards;
 }
 
 /* Ring fill animation for scores */
@@ -272,17 +414,55 @@ input[type='number'] {
 }
 
 .animate-ring-fill {
-  animation: ringFill 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: ringFill 1s var(--ease-settle) forwards;
 }
 
-/* Pulse glow for active states */
+/* Pulse glow — warm amber primary */
 @keyframes pulseGlow {
-  0%, 100% { box-shadow: var(--glow-success); }
-  50% { box-shadow: 0 0 30px rgba(16, 185, 129, 0.5); }
+  0%, 100% { box-shadow: var(--glow-primary); }
+  50% { box-shadow: 0 0 40px rgba(212, 165, 116, 0.35); }
 }
 
 .animate-pulse-glow {
-  animation: pulseGlow 2s ease-in-out infinite;
+  animation: pulseGlow 2.5s ease-in-out infinite;
+}
+
+/* Status color cross-fade */
+@keyframes statusFade {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+.animate-status-fade {
+  animation: statusFade var(--duration-status) var(--ease-settle) forwards;
+}
+
+/* Data count-up stagger (used with JS for number animations) */
+.animate-data-enter {
+  animation: pageFadeIn var(--duration-data) var(--ease-settle) forwards;
+  opacity: 0;
+}
+
+/* Warm ambient glow celebration — replaces confetti */
+@keyframes celebrationGlow {
+  0% { opacity: 0; transform: scale(0.8); }
+  40% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.2); }
+}
+
+.animate-celebration {
+  animation: celebrationGlow 1.5s var(--ease-settle) forwards;
+  pointer-events: none;
+}
+
+/* Blur-to-sharp reveal (replaces skeleton pulse) */
+@keyframes blurReveal {
+  0% { filter: blur(8px); opacity: 0.4; }
+  100% { filter: blur(0px); opacity: 1; }
+}
+
+.animate-blur-reveal {
+  animation: blurReveal var(--duration-enter) var(--ease-settle) forwards;
 }
 
 /* ========================================
@@ -297,7 +477,7 @@ input[type='number'] {
    ======================================== */
 
 /* ========================================
-   GLASSMORPHISM - Enhanced
+   GLASSMORPHISM — Warm tones
    ======================================== */
 
 .glass {
@@ -307,7 +487,7 @@ input[type='number'] {
 }
 
 .dark .glass {
-  background: rgba(17, 17, 17, 0.85);
+  background: rgba(18, 16, 16, 0.85);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
 }
@@ -319,26 +499,26 @@ input[type='number'] {
 }
 
 .dark .glass-subtle {
-  background: rgba(17, 17, 17, 0.6);
+  background: rgba(18, 16, 16, 0.6);
 }
 
-/* Premium glass card effect */
+/* Premium glass card — warm tones */
 .glass-card {
   background: rgba(255, 255, 255, 0.7);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(232, 226, 218, 0.5);
   box-shadow:
-    0 4px 24px rgba(0, 0, 0, 0.06),
+    0 4px 24px rgba(28, 25, 23, 0.06),
     inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 .dark .glass-card {
-  background: rgba(17, 17, 17, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(28, 25, 23, 0.7);
+  border: 1px solid rgba(245, 240, 235, 0.06);
   box-shadow:
     0 4px 24px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    inset 0 1px 0 rgba(245, 240, 235, 0.03);
 }
 
 /* ========================================
@@ -348,9 +528,9 @@ input[type='number'] {
 .card-premium {
   background: var(--card);
   border-radius: 16px;
-  border: none;
+  border: 1px solid var(--border-subtle);
   box-shadow: var(--shadow-card);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.2s var(--ease-settle);
 }
 
 .card-premium:hover {
@@ -362,13 +542,14 @@ input[type='number'] {
   border: 1px solid var(--border);
 }
 
-/* Interactive card - press effect */
+/* Interactive card — precision press */
 .card-interactive {
   cursor: pointer;
 }
 
 .card-interactive:active {
-  transform: scale(0.98);
+  transform: scale(0.97);
+  transition-duration: var(--duration-micro);
 }
 
 /* Status card variants */
@@ -388,45 +569,9 @@ input[type='number'] {
 }
 
 /* ========================================
-   TYPOGRAPHY - Premium Scaling
-   ======================================== */
-
-/* Hero numbers - for scores and key metrics */
-.text-hero {
-  font-size: 3rem;
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: -0.02em;
-  font-feature-settings: "tnum" 1;
-}
-
-.text-hero-sm {
-  font-size: 2rem;
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: -0.02em;
-  font-feature-settings: "tnum" 1;
-}
-
-/* Tabular numbers for data */
-.tabular-nums {
-  font-feature-settings: "tnum" 1;
-}
-
-/* Premium label style */
-.text-label {
-  font-size: 0.6875rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--muted-foreground);
-}
-
-/* ========================================
    STATUS INDICATORS
    ======================================== */
 
-/* Status dot with optional pulse */
 .status-dot {
   width: 8px;
   height: 8px;
@@ -455,7 +600,7 @@ input[type='number'] {
   height: 44px;
   border-radius: 50%;
   background: conic-gradient(
-    var(--success) calc(var(--progress, 0) * 3.6deg),
+    var(--accent) calc(var(--progress, 0) * 3.6deg),
     var(--muted) calc(var(--progress, 0) * 3.6deg)
   );
   display: flex;
@@ -476,17 +621,18 @@ input[type='number'] {
 }
 
 /* ========================================
-   BOTTOM NAV - Premium
+   BOTTOM NAV — Warm surface
    ======================================== */
 
 .nav-premium {
   background: var(--card);
   border-top: 1px solid var(--border);
-  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 -4px 20px rgba(28, 25, 23, 0.06);
 }
 
 .dark .nav-premium {
-  background: var(--card);
+  background: var(--surface-1);
+  border-top: 1px solid var(--border);
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
 }
 
@@ -498,7 +644,7 @@ input[type='number'] {
   gap: 2px;
   padding: 8px 16px;
   border-radius: 12px;
-  transition: all 0.2s ease;
+  transition: all 0.2s var(--ease-settle);
 }
 
 .nav-item-active {

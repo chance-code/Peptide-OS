@@ -91,8 +91,8 @@ export function BottomSheet({ isOpen, onClose, title, children }: BottomSheetPro
       <div
         ref={sheetRef}
         className={cn(
-          'fixed bottom-0 left-0 right-0 z-50 bg-[var(--card)] rounded-t-2xl shadow-xl',
-          'transform transition-transform duration-300 ease-out',
+          'fixed bottom-0 left-0 right-0 z-50 bg-[var(--surface-1)] rounded-t-2xl shadow-xl border-t border-[var(--border-subtle)]',
+          'transform transition-transform duration-300',
           'max-h-[85vh] flex flex-col',
           isOpen ? 'translate-y-0' : 'translate-y-full'
         )}
@@ -108,7 +108,7 @@ export function BottomSheet({ isOpen, onClose, title, children }: BottomSheetPro
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
         >
-          <div className="w-10 h-1 bg-[var(--border)] rounded-full" />
+          <div className="w-10 h-1 bg-[var(--border-strong)] rounded-full opacity-60" />
         </div>
 
         {/* Header */}

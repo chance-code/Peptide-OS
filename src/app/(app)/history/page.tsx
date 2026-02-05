@@ -96,10 +96,10 @@ export default function HistoryPage() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-emerald-500" />
+                <TrendingUp className="w-5 h-5 text-[var(--success)]" />
                 <span className="font-medium text-[var(--foreground)]">Adherence Rate</span>
               </div>
-              <span className="text-2xl font-bold text-emerald-500">{adherenceRate}%</span>
+              <span className="text-2xl font-bold text-[var(--success)]">{adherenceRate}%</span>
             </div>
             <div className="grid grid-cols-4 gap-2 text-center">
               <div>
@@ -107,7 +107,7 @@ export default function HistoryPage() {
                 <div className="text-xs text-[var(--muted-foreground)]">Total</div>
               </div>
               <div>
-                <div className="text-lg font-semibold text-emerald-500">{stats.completed}</div>
+                <div className="text-lg font-semibold text-[var(--success)]">{stats.completed}</div>
                 <div className="text-xs text-[var(--muted-foreground)]">Done</div>
               </div>
               <div>
@@ -115,7 +115,7 @@ export default function HistoryPage() {
                 <div className="text-xs text-[var(--muted-foreground)]">Skipped</div>
               </div>
               <div>
-                <div className="text-lg font-semibold text-red-500">{stats.missed}</div>
+                <div className="text-lg font-semibold text-[var(--error)]">{stats.missed}</div>
                 <div className="text-xs text-[var(--muted-foreground)]">Missed</div>
               </div>
             </div>
@@ -144,23 +144,23 @@ export default function HistoryPage() {
                         <div
                           className={cn(
                             'w-8 h-8 rounded-full flex items-center justify-center',
-                            log.status === 'completed' && 'bg-emerald-500/20',
+                            log.status === 'completed' && 'bg-[var(--success-muted)]',
                             log.status === 'skipped' && 'bg-slate-500/20',
-                            log.status === 'missed' && 'bg-red-500/20',
-                            log.status === 'pending' && 'bg-amber-500/20'
+                            log.status === 'missed' && 'bg-[var(--error-muted)]',
+                            log.status === 'pending' && 'bg-[var(--warning-muted)]'
                           )}
                         >
                           {log.status === 'completed' && (
-                            <CheckCircle className="w-4 h-4 text-emerald-500" />
+                            <CheckCircle className="w-4 h-4 text-[var(--success)]" />
                           )}
                           {log.status === 'skipped' && (
                             <MinusCircle className="w-4 h-4 text-[var(--muted-foreground)]" />
                           )}
                           {log.status === 'missed' && (
-                            <XCircle className="w-4 h-4 text-red-500" />
+                            <XCircle className="w-4 h-4 text-[var(--error)]" />
                           )}
                           {log.status === 'pending' && (
-                            <div className="w-3 h-3 rounded-full bg-amber-500" />
+                            <div className="w-3 h-3 rounded-full bg-[var(--warning)]" />
                           )}
                         </div>
                         <div className="flex-1 min-w-0">

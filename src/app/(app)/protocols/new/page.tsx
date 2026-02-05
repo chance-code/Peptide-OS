@@ -605,14 +605,14 @@ export default function NewProtocolPage() {
               {peptideScanResult && (
                 <div className={`rounded-lg p-3 ${
                   peptideScanResult.confidence === 'high'
-                    ? 'bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800'
-                    : 'bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800'
+                    ? 'bg-[var(--success-muted)] border border-[var(--success)]/30'
+                    : 'bg-[var(--warning-muted)] border border-[var(--warning)]/30'
                 }`}>
                   <div className="flex items-start gap-2">
                     {peptideScanResult.confidence === 'high' ? (
-                      <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" />
+                      <CheckCircle className="w-5 h-5 text-[var(--success)] flex-shrink-0" />
                     ) : (
-                      <AlertCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0" />
+                      <AlertCircle className="w-5 h-5 text-[var(--warning)] flex-shrink-0" />
                     )}
                     <div className="flex-1 text-sm">
                       <div className="font-medium text-[var(--foreground)]">
@@ -634,7 +634,7 @@ export default function NewProtocolPage() {
               )}
 
               {itemType === 'peptide' && scanError && (
-                <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-3 text-sm text-red-700 dark:text-red-300">
+                <div className="bg-[var(--error-muted)] border border-[var(--error)]/30 rounded-lg p-3 text-sm text-[var(--error)]">
                   {scanError}
                 </div>
               )}
@@ -679,7 +679,7 @@ export default function NewProtocolPage() {
                       <button
                         type="button"
                         onClick={() => removeImage(index)}
-                        className="absolute -top-3 -right-3 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg"
+                        className="absolute -top-3 -right-3 w-8 h-8 bg-[var(--error)] text-[var(--background)] rounded-full flex items-center justify-center shadow-lg"
                       >
                         <X className="w-4 h-4" />
                       </button>
@@ -735,18 +735,16 @@ export default function NewProtocolPage() {
               {scanResult && (
                 <div className={`rounded-lg p-3 ${
                   scanResult.confidence === 'high'
-                    ? 'bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800'
+                    ? 'bg-[var(--success-muted)] border border-[var(--success)]/30'
                     : scanResult.confidence === 'medium'
-                      ? 'bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800'
-                      : 'bg-orange-50 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-800'
+                      ? 'bg-[var(--warning-muted)] border border-[var(--warning)]/30'
+                      : 'bg-[var(--warning-muted)] border border-[var(--warning)]/30'
                 }`}>
                   <div className="flex items-start gap-2">
                     {scanResult.confidence === 'high' ? (
-                      <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" />
+                      <CheckCircle className="w-5 h-5 text-[var(--success)] flex-shrink-0" />
                     ) : (
-                      <AlertCircle className={`w-5 h-5 flex-shrink-0 ${
-                        scanResult.confidence === 'medium' ? 'text-yellow-600 dark:text-yellow-400' : 'text-orange-600 dark:text-orange-400'
-                      }`} />
+                      <AlertCircle className={`w-5 h-5 flex-shrink-0 text-[var(--warning)]`} />
                     )}
                     <div className="flex-1 text-sm">
                       <div className="font-medium text-[var(--foreground)]">
@@ -773,7 +771,7 @@ export default function NewProtocolPage() {
 
               {/* Scan error */}
               {scanError && (
-                <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-3 text-sm text-red-700 dark:text-red-300">
+                <div className="bg-[var(--error-muted)] border border-[var(--error)]/30 rounded-lg p-3 text-sm text-[var(--error)]">
                   {scanError}
                 </div>
               )}
@@ -840,17 +838,17 @@ export default function NewProtocolPage() {
 
         {/* Recommendation Banner */}
         {recommendation && recommendation.source === 'previous' && (
-          <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-4">
+          <div className="bg-[var(--success-muted)] border border-[var(--success)]/30 rounded-lg p-4">
             <div className="flex items-start gap-3">
-              <History className="w-5 h-5 text-green-500 dark:text-green-400 flex-shrink-0 mt-0.5" />
+              <History className="w-5 h-5 text-[var(--success)] flex-shrink-0 mt-0.5" />
               <div className="flex-1">
-                <div className="font-medium text-green-900 dark:text-green-100 text-sm">
+                <div className="font-medium text-[var(--foreground)] text-sm">
                   Using your previous {recommendation.peptideName} settings
                 </div>
-                <div className="text-green-700 dark:text-green-300 text-sm mt-1">
+                <div className="text-[var(--success)] text-sm mt-1">
                   Your dose: {recommendation.doseAmount} {recommendation.doseUnit}
                   {recommendation.vialAmount && recommendation.diluentVolume && (
-                    <span className="text-green-600 dark:text-green-400 ml-2">
+                    <span className="text-[var(--success)] ml-2">
                       ({recommendation.vialAmount}{recommendation.vialUnit} + {recommendation.diluentVolume}mL)
                     </span>
                   )}
@@ -860,18 +858,18 @@ export default function NewProtocolPage() {
           </div>
         )}
         {recommendation && recommendation.source === 'reference' && (
-          <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+          <div className="bg-[var(--evidence-muted)] border border-[var(--evidence)]/30 rounded-lg p-4">
             <div className="flex items-start gap-3">
-              <Lightbulb className="w-5 h-5 text-blue-500 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+              <Lightbulb className="w-5 h-5 text-[var(--evidence)] flex-shrink-0 mt-0.5" />
               <div className="flex-1">
-                <div className="font-medium text-blue-900 dark:text-blue-100 text-sm">
+                <div className="font-medium text-[var(--foreground)] text-sm">
                   {recommendation.peptideName} - Enter your vial size below
                 </div>
-                <div className="text-blue-700 dark:text-blue-300 text-sm mt-1">
+                <div className="text-[var(--evidence)] text-sm mt-1">
                   Recommended dose: {recommendation.doseAmount} {recommendation.doseUnit}
                 </div>
                 {recommendation.typicalVialSizes && (
-                  <div className="text-blue-600 dark:text-blue-400 text-xs mt-1">
+                  <div className="text-[var(--evidence)] text-xs mt-1">
                     Common vial sizes: {recommendation.typicalVialSizes.map(v => `${v.amount}${v.unit}`).join(', ')}
                   </div>
                 )}
@@ -1058,8 +1056,8 @@ export default function NewProtocolPage() {
                   const concentrationStr = `${concentration.toFixed(2)} ${vialUnit}/mL`
 
                   return (
-                    <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg p-4">
-                      <div className="text-green-800 dark:text-green-100 font-medium mb-3">Your Reconstitution Summary</div>
+                    <div className="bg-[var(--success-muted)] border border-[var(--success)]/30 rounded-lg p-4">
+                      <div className="text-[var(--foreground)] font-medium mb-3">Your Reconstitution Summary</div>
 
                       {/* Key Info */}
                       <div className="grid grid-cols-2 gap-3 text-sm">

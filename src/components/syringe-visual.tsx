@@ -36,7 +36,7 @@ export function SyringeVisual({ units, dose, concentration, maxUnits = 20 }: Syr
             <div className="h-10 bg-[var(--background)] border-2 border-[var(--border)] rounded-r relative overflow-hidden">
               {/* Fill level */}
               <div
-                className="absolute left-0 top-0 bottom-0 bg-blue-300 transition-all duration-300"
+                className="absolute left-0 top-0 bottom-0 bg-[var(--evidence)]/40 transition-all duration-300"
                 style={{ width: `${fillPercent * 100}%` }}
               />
 
@@ -53,7 +53,7 @@ export function SyringeVisual({ units, dose, concentration, maxUnits = 20 }: Syr
               {/* Fill line indicator */}
               {fillUnits > 0 && fillUnits < maxUnits && (
                 <div
-                  className="absolute top-0 bottom-0 w-1 bg-blue-600 rounded"
+                  className="absolute top-0 bottom-0 w-1 bg-[var(--evidence)] rounded"
                   style={{ left: `calc(${fillPercent * 100}% - 2px)` }}
                 />
               )}
@@ -74,7 +74,7 @@ export function SyringeVisual({ units, dose, concentration, maxUnits = 20 }: Syr
         {/* Annotation */}
         <div className="mt-3 text-center">
           <div className="inline-flex items-center gap-2 bg-[var(--accent)]/10 text-[var(--accent)] px-3 py-1.5 rounded-full text-sm font-medium">
-            <span className="w-3 h-3 bg-blue-500 rounded-full" />
+            <span className="w-3 h-3 bg-[var(--evidence)] rounded-full" />
             {dose} = {units} units
           </div>
         </div>

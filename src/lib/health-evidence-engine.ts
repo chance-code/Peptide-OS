@@ -616,6 +616,7 @@ interface ProtocolWithDetails {
   status: string
   peptide: {
     name: string
+    canonicalName: string | null
     type: string
     category: string | null
   }
@@ -647,6 +648,7 @@ async function fetchProtocols(
       peptide: {
         select: {
           name: true,
+          canonicalName: true,
           type: true,
           category: true,
         },
@@ -844,8 +846,8 @@ async function computeSingleProtocolEvidence(
   const startDate = protocol.startDate
   const daysOnProtocol = differenceInDays(today, startDate)
 
-  // Normalize protocol name so mechanism lookups always resolve correctly
-  const { canonical: normalizedName } = normalizeProtocolName(protocol.peptide.name)
+  // Use AI-classified canonical name if available, otherwise fall back to normalization
+  const normalizedName = protocol.peptide.canonicalName || normalizeProtocolName(protocol.peptide.name).canonical
 
   // Determine ramp phase
   const rampPhase: RampPhase =

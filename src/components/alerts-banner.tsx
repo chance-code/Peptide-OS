@@ -55,11 +55,11 @@ export function AlertsBanner() {
   const getSeverityStyles = (severity: Alert['severity']) => {
     switch (severity) {
       case 'danger':
-        return 'bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800 text-red-800 dark:text-red-300'
+        return 'bg-[var(--error-muted)] border-[var(--error)]/30 text-[var(--error)]'
       case 'warning':
-        return 'bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300'
+        return 'bg-[var(--warning-muted)] border-[var(--warning)]/30 text-[var(--warning)]'
       case 'info':
-        return 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-300'
+        return 'bg-[var(--evidence-muted)] border-[var(--evidence)]/30 text-[var(--evidence)]'
       default:
         return 'bg-[var(--muted)] border-[var(--border)] text-[var(--foreground)]'
     }

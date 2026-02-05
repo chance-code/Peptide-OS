@@ -42,7 +42,7 @@ export function Modal({ isOpen, onClose, title, children, className }: ModalProp
       />
       <div
         className={cn(
-          'relative bg-[var(--card)] rounded-xl shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-auto',
+          'relative bg-[var(--surface-1)] rounded-xl shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-auto border border-[var(--border-subtle)]',
           className
         )}
       >

@@ -73,9 +73,14 @@ export function ComplianceRing({
           strokeLinecap="round"
           strokeDasharray={circumference}
           strokeDashoffset={strokeDashoffset}
-          className="transition-all duration-1000 ease-out"
+          className="transition-all duration-1000"
           style={{
-            filter: isComplete ? 'drop-shadow(0 0 8px var(--success))' : undefined,
+            transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)',
+            filter: isComplete
+              ? 'drop-shadow(0 0 10px var(--success))'
+              : animatedProgress > 0
+              ? 'drop-shadow(0 0 6px var(--accent))'
+              : undefined,
           }}
         />
       </svg>
@@ -91,7 +96,7 @@ export function ComplianceRing({
               style={{
                 width: ring * 0.5,
                 height: ring * 0.5,
-                animation: 'checkPop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                animation: 'checkPop 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
               }}
             >
               <Check className={icon} />
@@ -99,7 +104,7 @@ export function ComplianceRing({
           )
         ) : showPercentage ? (
           <div className="flex items-baseline">
-            <span className={cn('font-bold tabular-nums text-[var(--foreground)]', text)}>
+            <span className={cn('text-data font-bold text-[var(--foreground)]', text)}>
               {animatedProgress}
             </span>
             <span className={cn('font-bold text-[var(--muted-foreground)]', size === 'lg' ? 'text-lg' : size === 'md' ? 'text-sm' : 'text-[6px]')}>
@@ -107,7 +112,7 @@ export function ComplianceRing({
             </span>
           </div>
         ) : (
-          <span className={cn('font-bold tabular-nums text-[var(--foreground)]', text)}>
+          <span className={cn('text-data font-bold text-[var(--foreground)]', text)}>
             {completed}/{total}
           </span>
         )}

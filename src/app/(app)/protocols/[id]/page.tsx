@@ -417,12 +417,12 @@ export default function ProtocolDetailPage({
                   placeholder="e.g., 2"
                 />
                 {editVialAmount && editDiluentVolume && editDoseAmount && (
-                  <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-3">
-                    <div className="text-sm text-emerald-600 dark:text-emerald-400">
+                  <div className="bg-[var(--success-muted)] border border-[var(--success)]/20 rounded-lg p-3">
+                    <div className="text-sm text-[var(--success)]">
                       <strong>Concentration:</strong>{' '}
                       {(parseFloat(editVialAmount) / parseFloat(editDiluentVolume)).toFixed(2)} {editVialUnit}/mL
                     </div>
-                    <div className="text-sm text-emerald-600 dark:text-emerald-400 mt-1">
+                    <div className="text-sm text-[var(--success)] mt-1">
                       <strong>Per dose:</strong>{' '}
                       {(() => {
                         const concentration = parseFloat(editVialAmount) / parseFloat(editDiluentVolume)
@@ -568,7 +568,7 @@ export default function ProtocolDetailPage({
               <Edit2 className="w-5 h-5 text-[var(--muted-foreground)]" />
             </Button>
             <Button variant="ghost" size="sm" onClick={() => setShowDeleteModal(true)} className="w-11 h-11 p-0">
-              <Trash2 className="w-5 h-5 text-red-500" />
+              <Trash2 className="w-5 h-5 text-[var(--error)]" />
             </Button>
           </div>
         )}
@@ -629,7 +629,7 @@ export default function ProtocolDetailPage({
         </Card>
         <Card>
           <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-emerald-500">{adherenceRate}%</div>
+            <div className="text-2xl font-bold text-[var(--success)]">{adherenceRate}%</div>
             <div className="text-xs text-[var(--muted-foreground)]">Adherence</div>
           </CardContent>
         </Card>
@@ -696,7 +696,7 @@ export default function ProtocolDetailPage({
             </div>
             <div className="h-2 bg-[var(--muted)] rounded-full overflow-hidden">
               <div
-                className="h-full bg-green-500 rounded-full transition-all"
+                className="h-full bg-[var(--success)] rounded-full transition-all"
                 style={{ width: `${progress}%` }}
               />
             </div>

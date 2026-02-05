@@ -107,15 +107,15 @@ function ScoreRing({ score, size = 120 }: { score: number; size?: number }) {
           strokeLinecap="round"
           strokeDasharray={circumference}
           strokeDashoffset={offset}
-          className="transition-all duration-1000 ease-out"
-          style={{ filter: `drop-shadow(0 0 8px ${getColor()})` }}
+          className="transition-all duration-1000"
+          style={{ transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)', filter: `drop-shadow(0 0 8px ${getColor()})` }}
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-4xl font-bold tabular-nums text-[var(--foreground)]">
+        <span className="text-display-xl text-[var(--foreground)]">
           {score}
         </span>
-        <span className="text-xs text-[var(--muted-foreground)] uppercase tracking-wider">
+        <span className="text-label">
           Score
         </span>
       </div>
@@ -327,7 +327,7 @@ export default function CalendarPage() {
             <ChevronLeft className="w-5 h-5" />
           </button>
           <div className="text-center">
-            <h1 className="text-xl font-semibold text-[var(--foreground)]">
+            <h1 className="text-display text-[var(--foreground)]">
               {format(currentMonth, 'MMMM')}
             </h1>
             <p className="text-sm text-[var(--muted-foreground)]">
@@ -348,10 +348,10 @@ export default function CalendarPage() {
             <div className="flex-1">
               <p className="text-sm text-[var(--muted-foreground)] mb-1">Monthly Compliance</p>
               <div className="flex items-baseline mb-3">
-                <span className="text-5xl font-bold tabular-nums text-[var(--foreground)]">
+                <span className="text-display-xl text-[var(--foreground)]">
                   {monthlyStats.percentage}
                 </span>
-                <span className="text-2xl font-bold text-[var(--muted-foreground)] ml-0.5">%</span>
+                <span className="text-display text-[var(--muted-foreground)] ml-0.5">%</span>
               </div>
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-1.5">
@@ -361,7 +361,7 @@ export default function CalendarPage() {
                   </span>
                 </div>
                 {monthlyStats.streak > 0 && (
-                  <div className="flex items-center gap-1 text-orange-500">
+                  <div className="flex items-center gap-1 text-[var(--accent)]">
                     <Flame className="w-4 h-4" />
                     <span className="text-sm font-medium">{monthlyStats.streak} day streak</span>
                   </div>

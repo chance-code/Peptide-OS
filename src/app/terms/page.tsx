@@ -30,11 +30,11 @@ export default function TermsPage() {
 
         <section className="mb-6">
           <h2 className="text-lg font-semibold text-[var(--foreground)] mb-2">3. Medical Disclaimer</h2>
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
-            <p className="text-amber-800 font-semibold mb-2">
+          <div className="bg-[var(--warning-muted)] border border-[var(--warning)]/30 rounded-lg p-4 mb-4">
+            <p className="text-[var(--foreground)] font-semibold mb-2">
               IMPORTANT - PLEASE READ CAREFULLY
             </p>
-            <p className="text-amber-700 text-sm">
+            <p className="text-[var(--warning)] text-sm">
               Peptide OS is NOT a medical device, NOT FDA-approved, and does NOT provide
               medical advice, diagnosis, treatment recommendations, or prescriptions.
             </p>

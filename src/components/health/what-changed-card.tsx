@@ -71,8 +71,8 @@ export function WhatChangedCard({
           What Matters Today
         </h3>
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          <div className="w-8 h-8 rounded-full bg-[var(--success-muted)] flex items-center justify-center flex-shrink-0">
+            <CheckCircle2 className="w-4 h-4 text-[var(--success)]" />
           </div>
           <p className="text-sm text-[var(--muted-foreground)]">
             All clear — your metrics are within normal range today.
@@ -139,10 +139,10 @@ export function WhatChangedCard({
               <div className={cn(
                 'w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0',
                 item.isGood
-                  ? 'bg-emerald-500/20 text-emerald-400'
+                  ? 'bg-[var(--success-muted)] text-[var(--success)]'
                   : item.direction === 'neutral'
                   ? 'bg-[var(--muted-foreground)]/20 text-[var(--muted-foreground)]'
-                  : 'bg-amber-500/20 text-amber-400'
+                  : 'bg-[var(--warning-muted)] text-[var(--warning)]'
               )}>
                 {item.direction === 'up' ? (
                   <TrendingUp className="w-4 h-4" />
@@ -158,7 +158,7 @@ export function WhatChangedCard({
                 <div className="flex items-baseline gap-2">
                   <span className={cn(
                     'text-lg font-semibold tabular-nums',
-                    item.isGood ? 'text-emerald-400' : 'text-amber-400'
+                    item.isGood ? 'text-[var(--success)]' : 'text-[var(--warning)]'
                   )}>
                     {item.delta}
                   </span>
@@ -206,8 +206,8 @@ function SignalBadge({ signalClass }: { signalClass: SignalClass }) {
   const config = {
     noise: { label: 'noise', color: 'text-[var(--muted-foreground)] bg-[var(--muted-foreground)]/10' },
     blip: { label: 'blip', color: 'text-[var(--muted-foreground)] bg-[var(--muted-foreground)]/10' },
-    short_term_change: { label: '2-3d', color: 'text-amber-400 bg-amber-500/10' },
-    sustained_trend: { label: '7d+', color: 'text-emerald-400 bg-emerald-500/10' },
+    short_term_change: { label: '2-3d', color: 'text-[var(--warning)] bg-[var(--warning-muted)]' },
+    sustained_trend: { label: '7d+', color: 'text-[var(--success)] bg-[var(--success-muted)]' },
   }
 
   const c = config[signalClass]
@@ -236,8 +236,8 @@ export function DeltaBadge({
       'inline-flex items-center gap-1 rounded-full font-medium tabular-nums',
       size === 'sm' ? 'px-2 py-0.5 text-xs' : 'px-3 py-1 text-sm',
       isGood
-        ? 'bg-emerald-500/20 text-emerald-400'
-        : 'bg-amber-500/20 text-amber-400'
+        ? 'bg-[var(--success-muted)] text-[var(--success)]'
+        : 'bg-[var(--warning-muted)] text-[var(--warning)]'
     )}>
       {direction === 'up' ? (
         <TrendingUp className={size === 'sm' ? 'w-3 h-3' : 'w-4 h-4'} />

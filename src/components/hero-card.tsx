@@ -98,9 +98,9 @@ export function HeroCard({
     >
       {/* Subtle gradient overlay */}
       <div
-        className="absolute inset-0 opacity-5"
+        className="absolute inset-0 opacity-10"
         style={{
-          background: `radial-gradient(circle at 70% 20%, ${message.accent}, transparent 50%)`,
+          background: `radial-gradient(circle at 70% 20%, ${message.accent}, transparent 60%)`,
         }}
       />
 
@@ -118,7 +118,7 @@ export function HeroCard({
         <div className="flex-1 min-w-0">
           {/* Greeting */}
           {userName && (
-            <div className="text-sm text-[var(--muted-foreground)] mb-1">
+            <div className="text-caption mb-1">
               {getGreeting()}, {userName.split(' ')[0]}
             </div>
           )}

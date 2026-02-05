@@ -43,13 +43,13 @@ const ICONS = {
 }
 
 const ICON_COLORS = {
-  temperature: 'text-cyan-400 bg-cyan-500/20',
+  temperature: 'text-[var(--evidence)] bg-[var(--evidence-muted)]',
   sleep: 'text-[var(--accent)] bg-[var(--accent-muted)]',
-  workout: 'text-orange-400 bg-orange-500/20',
-  supplement: 'text-emerald-400 bg-emerald-500/20',
-  caffeine: 'text-amber-400 bg-amber-500/20',
-  alcohol: 'text-rose-400 bg-rose-500/20',
-  general: 'text-violet-400 bg-violet-500/20'
+  workout: 'text-[var(--accent)] bg-[var(--accent-muted)]',
+  supplement: 'text-[var(--success)] bg-[var(--success-muted)]',
+  caffeine: 'text-[var(--warning)] bg-[var(--warning-muted)]',
+  alcohol: 'text-[var(--error)] bg-[var(--error-muted)]',
+  general: 'text-[var(--tier-3)] bg-[rgba(155,125,212,0.12)]'
 }
 
 export function DoThisNextCard({
@@ -68,8 +68,8 @@ export function DoThisNextCard({
         className
       )}>
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
-            <Check className="w-5 h-5 text-emerald-400" />
+          <div className="w-10 h-10 rounded-full bg-[var(--success-muted)] flex items-center justify-center">
+            <Check className="w-5 h-5 text-[var(--success)]" />
           </div>
           <div>
             <h3 className="text-sm font-medium text-[var(--muted-foreground)] uppercase tracking-wider">
@@ -137,9 +137,9 @@ export function DoThisNextCard({
               <span className={cn(
                 'text-xs px-2 py-0.5 rounded-full',
                 recommendation.confidence === 'high'
-                  ? 'bg-emerald-500/20 text-emerald-400'
+                  ? 'bg-[var(--success-muted)] text-[var(--success)]'
                   : recommendation.confidence === 'medium'
-                  ? 'bg-amber-500/20 text-amber-400'
+                  ? 'bg-[var(--warning-muted)] text-[var(--warning)]'
                   : 'bg-[var(--muted-foreground)]/20 text-[var(--muted-foreground)]'
               )}>
                 {recommendation.confidence} confidence

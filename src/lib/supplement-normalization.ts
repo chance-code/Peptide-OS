@@ -180,6 +180,11 @@ const EXTENDED_ALIASES: Record<string, string> = {
   // Omega-3 variations
   'omega 3': 'Omega-3',
   'omega3': 'Omega-3',
+  'omegad3': 'Omega-3',
+  'omega d3': 'Omega-3',
+  'omega d3 sport': 'Omega-3',
+  'ultimate omega': 'Omega-3',
+  'ultimate omega d3': 'Omega-3',
   'fish oil': 'Omega-3',
   'epa': 'Omega-3',
   'dha': 'Omega-3',
@@ -288,12 +293,18 @@ export function normalizeProtocolName(input: string): NormalizedProtocol {
     }
   }
 
-  // Fuzzy substring match — check if input contains or is contained by a known alias
+  // Fuzzy substring match — prefer longest (most specific) match
+  let bestMatch: { canonical: string; length: number } | null = null
   for (const [key, canonical] of Object.entries(EXTENDED_ALIASES)) {
     const keyStripped = key.replace(/[\s\-]/g, '')
     if (stripped.includes(keyStripped) || keyStripped.includes(stripped)) {
-      return { canonical, displayName: trimmed }
+      if (!bestMatch || keyStripped.length > bestMatch.length) {
+        bestMatch = { canonical, length: keyStripped.length }
+      }
     }
+  }
+  if (bestMatch) {
+    return { canonical: bestMatch.canonical, displayName: trimmed }
   }
 
   // No match — return input as-is

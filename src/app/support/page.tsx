@@ -45,7 +45,7 @@ export default function SupportPage() {
               <h3 className="font-medium text-[var(--foreground)] mb-1">Is my data secure?</h3>
               <p className="text-[var(--muted-foreground)] text-sm">
                 Yes. Your data is stored securely with encryption in transit. Chat history is stored
-                locally on your device. See our <Link href="/privacy" className="text-blue-600 underline">Privacy Policy</Link> for
+                locally on your device. See our <Link href="/privacy" className="text-[var(--accent)] underline">Privacy Policy</Link> for
                 full details.
               </p>
             </div>
@@ -77,7 +77,7 @@ export default function SupportPage() {
           <div className="space-y-2">
             <p className="text-[var(--muted-foreground)]">
               <strong>Email:</strong>{' '}
-              <a href="mailto:support@peptideos.app" className="text-blue-600 underline">
+              <a href="mailto:support@peptideos.app" className="text-[var(--accent)] underline">
                 support@peptideos.app
               </a>
             </p>
@@ -88,21 +88,21 @@ export default function SupportPage() {
           <h2 className="text-lg font-semibold text-[var(--foreground)] mb-3">Legal</h2>
           <div className="space-y-2">
             <p>
-              <Link href="/privacy" className="text-blue-600 underline">
+              <Link href="/privacy" className="text-[var(--accent)] underline">
                 Privacy Policy
               </Link>
             </p>
             <p>
-              <Link href="/terms" className="text-blue-600 underline">
+              <Link href="/terms" className="text-[var(--accent)] underline">
                 Terms of Service
               </Link>
             </p>
           </div>
         </section>
 
-        <section className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-          <h2 className="text-lg font-semibold text-amber-900 mb-2">Medical Disclaimer</h2>
-          <p className="text-amber-800 text-sm">
+        <section className="bg-[var(--warning-muted)] border border-[var(--warning)]/30 rounded-lg p-4">
+          <h2 className="text-lg font-semibold text-[var(--foreground)] mb-2">Medical Disclaimer</h2>
+          <p className="text-[var(--warning)] text-sm">
             Peptide OS is a tracking tool only and does not provide medical advice, diagnosis,
             or treatment. Always consult with a qualified healthcare provider before starting
             any supplement regimen.

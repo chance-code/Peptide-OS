@@ -37,20 +37,20 @@ export function TrajectoryHero({
     improving: {
       icon: ArrowUpRight,
       label: 'IMPROVING',
-      color: 'text-emerald-400',
-      bgGlow: '#10b981',
+      color: 'text-[var(--success)]',
+      bgGlow: 'var(--success)',
     },
     stable: {
       icon: ArrowRight,
       label: 'STABLE',
       color: 'text-[var(--accent)]',
-      bgGlow: '#6366f1',
+      bgGlow: 'var(--accent)',
     },
     declining: {
       icon: ArrowDownRight,
       label: 'DECLINING',
-      color: 'text-amber-400',
-      bgGlow: '#f59e0b',
+      color: 'text-[var(--warning)]',
+      bgGlow: 'var(--warning)',
     },
   }
 
@@ -69,7 +69,7 @@ export function TrajectoryHero({
       className={cn(
         'relative overflow-hidden rounded-2xl',
         'bg-gradient-to-br from-[var(--card)] via-[var(--card)] to-[var(--accent-muted)]',
-        'dark:from-[#1F2937] dark:via-[#1F2937] dark:to-[#312e81]',
+        'dark:from-[var(--surface-2)] dark:via-[var(--surface-2)] dark:to-[var(--accent-muted)]',
         'border border-[var(--border)]',
         'p-6',
         'shadow-[var(--shadow-card)]',
@@ -93,7 +93,7 @@ export function TrajectoryHero({
           {trajectory.confidence !== 'insufficient' && (
             <span className={cn(
               'px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0',
-              trajectory.confidence === 'high' ? 'bg-emerald-500/20 text-emerald-400' :
+              trajectory.confidence === 'high' ? 'bg-[var(--success-muted)] text-[var(--success)]' :
               trajectory.confidence === 'moderate' ? 'bg-[var(--accent-muted)] text-[var(--accent)]' :
               'bg-[var(--muted-foreground)]/20 text-[var(--muted-foreground)]'
             )}>
@@ -132,7 +132,7 @@ export function TrajectoryHero({
         <div className="flex items-center gap-3 mb-3">
           <DirIcon className={cn('w-8 h-8', config.color)} />
           <div>
-            <div className={cn('text-2xl font-bold', config.color)}>
+            <div className={cn('text-display', config.color)}>
               {config.label}
             </div>
             <div className="text-sm text-[var(--muted-foreground)]">
@@ -182,9 +182,9 @@ function CategoryChip({ label, category }: { label: string; category: CategoryTr
     : <Minus className="w-3.5 h-3.5" />
 
   const colorClass = category.direction === 'improving'
-    ? 'text-emerald-400'
+    ? 'text-[var(--success)]'
     : category.direction === 'declining'
-    ? 'text-amber-400'
+    ? 'text-[var(--warning)]'
     : 'text-[var(--muted-foreground)]'
 
   return (

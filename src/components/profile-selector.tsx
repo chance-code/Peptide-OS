@@ -111,7 +111,7 @@ export function ProfileSelector({ onSelect }: ProfileSelectorProps) {
                   )}
                 </div>
                 {user.isActive && (
-                  <Check className="w-5 h-5 text-green-600 dark:text-green-400" />
+                  <Check className="w-5 h-5 text-[var(--success)]" />
                 )}
               </button>
             ))}

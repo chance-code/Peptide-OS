@@ -101,7 +101,7 @@ export function Paywall({ isOpen, onClose, onPurchaseSuccess }: PaywallProps) {
           </button>
 
           <div className="text-center py-8">
-            <Sparkles className="w-12 h-12 text-amber-500 mx-auto mb-4" />
+            <Sparkles className="w-12 h-12 text-[var(--accent)] mx-auto mb-4" />
             <h2 className="text-xl font-bold text-[var(--foreground)] mb-2">
               Premium Available on iOS
             </h2>
@@ -126,8 +126,8 @@ export function Paywall({ isOpen, onClose, onPurchaseSuccess }: PaywallProps) {
 
         {/* Header */}
         <div className="bg-gradient-to-br from-slate-900 to-slate-800 p-6 rounded-t-2xl text-white text-center">
-          <div className="w-16 h-16 bg-gradient-to-br from-emerald-400 to-cyan-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <Zap className="w-8 h-8" />
+          <div className="w-16 h-16 bg-gradient-to-br from-[var(--accent)] to-[var(--evidence)] rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <Zap className="w-8 h-8 text-[var(--background)]" />
           </div>
           <h2 className="text-2xl font-bold mb-2">Upgrade to Premium</h2>
           <p className="text-slate-300 text-sm">
@@ -147,8 +147,8 @@ export function Paywall({ isOpen, onClose, onPurchaseSuccess }: PaywallProps) {
               'All future features',
             ].map((feature) => (
               <div key={feature} className="flex items-center gap-3">
-                <div className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center">
-                  <Check className="w-3 h-3 text-emerald-600" />
+                <div className="w-5 h-5 rounded-full bg-[var(--success-muted)] flex items-center justify-center">
+                  <Check className="w-3 h-3 text-[var(--success)]" />
                 </div>
                 <span className="text-[var(--foreground)]">{feature}</span>
               </div>
@@ -170,17 +170,17 @@ export function Paywall({ isOpen, onClose, onPurchaseSuccess }: PaywallProps) {
                   onClick={() => setSelectedPackage(pkg)}
                   className={`w-full p-4 rounded-xl border-2 transition-all text-left relative ${
                     isSelected
-                      ? 'border-emerald-500 bg-emerald-50'
+                      ? 'border-[var(--success)] bg-[var(--success-muted)]'
                       : 'border-[var(--border)] hover:border-[var(--muted-foreground)]'
                   }`}
                 >
                   {isAnnual && (
-                    <span className="absolute -top-2 left-4 bg-emerald-500 text-white text-xs font-bold px-2 py-0.5 rounded">
+                    <span className="absolute -top-2 left-4 bg-[var(--success)] text-[var(--background)] text-xs font-bold px-2 py-0.5 rounded">
                       BEST VALUE
                     </span>
                   )}
                   {isLifetime && (
-                    <span className="absolute -top-2 left-4 bg-purple-500 text-white text-xs font-bold px-2 py-0.5 rounded">
+                    <span className="absolute -top-2 left-4 bg-[var(--tier-3)] text-[var(--background)] text-xs font-bold px-2 py-0.5 rounded">
                       ONE TIME
                     </span>
                   )}
@@ -198,7 +198,7 @@ export function Paywall({ isOpen, onClose, onPurchaseSuccess }: PaywallProps) {
                         {pkg.product.priceString}
                       </div>
                       {isAnnual && (
-                        <div className="text-xs text-emerald-600">
+                        <div className="text-xs text-[var(--success)]">
                           Save 40%
                         </div>
                       )}
@@ -219,8 +219,8 @@ export function Paywall({ isOpen, onClose, onPurchaseSuccess }: PaywallProps) {
                   <div className="font-bold text-[var(--foreground)]">$6.99/mo</div>
                 </div>
               </div>
-              <div className="p-4 rounded-xl border-2 border-emerald-500 bg-emerald-50 relative">
-                <span className="absolute -top-2 left-4 bg-emerald-500 text-white text-xs font-bold px-2 py-0.5 rounded">
+              <div className="p-4 rounded-xl border-2 border-[var(--success)] bg-[var(--success-muted)] relative">
+                <span className="absolute -top-2 left-4 bg-[var(--success)] text-[var(--background)] text-xs font-bold px-2 py-0.5 rounded">
                   BEST VALUE
                 </span>
                 <div className="flex justify-between items-center">
@@ -230,7 +230,7 @@ export function Paywall({ isOpen, onClose, onPurchaseSuccess }: PaywallProps) {
                   </div>
                   <div className="text-right">
                     <div className="font-bold text-[var(--foreground)]">$49.99/yr</div>
-                    <div className="text-xs text-emerald-600">Save 40%</div>
+                    <div className="text-xs text-[var(--success)]">Save 40%</div>
                   </div>
                 </div>
               </div>
@@ -250,7 +250,7 @@ export function Paywall({ isOpen, onClose, onPurchaseSuccess }: PaywallProps) {
         {/* Error Message */}
         {error && (
           <div className="px-6 pb-4">
-            <div className="bg-red-50 text-red-700 text-sm p-3 rounded-lg">
+            <div className="bg-[var(--error-muted)] text-[var(--error)] text-sm p-3 rounded-lg">
               {error}
             </div>
           </div>
@@ -261,7 +261,7 @@ export function Paywall({ isOpen, onClose, onPurchaseSuccess }: PaywallProps) {
           <Button
             onClick={handlePurchase}
             disabled={isLoading || !selectedPackage}
-            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-6 text-lg font-semibold"
+            className="w-full bg-[var(--success)] hover:bg-[var(--success)]/90 text-[var(--background)] py-6 text-lg font-semibold"
           >
             {isLoading ? 'Processing...' : 'Continue'}
           </Button>

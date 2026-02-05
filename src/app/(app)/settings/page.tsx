@@ -56,13 +56,13 @@ export default function SettingsPage() {
 
   return (
     <div className="p-4 pb-20">
-      <h2 className="text-xl font-semibold text-[var(--foreground)] mb-4">Settings</h2>
+      <h2 className="text-display text-[var(--foreground)] mb-4">Settings</h2>
 
       {/* Current Profile */}
       {currentUser && (
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle className="text-base">Your Profile</CardTitle>
+            <CardTitle className="text-title text-base">Your Profile</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-3">
@@ -92,14 +92,14 @@ export default function SettingsPage() {
         <CardContent className="p-4">
           {isPremium ? (
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
-                <Crown className="w-5 h-5 text-white" />
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--accent)] to-[var(--warning)] flex items-center justify-center">
+                <Crown className="w-5 h-5 text-[var(--background)]" />
               </div>
               <div className="flex-1">
                 <div className="font-medium text-[var(--foreground)]">Premium Active</div>
                 <div className="text-sm text-[var(--muted-foreground)]">All features unlocked</div>
               </div>
-              <Badge className="bg-gradient-to-r from-amber-400 to-orange-500 text-white">PRO</Badge>
+              <Badge className="bg-gradient-to-r from-[var(--accent)] to-[var(--warning)] text-[var(--background)]">PRO</Badge>
             </div>
           ) : (
             <div className="flex items-center gap-3">
@@ -121,7 +121,7 @@ export default function SettingsPage() {
       {/* Appearance */}
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle className="text-base">Appearance</CardTitle>
+          <CardTitle className="text-title text-base">Appearance</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex gap-2">
@@ -156,7 +156,7 @@ export default function SettingsPage() {
       {/* Connected Health Services */}
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle className="text-base">Connected Health Services</CardTitle>
+          <CardTitle className="text-title text-base">Connected Health Services</CardTitle>
         </CardHeader>
         <CardContent>
           <Link
@@ -164,8 +164,8 @@ export default function SettingsPage() {
             className="flex items-center justify-between p-3 -m-3 rounded-xl hover:bg-[var(--muted)] transition-colors"
           >
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                <Activity className="w-5 h-5 text-emerald-500" />
+              <div className="w-10 h-10 rounded-full bg-[var(--success-muted)] flex items-center justify-center">
+                <Activity className="w-5 h-5 text-[var(--success)]" />
               </div>
               <div>
                 <div className="font-medium text-[var(--foreground)]">Health Integrations</div>
@@ -180,7 +180,7 @@ export default function SettingsPage() {
       {/* App Info */}
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle className="text-base">About</CardTitle>
+          <CardTitle className="text-title text-base">About</CardTitle>
         </CardHeader>
         <CardContent className="text-sm text-[var(--muted-foreground)] space-y-1">
           <div>Peptide OS v1.0.0</div>

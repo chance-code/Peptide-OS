@@ -511,7 +511,7 @@ export default function HealthDashboardNew() {
       {/* Header — scrolls with content, same as all other tabs */}
       <div>
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
-          <h1 className="text-lg font-semibold text-[var(--foreground)]">Health</h1>
+          <h1 className="text-display text-[var(--foreground)]">Health</h1>
           <div className="flex items-center gap-2">
             {isLoading ? (
               <Loader2 className="w-4 h-4 animate-spin text-[var(--muted-foreground)]" />
@@ -521,7 +521,7 @@ export default function HealthDashboardNew() {
                 return (
                   <button
                     onClick={() => setShowIntegrations(!showIntegrations)}
-                    className="px-2 py-0.5 bg-violet-500/20 text-violet-400 text-xs rounded-full"
+                    className="px-2 py-0.5 bg-[rgba(155,125,212,0.12)] text-[var(--tier-3)] text-xs rounded-full"
                   >
                     Demo Data
                   </button>
@@ -550,9 +550,9 @@ export default function HealthDashboardNew() {
                     className={cn(
                       "px-2 py-0.5 text-xs rounded-full",
                       hasDenied
-                        ? "bg-amber-500/20 text-amber-400"
+                        ? "bg-[var(--warning-muted)] text-[var(--warning)]"
                         : isStale
-                        ? "bg-amber-500/20 text-amber-400"
+                        ? "bg-[var(--warning-muted)] text-[var(--warning)]"
                         : "bg-[var(--success-muted)] text-[var(--success)]"
                     )}
                   >
@@ -644,9 +644,9 @@ export default function HealthDashboardNew() {
                       <div className="flex items-center gap-3">
                         <div className={cn(
                           "w-10 h-10 rounded-lg flex items-center justify-center",
-                          isConnected ? "bg-red-500/20" : "bg-[var(--border)]"
+                          isConnected ? "bg-[var(--error-muted)]" : "bg-[var(--border)]"
                         )}>
-                          <Heart className={cn("w-5 h-5", isConnected ? "text-red-400" : "text-[var(--muted-foreground)]")} />
+                          <Heart className={cn("w-5 h-5", isConnected ? "text-[var(--error)]" : "text-[var(--muted-foreground)]")} />
                         </div>
                         <div>
                           <div className="font-medium text-[var(--foreground)]">Apple Health</div>
@@ -674,7 +674,7 @@ export default function HealthDashboardNew() {
                           disabled={syncingProvider === 'apple_health'}
                           className={cn(
                             "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
-                            "bg-indigo-600 hover:bg-indigo-500 text-white",
+                            "bg-[var(--accent)] hover:opacity-90 text-[var(--accent-foreground)]",
                             "disabled:opacity-50"
                           )}
                         >
@@ -688,7 +688,7 @@ export default function HealthDashboardNew() {
                       ) : (
                         <button
                           onClick={connectAppleHealth}
-                          className="px-3 py-1.5 rounded-lg text-sm font-medium bg-emerald-600 hover:bg-emerald-500 text-white"
+                          className="px-3 py-1.5 rounded-lg text-sm font-medium bg-[var(--success)] hover:bg-[var(--success)]/90 text-[var(--background)]"
                         >
                           Connect
                         </button>
@@ -708,17 +708,17 @@ export default function HealthDashboardNew() {
                     "p-3 rounded-xl border",
                     isConnected
                       ? hasError
-                        ? "bg-amber-950/30 border-amber-800/50"
-                        : "bg-emerald-950/30 border-emerald-800/50"
+                        ? "bg-[var(--warning-muted)] border-[var(--warning)]/30"
+                        : "bg-[var(--success-muted)] border-[var(--success)]/30"
                       : "bg-[var(--muted)] border-[var(--border)]"
                   )}>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div className={cn(
                           "w-10 h-10 rounded-lg flex items-center justify-center",
-                          isConnected ? "bg-violet-500/20" : "bg-[var(--border)]"
+                          isConnected ? "bg-[rgba(155,125,212,0.12)]" : "bg-[var(--border)]"
                         )}>
-                          <Watch className={cn("w-5 h-5", isConnected ? "text-violet-400" : "text-[var(--muted-foreground)]")} />
+                          <Watch className={cn("w-5 h-5", isConnected ? "text-[var(--tier-3)]" : "text-[var(--muted-foreground)]")} />
                         </div>
                         <div>
                           <div className="font-medium text-[var(--foreground)]">
@@ -726,7 +726,7 @@ export default function HealthDashboardNew() {
                             {!isConnected && <span className="ml-1.5 text-[10px] font-normal text-[var(--muted-foreground)]">Optional</span>}
                           </div>
                           {isConnected ? (
-                            <div className="text-xs text-emerald-400 flex items-center gap-1">
+                            <div className="text-xs text-[var(--success)] flex items-center gap-1">
                               <CheckCircle2 className="w-3 h-3" />
                               Connected
                               {oura?.lastSyncAt && (
@@ -739,7 +739,7 @@ export default function HealthDashboardNew() {
                             <div className="text-xs text-[var(--muted-foreground)]">Adds sleep scores, readiness, and detailed sleep stages</div>
                           )}
                           {hasError && (
-                            <div className="text-xs text-amber-400 mt-1">{oura.syncError}</div>
+                            <div className="text-xs text-[var(--warning)] mt-1">{oura.syncError}</div>
                           )}
                         </div>
                       </div>
@@ -749,7 +749,7 @@ export default function HealthDashboardNew() {
                           disabled={syncingProvider === 'oura'}
                           className={cn(
                             "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
-                            "bg-indigo-600 hover:bg-indigo-500 text-white",
+                            "bg-[var(--accent)] hover:opacity-90 text-[var(--accent-foreground)]",
                             "disabled:opacity-50"
                           )}
                         >
@@ -763,7 +763,7 @@ export default function HealthDashboardNew() {
                       ) : (
                         <button
                           onClick={connectOura}
-                          className="px-3 py-1.5 rounded-lg text-sm font-medium bg-emerald-600 hover:bg-emerald-500 text-white"
+                          className="px-3 py-1.5 rounded-lg text-sm font-medium bg-[var(--success)] hover:bg-[var(--success)]/90 text-[var(--background)]"
                         >
                           Connect
                         </button>
@@ -790,8 +790,8 @@ export default function HealthDashboardNew() {
           if (deniedList.length === 0) return null
           return (
             <div className="pt-4">
-              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-2">
-                <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
+              <div className="p-3 rounded-xl bg-[var(--warning-muted)] border border-[var(--warning)]/30 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-[var(--warning)] mt-0.5 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-[var(--foreground)]">
                     {deniedList.length} metric{deniedList.length > 1 ? 's' : ''} need{deniedList.length === 1 ? 's' : ''} permission
@@ -812,33 +812,33 @@ export default function HealthDashboardNew() {
           <>
             {/* Trajectory skeleton */}
             <div className="rounded-2xl bg-[var(--card)] border border-[var(--border)] p-6 space-y-4">
-              <div className="h-4 w-40 bg-[var(--muted)] rounded animate-pulse" />
-              <div className="h-8 w-32 bg-[var(--muted)] rounded animate-pulse" />
-              <div className="h-4 w-64 bg-[var(--muted)] rounded animate-pulse" />
+              <div className="h-4 w-40 bg-[var(--muted)] rounded animate-blur-reveal" />
+              <div className="h-8 w-32 bg-[var(--muted)] rounded animate-blur-reveal" />
+              <div className="h-4 w-64 bg-[var(--muted)] rounded animate-blur-reveal" />
               <div className="flex gap-3 mt-4">
-                <div className="h-10 flex-1 bg-[var(--muted)] rounded-lg animate-pulse" />
-                <div className="h-10 flex-1 bg-[var(--muted)] rounded-lg animate-pulse" />
-                <div className="h-10 flex-1 bg-[var(--muted)] rounded-lg animate-pulse" />
+                <div className="h-10 flex-1 bg-[var(--muted)] rounded-lg animate-blur-reveal" />
+                <div className="h-10 flex-1 bg-[var(--muted)] rounded-lg animate-blur-reveal" />
+                <div className="h-10 flex-1 bg-[var(--muted)] rounded-lg animate-blur-reveal" />
               </div>
             </div>
             {/* Category cards skeleton */}
             <div className="grid grid-cols-3 gap-3">
               {[0, 1, 2].map(i => (
                 <div key={i} className="rounded-xl bg-[var(--card)] border border-[var(--border)] p-3 space-y-2">
-                  <div className="h-3 w-12 bg-[var(--muted)] rounded animate-pulse" />
-                  <div className="h-5 w-16 bg-[var(--muted)] rounded animate-pulse" />
+                  <div className="h-3 w-12 bg-[var(--muted)] rounded animate-blur-reveal" />
+                  <div className="h-5 w-16 bg-[var(--muted)] rounded animate-blur-reveal" />
                 </div>
               ))}
             </div>
             {/* What matters skeleton */}
             <div className="rounded-xl bg-[var(--card)] border border-[var(--border)] p-5 space-y-3">
-              <div className="h-3 w-32 bg-[var(--muted)] rounded animate-pulse" />
+              <div className="h-3 w-32 bg-[var(--muted)] rounded animate-blur-reveal" />
               {[0, 1, 2].map(i => (
                 <div key={i} className="flex items-center gap-4 py-2">
-                  <div className="w-8 h-8 bg-[var(--muted)] rounded-full animate-pulse" />
+                  <div className="w-8 h-8 bg-[var(--muted)] rounded-full animate-blur-reveal" />
                   <div className="flex-1 space-y-2">
-                    <div className="h-4 w-24 bg-[var(--muted)] rounded animate-pulse" />
-                    <div className="h-3 w-48 bg-[var(--muted)] rounded animate-pulse" />
+                    <div className="h-4 w-24 bg-[var(--muted)] rounded animate-blur-reveal" />
+                    <div className="h-3 w-48 bg-[var(--muted)] rounded animate-blur-reveal" />
                   </div>
                 </div>
               ))}
@@ -863,8 +863,8 @@ export default function HealthDashboardNew() {
                 <div className="p-4 rounded-xl bg-[var(--card)] border border-[var(--border)]">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center">
-                        <Heart className="w-5 h-5 text-red-400" />
+                      <div className="w-10 h-10 rounded-lg bg-[var(--error-muted)] flex items-center justify-center">
+                        <Heart className="w-5 h-5 text-[var(--error)]" />
                       </div>
                       <div>
                         <div className="font-medium text-[var(--foreground)]">Apple Health</div>
@@ -883,7 +883,7 @@ export default function HealthDashboardNew() {
                         disabled={syncingProvider === 'apple_health'}
                         className={cn(
                           'px-3 py-1.5 rounded-lg text-sm font-medium',
-                          'bg-indigo-600 hover:bg-indigo-500 text-white',
+                          'bg-[var(--accent)] hover:opacity-90 text-[var(--accent-foreground)]',
                           'disabled:opacity-50'
                         )}
                       >
@@ -894,14 +894,14 @@ export default function HealthDashboardNew() {
                     ) : (
                       <button
                         onClick={connectAppleHealth}
-                        className="px-3 py-1.5 rounded-lg text-sm font-medium bg-emerald-600 hover:bg-emerald-500 text-white"
+                        className="px-3 py-1.5 rounded-lg text-sm font-medium bg-[var(--success)] hover:bg-[var(--success)]/90 text-[var(--background)]"
                       >
                         Connect
                       </button>
                     )}
                   </div>
                   {appleHealthIntegration?.syncError && (
-                    <div className="mt-2 text-xs text-red-400">
+                    <div className="mt-2 text-xs text-[var(--error)]">
                       Error: {appleHealthIntegration.syncError}
                     </div>
                   )}
@@ -968,8 +968,8 @@ export default function HealthDashboardNew() {
                     </h3>
                     <span className={cn(
                       'text-xs px-1.5 py-0.5 rounded',
-                      processedData.bodyCompState.confidence === 'high' ? 'bg-emerald-500/20 text-emerald-400' :
-                      processedData.bodyCompState.confidence === 'medium' ? 'bg-amber-500/20 text-amber-400' :
+                      processedData.bodyCompState.confidence === 'high' ? 'bg-[var(--success-muted)] text-[var(--success)]' :
+                      processedData.bodyCompState.confidence === 'medium' ? 'bg-[var(--warning-muted)] text-[var(--warning)]' :
                       'bg-[var(--muted-foreground)]/20 text-[var(--muted-foreground)]'
                     )}>
                       {processedData.bodyCompState.confidence}
@@ -1029,7 +1029,7 @@ export default function HealthDashboardNew() {
                 {processedData.protocolEvidence.length > 0 && (
                   <button
                     onClick={() => setSelectedSection('evidence')}
-                    className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
+                    className="text-xs text-[var(--accent)] hover:opacity-80 flex items-center gap-1"
                   >
                     View All <ChevronRight className="w-3 h-3" />
                   </button>
@@ -1091,7 +1091,7 @@ export default function HealthDashboardNew() {
                         }
                       </span>
                       {deniedMetrics.length > 0 && (
-                        <span className="px-1.5 py-0.5 bg-amber-500/20 text-amber-400 text-[10px] rounded-full">
+                        <span className="px-1.5 py-0.5 bg-[var(--warning-muted)] text-[var(--warning)] text-[10px] rounded-full">
                           {deniedMetrics.length} denied
                         </span>
                       )}
@@ -1100,9 +1100,9 @@ export default function HealthDashboardNew() {
                   </summary>
                   <div className="px-4 pb-4 space-y-3">
                     {deniedMetrics.length > 0 && (
-                      <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30">
+                      <div className="p-3 rounded-xl bg-[var(--warning-muted)] border border-[var(--warning)]/30">
                         <div className="flex items-start gap-2">
-                          <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
+                          <AlertTriangle className="w-4 h-4 text-[var(--warning)] mt-0.5 flex-shrink-0" />
                           <div>
                             <div className="text-sm font-medium text-[var(--foreground)]">
                               {deniedMetrics.length} permission{deniedMetrics.length > 1 ? 's' : ''} denied
@@ -1113,7 +1113,7 @@ export default function HealthDashboardNew() {
                             <button
                               onClick={() => syncAppleHealth()}
                               disabled={syncingProvider === 'apple_health'}
-                              className="mt-2 text-xs text-amber-400 font-medium hover:text-amber-300"
+                              className="mt-2 text-xs text-[var(--warning)] font-medium hover:opacity-80"
                             >
                               Re-request Permissions
                             </button>
@@ -1164,13 +1164,13 @@ export default function HealthDashboardNew() {
                                 <span className="text-[var(--muted-foreground)]">No data</span>
                               )}
                               {state.status === 'permission_denied' && (
-                                <span className="text-amber-400 flex items-center gap-0.5">
+                                <span className="text-[var(--warning)] flex items-center gap-0.5">
                                   <AlertTriangle className="w-2.5 h-2.5" />
                                   Denied
                                 </span>
                               )}
                               {state.status === 'error' && (
-                                <span className="text-red-400">Error</span>
+                                <span className="text-[var(--error)]">Error</span>
                               )}
                             </div>
                           </div>
@@ -1299,28 +1299,28 @@ export default function HealthDashboardNew() {
             <h4 className="font-medium text-[var(--foreground)]">What goes into your trajectory:</h4>
             <div className="space-y-2 text-sm text-[var(--muted-foreground)]">
               <div className="flex items-start gap-2">
-                <Scale className="w-4 h-4 mt-0.5 text-cyan-400" />
+                <Scale className="w-4 h-4 mt-0.5 text-[var(--evidence)]" />
                 <div>
                   <span className="text-[var(--foreground)] font-medium">Body Comp ({timeWindow === 7 ? '40' : timeWindow === 30 ? '55' : '70'}%)</span>
                   <p>Weight, body fat, and lean mass trends when available. Primary signal.</p>
                 </div>
               </div>
               <div className="flex items-start gap-2">
-                <Moon className="w-4 h-4 mt-0.5 text-indigo-400" />
+                <Moon className="w-4 h-4 mt-0.5 text-[var(--evidence)]" />
                 <div>
                   <span className="text-[var(--foreground)] font-medium">Sleep ({timeWindow === 7 ? '17.5' : timeWindow === 30 ? '15' : '10'}%)</span>
                   <p>Duration, deep sleep, efficiency, and sleep score trends.</p>
                 </div>
               </div>
               <div className="flex items-start gap-2">
-                <Heart className="w-4 h-4 mt-0.5 text-emerald-400" />
+                <Heart className="w-4 h-4 mt-0.5 text-[var(--success)]" />
                 <div>
                   <span className="text-[var(--foreground)] font-medium">Recovery ({timeWindow === 7 ? '17.5' : timeWindow === 30 ? '15' : '10'}%)</span>
                   <p>HRV, resting heart rate, and readiness trends.</p>
                 </div>
               </div>
               <div className="flex items-start gap-2">
-                <Footprints className="w-4 h-4 mt-0.5 text-amber-400" />
+                <Footprints className="w-4 h-4 mt-0.5 text-[var(--warning)]" />
                 <div>
                   <span className="text-[var(--foreground)] font-medium">Activity ({timeWindow === 7 ? '25' : timeWindow === 30 ? '15' : '10'}%)</span>
                   <p>Steps, exercise, and activity consistency.</p>
@@ -1364,12 +1364,12 @@ export default function HealthDashboardNew() {
           {selectedDelta && (
             <div className={cn(
               "p-4 rounded-xl",
-              selectedDelta.isGood ? "bg-emerald-500/10" : "bg-amber-500/10"
+              selectedDelta.isGood ? "bg-[var(--success-muted)]" : "bg-[var(--warning-muted)]"
             )}>
               <div className="flex items-center gap-3">
                 <div className={cn(
                   "text-2xl font-bold tabular-nums",
-                  selectedDelta.isGood ? "text-emerald-400" : "text-amber-400"
+                  selectedDelta.isGood ? "text-[var(--success)]" : "text-[var(--warning)]"
                 )}>
                   {selectedDelta.delta}
                 </div>
@@ -1431,15 +1431,15 @@ function CategoryCard({
   color: 'indigo' | 'emerald' | 'amber'
 }) {
   const colors = {
-    indigo: 'bg-indigo-500/20 text-indigo-400',
-    emerald: 'bg-emerald-500/20 text-emerald-400',
-    amber: 'bg-amber-500/20 text-amber-400'
+    indigo: 'bg-[var(--evidence-muted)] text-[var(--evidence)]',
+    emerald: 'bg-[var(--success-muted)] text-[var(--success)]',
+    amber: 'bg-[var(--warning-muted)] text-[var(--warning)]'
   }
 
   const DirIcon = direction === 'improving' ? TrendingUp :
                   direction === 'declining' ? TrendingDown : Minus
-  const dirColor = direction === 'improving' ? 'text-emerald-400' :
-                   direction === 'declining' ? 'text-amber-400' : 'text-[var(--muted-foreground)]'
+  const dirColor = direction === 'improving' ? 'text-[var(--success)]' :
+                   direction === 'declining' ? 'text-[var(--warning)]' : 'text-[var(--muted-foreground)]'
 
   return (
     <div className="rounded-xl bg-[var(--card)] border border-[var(--border)] p-3">
@@ -1473,8 +1473,8 @@ function TrendPill({ label, direction }: { label: string; direction: 'up' | 'dow
     <span className={cn(
       'inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium',
       'bg-[var(--muted)] border border-[var(--border)]',
-      direction === 'up' ? 'text-emerald-400' :
-      direction === 'down' ? 'text-amber-400' : 'text-[var(--muted-foreground)]'
+      direction === 'up' ? 'text-[var(--success)]' :
+      direction === 'down' ? 'text-[var(--warning)]' : 'text-[var(--muted-foreground)]'
     )}>
       {icon}
       {label}
@@ -1495,12 +1495,12 @@ function QuickVerdictBadge({
 }) {
   const verdictColors: Record<string, string> = {
     too_early: 'text-[var(--muted-foreground)]',
-    accumulating: 'text-amber-400',
-    weak_positive: 'text-amber-400',
-    likely_positive: 'text-emerald-400',
-    strong_positive: 'text-emerald-400',
+    accumulating: 'text-[var(--warning)]',
+    weak_positive: 'text-[var(--warning)]',
+    likely_positive: 'text-[var(--success)]',
+    strong_positive: 'text-[var(--success)]',
     no_detectable_effect: 'text-[var(--muted-foreground)]',
-    possible_negative: 'text-rose-400',
+    possible_negative: 'text-[var(--error)]',
     confounded: 'text-[var(--muted-foreground)]',
   }
 

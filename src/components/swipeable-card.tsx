@@ -126,7 +126,7 @@ export function SwipeableCard({
       <div
         className={cn(
           'absolute inset-0 flex items-center px-6 transition-opacity',
-          isRight ? 'justify-start bg-green-500' : 'justify-end bg-[var(--muted-foreground)]'
+          isRight ? 'justify-start bg-[var(--success)]' : 'justify-end bg-[var(--muted-foreground)]'
         )}
         style={{ opacity: Math.min(progress * 0.8, 0.8) }}
       >

@@ -142,12 +142,12 @@ function getCurrentEffectPhaseIndex(
 }
 
 const CATEGORY_INFO: Record<string, { label: string; icon: typeof Pill; color: string }> = {
-  healing: { label: 'Healing', icon: Heart, color: 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300' },
-  'growth-hormone': { label: 'Growth Hormone', icon: Zap, color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300' },
-  'weight-loss': { label: 'Weight Loss', icon: Scale, color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300' },
-  cosmetic: { label: 'Cosmetic', icon: Sparkles, color: 'bg-pink-100 text-pink-800 dark:bg-pink-900/50 dark:text-pink-300' },
-  other: { label: 'Other', icon: Pill, color: 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300' },
-  supplements: { label: 'Supplements', icon: Pill, color: 'bg-teal-100 text-teal-800 dark:bg-teal-900/50 dark:text-teal-300' },
+  healing: { label: 'Healing', icon: Heart, color: 'bg-[var(--success-muted)] text-[var(--success)]' },
+  'growth-hormone': { label: 'Growth Hormone', icon: Zap, color: 'bg-[rgba(155,125,212,0.12)] text-[var(--tier-3)]' },
+  'weight-loss': { label: 'Weight Loss', icon: Scale, color: 'bg-[var(--evidence-muted)] text-[var(--evidence)]' },
+  cosmetic: { label: 'Cosmetic', icon: Sparkles, color: 'bg-[var(--warning-muted)] text-[var(--warning)]' },
+  other: { label: 'Other', icon: Pill, color: 'bg-[var(--accent-muted)] text-[var(--accent)]' },
+  supplements: { label: 'Supplements', icon: Pill, color: 'bg-[var(--success-muted)] text-[var(--success)]' },
 }
 
 function formatCycleSummary(g: CycleGuidance): string {
@@ -190,10 +190,10 @@ function ProtocolContext({ protocol, cyclePhase, guidance, availableMetrics, eff
   effectPhaseIndex?: number
 }) {
   const phaseColors: Record<CyclePhase['phase'], string> = {
-    'mid-cycle': 'text-blue-400',
-    'end-of-cycle': 'text-amber-400',
-    'past-end': 'text-red-400',
-    'ongoing': 'text-emerald-400',
+    'mid-cycle': 'text-[var(--evidence)]',
+    'end-of-cycle': 'text-[var(--warning)]',
+    'past-end': 'text-[var(--error)]',
+    'ongoing': 'text-[var(--success)]',
   }
 
   const phaseLabels: Record<CyclePhase['phase'], string> = {
@@ -203,17 +203,17 @@ function ProtocolContext({ protocol, cyclePhase, guidance, availableMetrics, eff
     'ongoing': 'Ongoing',
   }
 
-  const barColor = cyclePhase.phase === 'past-end' ? 'bg-red-400'
-    : cyclePhase.phase === 'end-of-cycle' ? 'bg-amber-400'
+  const barColor = cyclePhase.phase === 'past-end' ? 'bg-[var(--error)]'
+    : cyclePhase.phase === 'end-of-cycle' ? 'bg-[var(--warning)]'
     : 'bg-[var(--accent)]'
 
   const hasTimeToEffect = guidance?.timeToEffect && guidance.timeToEffect.length > 0
   const hasOutcomes = guidance?.primaryOutcomes && guidance.primaryOutcomes.length > 0
 
   return (
-    <div className="mt-2 mb-3 p-3 rounded-xl bg-blue-500/5 border border-blue-500/15">
+    <div className="mt-2 mb-3 p-3 rounded-xl bg-[var(--evidence-muted)] border border-[var(--evidence)]/15">
       <div className="flex items-center gap-1.5 mb-2">
-        <Activity className="w-3.5 h-3.5 text-blue-400" />
+        <Activity className="w-3.5 h-3.5 text-[var(--evidence)]" />
         <span className="text-xs font-semibold text-[var(--foreground)] uppercase tracking-wide">Your Protocol</span>
       </div>
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
@@ -239,7 +239,7 @@ function ProtocolContext({ protocol, cyclePhase, guidance, availableMetrics, eff
 
       {/* In your data so far */}
       {hasTimeToEffect && (
-        <div className="mt-3 pt-3 border-t border-blue-500/10">
+        <div className="mt-3 pt-3 border-t border-[var(--evidence)]/10">
           <div className="text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-wide mb-1.5">In your data so far</div>
           {effectPhaseIndex == null || effectPhaseIndex < 0 ? (
             <p className="text-sm text-[var(--muted-foreground)]">
@@ -256,7 +256,7 @@ function ProtocolContext({ protocol, cyclePhase, guidance, availableMetrics, eff
 
       {/* Metrics to watch */}
       {hasOutcomes && (
-        <div className="mt-3 pt-3 border-t border-blue-500/10">
+        <div className="mt-3 pt-3 border-t border-[var(--evidence)]/10">
           <div className="text-xs font-medium text-[var(--muted-foreground)] uppercase tracking-wide mb-1.5">Metrics to watch</div>
           <div className="space-y-1">
             {guidance!.primaryOutcomes.map(o => {
@@ -275,7 +275,7 @@ function ProtocolContext({ protocol, cyclePhase, guidance, availableMetrics, eff
                   {!hasTrackableMetrics ? (
                     <span className="text-xs text-[var(--muted-foreground)] whitespace-nowrap">—</span>
                   ) : isConnected ? (
-                    <span className="text-xs text-emerald-400 whitespace-nowrap">&#10003; Connected</span>
+                    <span className="text-xs text-[var(--success)] whitespace-nowrap">&#10003; Connected</span>
                   ) : (
                     <span className="text-xs text-[var(--muted-foreground)] whitespace-nowrap">— Not connected</span>
                   )}
@@ -347,8 +347,8 @@ function GuidanceContent({ guidance, activePhaseIndex }: { guidance: CycleGuidan
                 key={o.outcome}
                 className={cn(
                   'px-2 py-0.5 rounded-md text-xs font-medium border',
-                  o.confidence === 'high' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                    : o.confidence === 'medium' ? 'bg-amber-500/10 border-amber-500/20 text-amber-400'
+                  o.confidence === 'high' ? 'bg-[var(--success-muted)] border-[var(--success)]/20 text-[var(--success)]'
+                    : o.confidence === 'medium' ? 'bg-[var(--warning-muted)] border-[var(--warning)]/20 text-[var(--warning)]'
                     : 'bg-[var(--muted)] border-[var(--border)] text-[var(--muted-foreground)]'
                 )}
               >
@@ -395,7 +395,7 @@ function GuidanceContent({ guidance, activePhaseIndex }: { guidance: CycleGuidan
       {guidance.stopSignals && guidance.stopSignals.length > 0 && (
         <div className="mb-3">
           <div className="flex items-center gap-1.5 mb-1.5">
-            <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+            <AlertTriangle className="w-3.5 h-3.5 text-[var(--warning)]" />
             <span className="text-xs text-[var(--muted-foreground)] uppercase tracking-wide">Reassess if</span>
           </div>
           <ul className="space-y-0.5">
@@ -443,7 +443,7 @@ function PeptideCard({ peptide, protocol, availableMetrics }: {
                   {categoryInfo.label}
                 </Badge>
                 {protocol && (
-                  <Badge className="text-xs bg-blue-500/10 border border-blue-500/20 text-blue-400">
+                  <Badge className="text-xs bg-[var(--evidence-muted)] border border-[var(--evidence)]/20 text-[var(--evidence)]">
                     <Activity className="w-3 h-3 mr-1" />
                     Active
                   </Badge>
@@ -554,12 +554,12 @@ function SupplementCard({ supplement, protocol, availableMetrics }: {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1 flex-wrap">
                 <span className="font-semibold text-[var(--foreground)]">{supplement.name}</span>
-                <Badge className="text-xs bg-teal-100 text-teal-800 dark:bg-teal-900/50 dark:text-teal-300">
+                <Badge className="text-xs bg-[var(--success-muted)] text-[var(--success)]">
                   <Pill className="w-3 h-3 mr-1" />
                   {supplement.benefit}
                 </Badge>
                 {protocol && (
-                  <Badge className="text-xs bg-blue-500/10 border border-blue-500/20 text-blue-400">
+                  <Badge className="text-xs bg-[var(--evidence-muted)] border border-[var(--evidence)]/20 text-[var(--evidence)]">
                     <Activity className="w-3 h-3 mr-1" />
                     Active
                   </Badge>
@@ -800,9 +800,9 @@ function ReconstitutionCalculator() {
               )}
 
               {result.totalDoses != null && (
-                <div className="p-3 rounded-xl bg-green-500/10 border border-green-500/20">
+                <div className="p-3 rounded-xl bg-[var(--success-muted)] border border-[var(--success)]/20">
                   <div className="text-xs text-[var(--muted-foreground)] mb-1">Doses per Vial</div>
-                  <div className="text-lg font-bold text-green-400">
+                  <div className="text-lg font-bold text-[var(--success)]">
                     {result.totalDoses}
                   </div>
                   <div className="text-xs text-[var(--muted-foreground)]">approximately</div>
@@ -957,7 +957,7 @@ export default function LibraryPage() {
 
   return (
     <div className="p-4 pb-4">
-      <h2 className="text-xl font-semibold text-[var(--foreground)] mb-4">Library</h2>
+      <h2 className="text-display text-[var(--foreground)] mb-4">Library</h2>
 
       <div className="flex gap-1 p-1 rounded-xl bg-[var(--muted)] mb-4">
         {tabs.map(tab => {

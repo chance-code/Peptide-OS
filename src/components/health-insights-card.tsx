@@ -26,20 +26,20 @@ export function HealthInsightsCard({
     return (
       <div className={cn(
         'rounded-2xl p-5 border',
-        'bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-cyan-500/10',
-        'border-emerald-500/20',
+        'bg-gradient-to-br from-[var(--accent-muted)] via-[var(--surface-2)] to-[var(--evidence-muted)]',
+        'border-[var(--accent)]/20',
         className
       )}>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-emerald-400 animate-pulse" />
-            <span className="text-sm font-medium text-emerald-400">Health Insights</span>
+            <Sparkles className="w-4 h-4 text-[var(--accent)] animate-blur-reveal" />
+            <span className="text-sm font-medium text-[var(--accent)]">Health Insights</span>
           </div>
         </div>
         <div className="space-y-3">
-          <div className="h-4 w-full bg-[var(--muted)] rounded animate-pulse" />
-          <div className="h-4 w-3/4 bg-[var(--muted)] rounded animate-pulse" />
-          <div className="h-4 w-5/6 bg-[var(--muted)] rounded animate-pulse" />
+          <div className="h-4 w-full bg-[var(--muted)] rounded animate-blur-reveal" />
+          <div className="h-4 w-3/4 bg-[var(--muted)] rounded animate-blur-reveal" />
+          <div className="h-4 w-5/6 bg-[var(--muted)] rounded animate-blur-reveal" />
         </div>
         <p className="text-xs text-[var(--muted-foreground)] mt-4 text-center">
           Analyzing correlations...
@@ -53,14 +53,14 @@ export function HealthInsightsCard({
     return (
       <div className={cn(
         'rounded-2xl p-5 border',
-        'bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-cyan-500/10',
-        'border-emerald-500/20',
+        'bg-gradient-to-br from-[var(--accent-muted)] via-[var(--surface-2)] to-[var(--evidence-muted)]',
+        'border-[var(--accent)]/20',
         className
       )}>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-emerald-400" />
-            <span className="text-sm font-medium text-emerald-400">Health Insights</span>
+            <Sparkles className="w-4 h-4 text-[var(--accent)]" />
+            <span className="text-sm font-medium text-[var(--accent)]">Health Insights</span>
           </div>
         </div>
         <div className="flex items-start gap-2 text-sm text-[var(--muted-foreground)]">
@@ -78,14 +78,14 @@ export function HealthInsightsCard({
     return (
       <div className={cn(
         'rounded-2xl p-5 border',
-        'bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-cyan-500/10',
-        'border-emerald-500/20',
+        'bg-gradient-to-br from-[var(--accent-muted)] via-[var(--surface-2)] to-[var(--evidence-muted)]',
+        'border-[var(--accent)]/20',
         className
       )}>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-emerald-400" />
-            <span className="text-sm font-medium text-emerald-400">Health Insights</span>
+            <Sparkles className="w-4 h-4 text-[var(--accent)]" />
+            <span className="text-sm font-medium text-[var(--accent)]">Health Insights</span>
           </div>
           {onRefresh && (
             <button
@@ -106,15 +106,15 @@ export function HealthInsightsCard({
   return (
     <div className={cn(
       'rounded-2xl p-5 border',
-      'bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-cyan-500/10',
-      'border-emerald-500/20',
+      'bg-gradient-to-br from-[var(--accent-muted)] via-[var(--surface-2)] to-[var(--evidence-muted)]',
+      'border-[var(--accent)]/20',
       className
     )}>
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-emerald-400" />
-          <span className="text-sm font-medium text-emerald-400">Health Insights</span>
+          <Sparkles className="w-4 h-4 text-[var(--accent)]" />
+          <span className="text-sm font-medium text-[var(--accent)]">Health Insights</span>
         </div>
         {onRefresh && (
           <button
@@ -151,11 +151,11 @@ function CorrelationItem({ correlation }: { correlation: CorrelationResult }) {
     <div className="flex items-start gap-3">
       <div className={cn(
         'p-1.5 rounded-lg',
-        isPositive ? 'bg-green-500/20' : 'bg-amber-500/20'
+        isPositive ? 'bg-[var(--success-muted)]' : 'bg-[var(--warning-muted)]'
       )}>
         <Icon className={cn(
           'w-3.5 h-3.5',
-          isPositive ? 'text-green-400' : 'text-amber-400'
+          isPositive ? 'text-[var(--success)]' : 'text-[var(--warning)]'
         )} />
       </div>
       <div className="flex-1 min-w-0">
@@ -165,7 +165,7 @@ function CorrelationItem({ correlation }: { correlation: CorrelationResult }) {
         <div className="flex items-center gap-2 mt-1">
           <span className={cn(
             'text-xs font-medium',
-            isPositive ? 'text-green-400' : 'text-amber-400'
+            isPositive ? 'text-[var(--success)]' : 'text-[var(--warning)]'
           )}>
             {correlation.percentChange > 0 ? '+' : ''}{correlation.percentChange.toFixed(0)}%
           </span>

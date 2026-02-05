@@ -52,30 +52,30 @@ interface StackAssessmentCardProps {
 const scoreConfig = {
   excellent: {
     label: 'Excellent',
-    color: 'text-green-500',
-    bg: 'bg-green-500/10',
-    border: 'border-green-500/30',
+    color: 'text-[var(--success)]',
+    bg: 'bg-[var(--success-muted)]',
+    border: 'border-[var(--success)]/30',
     icon: TrendingUp,
   },
   good: {
     label: 'Good',
-    color: 'text-blue-500',
-    bg: 'bg-blue-500/10',
-    border: 'border-blue-500/30',
+    color: 'text-[var(--evidence)]',
+    bg: 'bg-[var(--evidence-muted)]',
+    border: 'border-[var(--evidence)]/30',
     icon: Shield,
   },
   moderate: {
     label: 'Moderate',
-    color: 'text-amber-500',
-    bg: 'bg-amber-500/10',
-    border: 'border-amber-500/30',
+    color: 'text-[var(--warning)]',
+    bg: 'bg-[var(--warning-muted)]',
+    border: 'border-[var(--warning)]/30',
     icon: Target,
   },
   needs_attention: {
     label: 'Needs Review',
-    color: 'text-red-500',
-    bg: 'bg-red-500/10',
-    border: 'border-red-500/30',
+    color: 'text-[var(--error)]',
+    bg: 'bg-[var(--error-muted)]',
+    border: 'border-[var(--error)]/30',
     icon: AlertTriangle,
   },
 }
@@ -175,18 +175,18 @@ export function StackAssessmentCard({ userId, protocols, className }: StackAsses
     return (
       <div className={cn(
         'rounded-2xl p-5 border',
-        'bg-gradient-to-br from-emerald-500/10 via-cyan-500/5 to-blue-500/10',
-        'border-emerald-500/20',
+        'bg-gradient-to-br from-[var(--accent-muted)] via-[var(--surface-2)] to-[var(--evidence-muted)]',
+        'border-[var(--accent)]/20',
         className
       )}>
         <div className="flex items-center gap-2 mb-4">
-          <Sparkles className="w-5 h-5 text-emerald-400 animate-pulse" />
-          <span className="font-semibold text-emerald-400">Stack Assessment</span>
+          <Sparkles className="w-5 h-5 text-[var(--accent)] animate-blur-reveal" />
+          <span className="font-semibold text-[var(--accent)]">Stack Assessment</span>
         </div>
         <div className="space-y-3">
-          <div className="h-4 w-full bg-[var(--muted)] rounded animate-pulse" />
-          <div className="h-4 w-4/5 bg-[var(--muted)] rounded animate-pulse" />
-          <div className="h-4 w-3/4 bg-[var(--muted)] rounded animate-pulse" />
+          <div className="h-4 w-full bg-[var(--muted)] rounded animate-blur-reveal" />
+          <div className="h-4 w-4/5 bg-[var(--muted)] rounded animate-blur-reveal" />
+          <div className="h-4 w-3/4 bg-[var(--muted)] rounded animate-blur-reveal" />
         </div>
         <p className="text-xs text-[var(--muted-foreground)] mt-4 text-center">
           Analyzing your stack...
@@ -200,14 +200,14 @@ export function StackAssessmentCard({ userId, protocols, className }: StackAsses
     return (
       <div className={cn(
         'rounded-2xl p-5 border',
-        'bg-gradient-to-br from-emerald-500/10 via-cyan-500/5 to-blue-500/10',
-        'border-emerald-500/20',
+        'bg-gradient-to-br from-[var(--accent-muted)] via-[var(--surface-2)] to-[var(--evidence-muted)]',
+        'border-[var(--accent)]/20',
         className
       )}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-emerald-400" />
-            <span className="font-semibold text-emerald-400">Stack Assessment</span>
+            <Sparkles className="w-5 h-5 text-[var(--accent)]" />
+            <span className="font-semibold text-[var(--accent)]">Stack Assessment</span>
           </div>
           <button
             onClick={handleRefresh}
@@ -230,8 +230,8 @@ export function StackAssessmentCard({ userId, protocols, className }: StackAsses
   return (
     <div className={cn(
       'rounded-2xl border overflow-hidden',
-      'bg-gradient-to-br from-emerald-500/10 via-cyan-500/5 to-blue-500/10',
-      'border-emerald-500/20',
+      'bg-gradient-to-br from-[var(--accent-muted)] via-[var(--surface-2)] to-[var(--evidence-muted)]',
+      'border-[var(--accent)]/20',
       className
     )}>
       {/* Header - Always visible, clickable to toggle */}
@@ -240,8 +240,8 @@ export function StackAssessmentCard({ userId, protocols, className }: StackAsses
           onClick={toggleCollapsed}
           className="flex items-center gap-2"
         >
-          <Sparkles className="w-5 h-5 text-emerald-400" />
-          <span className="font-semibold text-emerald-400">Stack Assessment</span>
+          <Sparkles className="w-5 h-5 text-[var(--accent)]" />
+          <span className="font-semibold text-[var(--accent)]">Stack Assessment</span>
           <ChevronDown className={cn(
             'w-4 h-4 text-[var(--muted-foreground)] transition-transform duration-200',
             isCollapsed ? '' : 'rotate-180'
@@ -281,7 +281,7 @@ export function StackAssessmentCard({ userId, protocols, className }: StackAsses
           {data.synergies.length > 0 && (
             <div className="mb-3">
               <div className="flex items-center gap-1.5 mb-2">
-                <Zap className="w-3.5 h-3.5 text-emerald-500" />
+                <Zap className="w-3.5 h-3.5 text-[var(--success)]" />
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
                   Synergies
                 </span>
@@ -300,7 +300,7 @@ export function StackAssessmentCard({ userId, protocols, className }: StackAsses
           {data.considerations.length > 0 && (
             <div>
               <div className="flex items-center gap-1.5 mb-2">
-                <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                <AlertTriangle className="w-3.5 h-3.5 text-[var(--warning)]" />
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
                   Consider
                 </span>

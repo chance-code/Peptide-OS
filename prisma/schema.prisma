@@ -36,14 +36,15 @@ model UserProfile {
 // PEPTIDE DEFINITIONS
 // ============================================
 model Peptide {
-  id           String   @id @default(cuid())
-  name         String   @unique
-  type         String   @default("peptide")  // 'peptide' | 'supplement'
-  category     String?
-  description  String?
-  storageNotes String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id             String   @id @default(cuid())
+  name           String   @unique
+  canonicalName  String?  // AI-classified canonical name for mechanism lookup
+  type           String   @default("peptide")  // 'peptide' | 'supplement'
+  category       String?
+  description    String?
+  storageNotes   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   // Relations
   protocols      Protocol[]

@@ -1018,6 +1018,11 @@ const PROTOCOL_ALIASES: Record<string, string> = {
   'epa': 'Omega-3',
   'dha': 'Omega-3',
   'epa/dha': 'Omega-3',
+  'omegad3': 'Omega-3',
+  'omega d3': 'Omega-3',
+  'omega d3 sport': 'Omega-3',
+  'ultimate omega': 'Omega-3',
+  'ultimate omega d3': 'Omega-3',
   'vitamin d3': 'Vitamin D',
   'd3': 'Vitamin D',
   'cholecalciferol': 'Vitamin D',
@@ -1059,19 +1064,27 @@ export function findProtocolMechanism(protocolName: string): ProtocolMechanism |
     return PROTOCOL_MECHANISMS[canonical]
   }
 
-  // Fuzzy match on keys and names
+  // Fuzzy match on keys and names — prefer longest (most specific) match
+  let bestFuzzy: { mechanism: ProtocolMechanism; length: number } | null = null
+  const searchNormalized = normalized.replace(/[^a-z0-9+]/g, '')
+
   for (const [key, mechanism] of Object.entries(PROTOCOL_MECHANISMS)) {
     const keyNormalized = key.toLowerCase().replace(/[^a-z0-9+]/g, '')
     const nameNormalized = mechanism.name.toLowerCase().replace(/[^a-z0-9+]/g, '')
-    const searchNormalized = normalized.replace(/[^a-z0-9+]/g, '')
 
-    if (searchNormalized.includes(keyNormalized) || keyNormalized.includes(searchNormalized) ||
-        searchNormalized.includes(nameNormalized) || nameNormalized.includes(searchNormalized)) {
-      return mechanism
+    const matchLength = Math.max(
+      searchNormalized.includes(keyNormalized) ? keyNormalized.length : 0,
+      keyNormalized.includes(searchNormalized) ? searchNormalized.length : 0,
+      searchNormalized.includes(nameNormalized) ? nameNormalized.length : 0,
+      nameNormalized.includes(searchNormalized) ? searchNormalized.length : 0,
+    )
+
+    if (matchLength > 0 && (!bestFuzzy || matchLength > bestFuzzy.length)) {
+      bestFuzzy = { mechanism, length: matchLength }
     }
   }
 
-  return null
+  return bestFuzzy?.mechanism ?? null
 }
 
 // Get insight template for a protocol and metric status

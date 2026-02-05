@@ -275,7 +275,7 @@ export default function ChatPage() {
                 'w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0',
                 message.role === 'user'
                   ? 'bg-[var(--foreground)] text-[var(--background)]'
-                  : 'bg-gradient-to-br from-emerald-400 to-cyan-500 text-white'
+                  : 'bg-gradient-to-br from-[var(--accent)] to-[var(--evidence)] text-[var(--background)]'
               )}
             >
               {message.role === 'user' ? (
@@ -324,7 +324,7 @@ export default function ChatPage() {
 
         {isLoading && (
           <div className="flex gap-3 max-w-[90%]">
-            <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-emerald-400 to-cyan-500 text-white">
+            <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-[var(--accent)] to-[var(--evidence)] text-[var(--background)]">
               <Bot className="w-4 h-4" />
             </div>
             <div className="bg-[var(--muted)] rounded-2xl rounded-tl-sm px-4 py-3">
@@ -341,7 +341,7 @@ export default function ChatPage() {
       </div>
 
       {/* Input - z-60 to sit above bottom nav (z-50) */}
-      <div className="border-t border-[var(--border)] bg-[var(--card)] p-3 pb-[calc(5rem+env(safe-area-inset-bottom))] relative z-[60]">
+      <div className="border-t border-[var(--border)] bg-[var(--surface-1)] p-3 pb-[calc(5rem+env(safe-area-inset-bottom))] relative z-[60]">
         <form onSubmit={handleSubmit} className="flex gap-2 items-end max-w-lg mx-auto">
           <div className="flex-1">
             <textarea

@@ -562,17 +562,17 @@ export default function NewInventoryPage() {
         <div className={`
           mb-4 p-4 rounded-xl border
           ${scanResult.confidence === 'high'
-            ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+            ? 'bg-[var(--success-muted)] border-[var(--success)]/30'
             : scanResult.confidence === 'medium'
-              ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
+              ? 'bg-[var(--warning-muted)] border-[var(--warning)]/30'
               : 'bg-[var(--muted)] border-[var(--border)]'
           }
         `}>
           <div className="flex items-start gap-3">
             {scanResult.confidence === 'high' ? (
-              <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+              <CheckCircle2 className="w-5 h-5 text-[var(--success)] flex-shrink-0 mt-0.5" />
             ) : (
-              <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+              <AlertCircle className="w-5 h-5 text-[var(--warning)] flex-shrink-0 mt-0.5" />
             )}
             <div className="flex-1 min-w-0">
               <div className="font-medium text-sm text-[var(--foreground)]">
@@ -600,8 +600,8 @@ export default function NewInventoryPage() {
 
       {/* Scan Error - Peptides only */}
       {itemType === 'peptide' && scanError && (
-        <div className="mb-4 p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-          <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
+        <div className="mb-4 p-4 rounded-xl bg-[var(--error-muted)] border border-[var(--error)]/30">
+          <div className="flex items-center gap-2 text-[var(--error)]">
             <AlertCircle className="w-5 h-5" />
             <span className="text-sm">{scanError}</span>
           </div>
@@ -640,7 +640,7 @@ export default function NewInventoryPage() {
                   <button
                     type="button"
                     onClick={() => removeSupplementImage(index)}
-                    className="absolute -top-3 -right-3 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg"
+                    className="absolute -top-3 -right-3 w-8 h-8 bg-[var(--error)] text-[var(--background)] rounded-full flex items-center justify-center shadow-lg"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -693,12 +693,12 @@ export default function NewInventoryPage() {
           {supplementScanResult && (
             <div className={`mt-3 p-3 rounded-lg ${
               supplementScanResult.confidence === 'high'
-                ? 'bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800'
-                : 'bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800'
+                ? 'bg-[var(--success-muted)] border border-[var(--success)]/30'
+                : 'bg-[var(--warning-muted)] border border-[var(--warning)]/30'
             }`}>
               <div className="flex items-start gap-2">
                 <CheckCircle2 className={`w-4 h-4 flex-shrink-0 mt-0.5 ${
-                  supplementScanResult.confidence === 'high' ? 'text-green-600' : 'text-yellow-600'
+                  supplementScanResult.confidence === 'high' ? 'text-[var(--success)]' : 'text-[var(--warning)]'
                 }`} />
                 <div className="text-sm">
                   <div className="font-medium text-[var(--foreground)]">
@@ -716,7 +716,7 @@ export default function NewInventoryPage() {
           )}
 
           {itemType === 'supplement' && scanError && (
-            <div className="mt-3 p-2 rounded-lg bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-sm">
+            <div className="mt-3 p-2 rounded-lg bg-[var(--error-muted)] text-[var(--error)] text-sm">
               {scanError}
             </div>
           )}
@@ -783,17 +783,17 @@ export default function NewInventoryPage() {
 
         {/* Recommendation Banner */}
         {recommendation && (
-          <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+          <div className="bg-[var(--evidence-muted)] border border-[var(--evidence)]/30 rounded-lg p-4">
             <div className="flex items-start gap-3">
-              <Lightbulb className="w-5 h-5 text-blue-500 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+              <Lightbulb className="w-5 h-5 text-[var(--evidence)] flex-shrink-0 mt-0.5" />
               <div className="flex-1">
-                <div className="font-medium text-blue-900 dark:text-blue-100 text-sm">
+                <div className="font-medium text-[var(--foreground)] text-sm">
                   {recommendation.source === 'protocol'
                     ? `Using settings from your ${recommendation.peptideName} protocol`
                     : `Info for ${recommendation.peptideName}`}
                 </div>
                 {recommendation.source === 'reference' && recommendation.typicalVialSizes && (
-                  <div className="text-blue-600 dark:text-blue-400 text-xs mt-1">
+                  <div className="text-[var(--evidence)] text-xs mt-1">
                     Common vial sizes: {recommendation.typicalVialSizes.map(v => `${v.amount}${v.unit}`).join(', ')}
                   </div>
                 )}

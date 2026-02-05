@@ -38,15 +38,15 @@ const providerIcons: Record<HealthProviderType, React.ReactNode> = {
 }
 
 const providerColors: Record<HealthProviderType, string> = {
-  apple_health: 'from-red-500/20 to-pink-500/10 border-red-500/30',
-  oura: 'from-teal-500/20 to-cyan-500/10 border-teal-500/30',
-  whoop: 'from-amber-500/20 to-yellow-500/10 border-amber-500/30'
+  apple_health: 'from-[var(--error-muted)] to-[var(--error-muted)] border-[var(--error)]/30',
+  oura: 'from-[var(--success-muted)] to-[var(--evidence-muted)] border-[var(--success)]/30',
+  whoop: 'from-[var(--warning-muted)] to-[var(--warning-muted)] border-[var(--warning)]/30'
 }
 
 const providerAccentColors: Record<HealthProviderType, string> = {
-  apple_health: 'text-red-400',
-  oura: 'text-teal-400',
-  whoop: 'text-amber-400'
+  apple_health: 'text-[var(--error)]',
+  oura: 'text-[var(--success)]',
+  whoop: 'text-[var(--warning)]'
 }
 
 export function HealthIntegrationCard({
@@ -157,8 +157,8 @@ export function HealthIntegrationCard({
           'flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium',
           isConnected
             ? hasError
-              ? 'bg-amber-500/20 text-amber-400'
-              : 'bg-green-500/20 text-green-400'
+              ? 'bg-[var(--warning-muted)] text-[var(--warning)]'
+              : 'bg-[var(--success-muted)] text-[var(--success)]'
             : 'bg-[var(--muted)] text-[var(--muted-foreground)]'
         )}>
           {isConnected ? (
@@ -189,8 +189,8 @@ export function HealthIntegrationCard({
 
       {/* Error message */}
       {hasError && (
-        <div className="mb-3 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
-          <p className="text-xs text-amber-400">{integration?.syncError}</p>
+        <div className="mb-3 p-2 rounded-lg bg-[var(--warning-muted)] border border-[var(--warning)]/20">
+          <p className="text-xs text-[var(--warning)]">{integration?.syncError}</p>
         </div>
       )}
 
@@ -209,8 +209,8 @@ export function HealthIntegrationCard({
           </div>
 
           {loginError && (
-            <div className="mb-3 p-2 rounded-lg bg-red-500/10 border border-red-500/20">
-              <p className="text-xs text-red-400">{loginError}</p>
+            <div className="mb-3 p-2 rounded-lg bg-[var(--error-muted)] border border-[var(--error)]/20">
+              <p className="text-xs text-[var(--error)]">{loginError}</p>
             </div>
           )}
 
@@ -323,7 +323,7 @@ export function HealthIntegrationCard({
               disabled={isConnecting}
               className="w-full"
             >
-              <Link2 className={cn('w-4 h-4 mr-2', isConnecting && 'animate-pulse')} />
+              <Link2 className={cn('w-4 h-4 mr-2', isConnecting && 'animate-blur-reveal')} />
               {isConnecting ? 'Connecting...' : isNativeOnly ? 'Enable Access' : 'Connect'}
             </Button>
           )}

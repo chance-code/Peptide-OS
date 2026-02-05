@@ -1,11 +1,25 @@
 import type { Metadata, Viewport } from 'next'
-import { Inter } from 'next/font/google'
+import { DM_Serif_Display, Plus_Jakarta_Sans, JetBrains_Mono } from 'next/font/google'
 import { Providers } from '@/components/providers'
 import './globals.css'
 
-const inter = Inter({
+const dmSerif = DM_Serif_Display({
   subsets: ['latin'],
-  variable: '--font-inter',
+  weight: '400',
+  variable: '--font-display',
+  display: 'swap',
+})
+
+const jakarta = Plus_Jakarta_Sans({
+  subsets: ['latin'],
+  variable: '--font-body',
+  display: 'swap',
+})
+
+const jetbrains = JetBrains_Mono({
+  subsets: ['latin'],
+  variable: '--font-mono',
+  display: 'swap',
 })
 
 export const metadata: Metadata = {
@@ -52,7 +66,7 @@ export default function RootLayout({
                   var theme = localStorage.getItem('theme');
                   var resolved = theme;
                   if (!theme || theme === 'system') {
-                    resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                    resolved = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
                   }
                   document.documentElement.classList.add(resolved);
                 } catch (e) {}
@@ -61,7 +75,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className={`${inter.variable} font-sans antialiased bg-[var(--background)] text-[var(--foreground)]`}>
+      <body className={`${dmSerif.variable} ${jakarta.variable} ${jetbrains.variable} font-sans antialiased bg-[var(--background)] text-[var(--foreground)]`}>
         <Providers>{children}</Providers>
       </body>
     </html>

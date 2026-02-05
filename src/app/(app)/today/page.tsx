@@ -3,7 +3,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { format } from 'date-fns'
-import type { CreateTypes } from 'canvas-confetti'
 import {
   Check,
   CheckCheck,
@@ -48,7 +47,7 @@ function AnimatedCheckButton({
         onClick={onUndo}
         className="w-11 h-11 rounded-full bg-[var(--success)] flex items-center justify-center shadow-lg"
         style={{
-          animation: justCompleted ? 'checkPop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)' : undefined,
+          animation: justCompleted ? 'checkPop 0.4s cubic-bezier(0.16, 1, 0.3, 1)' : undefined,
           boxShadow: justCompleted ? 'var(--glow-success)' : undefined,
         }}
       >
@@ -84,34 +83,17 @@ interface TodayResponse {
   }
 }
 
-// Trigger confetti celebration (dynamic import for smaller bundle)
-async function triggerConfetti() {
-  const confetti = (await import('canvas-confetti')).default as CreateTypes
-  const colors = ['#22c55e', '#6366f1', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4']
-
-  confetti({
-    particleCount: 60,
-    spread: 70,
-    origin: { y: 0.6 },
-    colors,
-  })
-
-  setTimeout(() => {
-    confetti({
-      particleCount: 30,
-      angle: 60,
-      spread: 50,
-      origin: { x: 0.1, y: 0.7 },
-      colors,
-    })
-    confetti({
-      particleCount: 30,
-      angle: 120,
-      spread: 50,
-      origin: { x: 0.9, y: 0.7 },
-      colors,
-    })
-  }, 150)
+// Warm glow celebration (replaces confetti — restrained, like a nod from a mentor)
+function triggerCelebration(containerRef: React.RefObject<HTMLDivElement | null>) {
+  if (!containerRef.current) return
+  const el = document.createElement('div')
+  el.className = 'animate-celebration'
+  el.style.cssText = `
+    position: fixed; inset: 0; z-index: 100; pointer-events: none;
+    background: radial-gradient(circle at 50% 50%, rgba(212, 165, 116, 0.25), transparent 70%);
+  `
+  containerRef.current.appendChild(el)
+  setTimeout(() => el.remove(), 1600)
 }
 
 export default function TodayPage() {
@@ -122,6 +104,7 @@ export default function TodayPage() {
   const [selectedDose, setSelectedDose] = useState<TodayDoseItem | null>(null)
   const prevCompletedRef = useRef<number | null>(null)
   const hasTriggeredConfetti = useRef(false)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   const dateParam = format(selectedDate, 'yyyy-MM-dd')
 
@@ -153,7 +136,7 @@ export default function TodayPage() {
 
     if (allCompleted && wasNotAllCompleted && !hasTriggeredConfetti.current) {
       hasTriggeredConfetti.current = true
-      triggerConfetti()
+      triggerCelebration(containerRef)
     }
 
     if (!allCompleted) {
@@ -281,7 +264,7 @@ export default function TodayPage() {
   const hasExpiredVials = data?.items.some(item => item.vialExpired) || false
 
   return (
-    <div>
+    <div ref={containerRef}>
       <AlertsBanner />
 
       <PullToRefresh onRefresh={handleRefresh} className="h-full">
@@ -303,8 +286,8 @@ export default function TodayPage() {
               <div className="text-label">
                 {isToday ? 'Today' : format(selectedDate, 'EEEE')}
               </div>
-              <div className="font-semibold text-[var(--foreground)]">
-                {format(selectedDate, 'MMMM d, yyyy')}
+              <div className="text-display text-[var(--foreground)]">
+                {format(selectedDate, 'MMMM d')}
               </div>
             </button>
             <Button
@@ -333,7 +316,7 @@ export default function TodayPage() {
 
           {/* Hero Card */}
           {isLoading ? (
-            <div className="h-[140px] rounded-2xl bg-[var(--muted)] animate-pulse mb-6" />
+            <div className="h-[140px] rounded-2xl bg-[var(--muted)] animate-blur-reveal mb-6" />
           ) : data ? (
             <div className="mb-6 animate-card-in">
               <HeroCard
@@ -552,11 +535,12 @@ export default function TodayPage() {
           <div className="space-y-4">
             {/* Pen Units - Primary Info */}
             {selectedDose.penUnits ? (
-              <div className="text-center py-6 bg-[var(--accent-muted)] rounded-2xl">
-                <div className="text-hero text-[var(--accent)]">
+              <div className="text-center py-6 bg-[var(--accent-muted)] rounded-2xl relative overflow-hidden">
+                <div className="absolute inset-0 opacity-10" style={{ background: 'radial-gradient(circle at 50% 40%, var(--accent), transparent 70%)' }} />
+                <div className="relative text-hero text-[var(--accent)]">
                   {selectedDose.penUnits}
                 </div>
-                <div className="text-[var(--accent)] mt-1 font-medium">
+                <div className="relative text-[var(--accent)] mt-1 font-medium text-sm">
                   units to draw
                 </div>
               </div>

@@ -85,23 +85,23 @@ export function ProtocolImpactReport({
 
   const confidenceLevel = daysOfData >= 21 ? 'high' : daysOfData >= 14 ? 'medium' : 'low'
   const confidenceColors = {
-    high: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-    medium: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+    high: 'bg-[var(--success-muted)] text-[var(--success)] border-[var(--success)]/30',
+    medium: 'bg-[var(--warning-muted)] text-[var(--warning)] border-[var(--warning)]/30',
     low: 'bg-[var(--muted-foreground)]/20 text-[var(--muted-foreground)] border-[var(--muted-foreground)]/30'
   }
 
   return (
     <div className={cn('space-y-6', className)}>
       {/* Header */}
-      <div className="rounded-xl bg-gradient-to-br from-[var(--card)] via-[var(--card)] to-indigo-950/30 border border-[var(--border)]/50 p-6">
+      <div className="rounded-xl bg-gradient-to-br from-[var(--card)] via-[var(--card)] to-[var(--accent-muted)] border border-[var(--border)]/50 p-6">
         <div className="flex items-start justify-between">
           <div>
             <div className="flex items-center gap-2 mb-2">
               <span className={cn(
                 'px-2 py-0.5 rounded text-xs font-medium',
                 protocolType === 'peptide'
-                  ? 'bg-violet-500/20 text-violet-400'
-                  : 'bg-emerald-500/20 text-emerald-400'
+                  ? 'bg-[rgba(155,125,212,0.12)] text-[var(--tier-3)]'
+                  : 'bg-[var(--success-muted)] text-[var(--success)]'
               )}>
                 {protocolType}
               </span>
@@ -112,7 +112,7 @@ export function ProtocolImpactReport({
                 {confidenceLevel} confidence
               </span>
             </div>
-            <h1 className="text-2xl font-bold text-[var(--foreground)] mb-1">
+            <h1 className="text-display text-[var(--foreground)] mb-1">
               {protocolName} Impact Report
             </h1>
             <p className="text-[var(--muted-foreground)] flex items-center gap-2">
@@ -138,17 +138,17 @@ export function ProtocolImpactReport({
                 <div className="flex items-center gap-3">
                   <div className={cn(
                     'w-8 h-8 rounded-lg flex items-center justify-center',
-                    metric.isGood ? 'bg-emerald-500/20' : 'bg-amber-500/20'
+                    metric.isGood ? 'bg-[var(--success-muted)]' : 'bg-[var(--warning-muted)]'
                   )}>
                     {metric.change > 0 ? (
                       <TrendingUp className={cn(
                         'w-4 h-4',
-                        metric.isGood ? 'text-emerald-400' : 'text-amber-400'
+                        metric.isGood ? 'text-[var(--success)]' : 'text-[var(--warning)]'
                       )} />
                     ) : (
                       <TrendingDown className={cn(
                         'w-4 h-4',
-                        metric.isGood ? 'text-emerald-400' : 'text-amber-400'
+                        metric.isGood ? 'text-[var(--success)]' : 'text-[var(--warning)]'
                       )} />
                     )}
                   </div>
@@ -164,7 +164,7 @@ export function ProtocolImpactReport({
                   </span>
                   <span className={cn(
                     'font-semibold tabular-nums min-w-[60px] text-right',
-                    metric.isGood ? 'text-emerald-400' : 'text-amber-400'
+                    metric.isGood ? 'text-[var(--success)]' : 'text-[var(--warning)]'
                   )}>
                     {metric.percentChange > 0 ? '+' : ''}{metric.percentChange.toFixed(0)}%
                   </span>
@@ -193,9 +193,9 @@ export function ProtocolImpactReport({
                 <div
                   className={cn(
                     'w-full rounded-t transition-all',
-                    period.change > 10 ? 'bg-emerald-500' :
-                    period.change > 5 ? 'bg-emerald-600' :
-                    period.change > 0 ? 'bg-emerald-700' :
+                    period.change > 10 ? 'bg-[var(--success)]' :
+                    period.change > 5 ? 'bg-[var(--success)]/80' :
+                    period.change > 0 ? 'bg-[var(--success)]/60' :
                     'bg-[var(--border)]'
                   )}
                   style={{ height: `${Math.max(10, Math.abs(period.change) * 3)}%` }}
@@ -240,7 +240,7 @@ export function ProtocolImpactReport({
                 <div className="flex items-center gap-3">
                   <span className={cn(
                     'font-semibold tabular-nums',
-                    split.change > 0 ? 'text-emerald-400' : 'text-[var(--muted-foreground)]'
+                    split.change > 0 ? 'text-[var(--success)]' : 'text-[var(--muted-foreground)]'
                   )}>
                     {split.change > 0 ? '+' : ''}{split.change}%
                   </span>
@@ -395,8 +395,8 @@ export function ProtocolImpactCard({
             <span className={cn(
               'px-1.5 py-0.5 rounded text-[10px] font-medium uppercase',
               protocolType === 'peptide'
-                ? 'bg-violet-500/20 text-violet-400'
-                : 'bg-emerald-500/20 text-emerald-400'
+                ? 'bg-[rgba(155,125,212,0.12)] text-[var(--tier-3)]'
+                : 'bg-[var(--success-muted)] text-[var(--success)]'
             )}>
               {protocolType}
             </span>
@@ -409,14 +409,14 @@ export function ProtocolImpactCard({
         <div className="text-right">
           <div className={cn(
             'text-xl font-bold tabular-nums',
-            isPositive ? 'text-emerald-400' : 'text-amber-400'
+            isPositive ? 'text-[var(--success)]' : 'text-[var(--warning)]'
           )}>
             {isPositive ? '+' : ''}{change}%
           </div>
           <div className={cn(
             'text-xs mt-1',
-            confidence === 'high' ? 'text-emerald-400' :
-            confidence === 'medium' ? 'text-amber-400' : 'text-[var(--muted-foreground)]'
+            confidence === 'high' ? 'text-[var(--success)]' :
+            confidence === 'medium' ? 'text-[var(--warning)]' : 'text-[var(--muted-foreground)]'
           )}>
             {confidence}
           </div>
@@ -436,12 +436,12 @@ interface ProtocolEvidenceCardProps {
 
 const VERDICT_CONFIG: Record<EvidenceVerdict, { label: string; color: string; bg: string }> = {
   too_early: { label: 'Too Early', color: 'text-[var(--muted-foreground)]', bg: 'bg-[var(--muted-foreground)]/20' },
-  accumulating: { label: 'Accumulating', color: 'text-amber-400', bg: 'bg-amber-500/20' },
-  weak_positive: { label: 'Weak Positive', color: 'text-amber-400', bg: 'bg-amber-500/20' },
-  likely_positive: { label: 'Likely Positive', color: 'text-emerald-400', bg: 'bg-emerald-500/20' },
-  strong_positive: { label: 'Strong Positive', color: 'text-emerald-400', bg: 'bg-emerald-500/20' },
+  accumulating: { label: 'Accumulating', color: 'text-[var(--warning)]', bg: 'bg-[var(--warning-muted)]' },
+  weak_positive: { label: 'Weak Positive', color: 'text-[var(--warning)]', bg: 'bg-[var(--warning-muted)]' },
+  likely_positive: { label: 'Likely Positive', color: 'text-[var(--success)]', bg: 'bg-[var(--success-muted)]' },
+  strong_positive: { label: 'Strong Positive', color: 'text-[var(--success)]', bg: 'bg-[var(--success-muted)]' },
   no_detectable_effect: { label: 'No Effect Detected', color: 'text-[var(--muted-foreground)]', bg: 'bg-[var(--muted-foreground)]/20' },
-  possible_negative: { label: 'Possible Negative', color: 'text-rose-400', bg: 'bg-rose-500/20' },
+  possible_negative: { label: 'Possible Negative', color: 'text-[var(--error)]', bg: 'bg-[var(--error-muted)]' },
   confounded: { label: 'Confounded', color: 'text-[var(--muted-foreground)]', bg: 'bg-[var(--muted-foreground)]/20' },
 }
 
@@ -450,8 +450,8 @@ export function ProtocolEvidenceCard({ evidence, onViewFull, className }: Protoc
   const verdictConfig = VERDICT_CONFIG[evidence.verdict]
 
   const confidenceColors = {
-    high: 'text-emerald-400',
-    medium: 'text-amber-400',
+    high: 'text-[var(--success)]',
+    medium: 'text-[var(--warning)]',
     low: 'text-[var(--muted-foreground)]',
   }
 
@@ -467,8 +467,8 @@ export function ProtocolEvidenceCard({ evidence, onViewFull, className }: Protoc
           <span className={cn(
             'px-1.5 py-0.5 rounded text-[10px] font-medium uppercase',
             evidence.protocolType === 'peptide'
-              ? 'bg-violet-500/20 text-violet-400'
-              : 'bg-emerald-500/20 text-emerald-400'
+              ? 'bg-[rgba(155,125,212,0.12)] text-[var(--tier-3)]'
+              : 'bg-[var(--success-muted)] text-[var(--success)]'
           )}>
             {evidence.protocolType}
           </span>
@@ -520,7 +520,7 @@ export function ProtocolEvidenceCard({ evidence, onViewFull, className }: Protoc
                   <div className="flex items-center gap-3">
                     <span className={cn(
                       'font-semibold tabular-nums',
-                      signal.isGood ? 'text-emerald-400' : 'text-amber-400'
+                      signal.isGood ? 'text-[var(--success)]' : 'text-[var(--warning)]'
                     )}>
                       {signal.percentChange > 0 ? '+' : ''}{signal.percentChange.toFixed(0)}%
                     </span>

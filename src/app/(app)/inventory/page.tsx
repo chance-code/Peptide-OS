@@ -62,7 +62,7 @@ export default function InventoryPage() {
     <div className="p-4 pb-20">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold text-[var(--foreground)]">Inventory</h2>
+        <h2 className="text-display text-[var(--foreground)]">Inventory</h2>
         <Link href="/inventory/new">
           <Button size="sm">
             <Plus className="w-4 h-4 mr-1" />
@@ -75,26 +75,26 @@ export default function InventoryPage() {
       {!isLoading && (expiringVials.length > 0 || expiredVials.length > 0) && (
         <div className="space-y-2 mb-4">
           {expiredVials.length > 0 && (
-            <div className="flex items-start gap-3 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">
-              <AlertTriangle className="w-5 h-5 text-red-500 dark:text-red-400 flex-shrink-0 mt-0.5" />
+            <div className="flex items-start gap-3 p-3 bg-[var(--error-muted)] border border-[var(--error)]/30 rounded-lg">
+              <AlertTriangle className="w-5 h-5 text-[var(--error)] flex-shrink-0 mt-0.5" />
               <div>
-                <div className="font-medium text-red-800 dark:text-red-300">
+                <div className="font-medium text-[var(--error)]">
                   {expiredVials.length} expired vial{expiredVials.length > 1 ? 's' : ''}
                 </div>
-                <div className="text-sm text-red-600 dark:text-red-400">
+                <div className="text-sm text-[var(--error)]">
                   {expiredVials.map(v => v.peptide.name).join(', ')}
                 </div>
               </div>
             </div>
           )}
           {expiringVials.length > 0 && (
-            <div className="flex items-start gap-3 p-3 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg">
-              <Clock className="w-5 h-5 text-amber-500 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+            <div className="flex items-start gap-3 p-3 bg-[var(--warning-muted)] border border-[var(--warning)]/30 rounded-lg">
+              <Clock className="w-5 h-5 text-[var(--warning)] flex-shrink-0 mt-0.5" />
               <div>
-                <div className="font-medium text-amber-800 dark:text-amber-300">
+                <div className="font-medium text-[var(--warning)]">
                   {expiringVials.length} vial{expiringVials.length > 1 ? 's' : ''} expiring soon
                 </div>
-                <div className="text-sm text-amber-600 dark:text-amber-400">
+                <div className="text-sm text-[var(--warning)]">
                   {expiringVials.map(v => {
                     const days = v.expirationDate
                       ? differenceInDays(new Date(v.expirationDate), new Date())
@@ -112,18 +112,18 @@ export default function InventoryPage() {
       {!isLoading && (
         <div className="grid grid-cols-3 gap-3 mb-6">
           <div className="bg-[var(--background)] rounded-lg p-3 text-center border border-[var(--border)]">
-            <div className="text-2xl font-bold text-[var(--foreground)]">{activeVials.length}</div>
+            <div className="text-data-lg text-[var(--foreground)]">{activeVials.length}</div>
             <div className="text-xs text-[var(--muted-foreground)]">Active</div>
           </div>
-          <div className="bg-amber-50 dark:bg-amber-900/30 rounded-lg p-3 text-center border border-amber-100 dark:border-amber-800">
-            <div className="text-2xl font-bold text-amber-700 dark:text-amber-400">
+          <div className="bg-[var(--warning-muted)] rounded-lg p-3 text-center border border-[var(--warning)]/30">
+            <div className="text-2xl font-bold text-[var(--warning)]">
               {expiringVials.length}
             </div>
-            <div className="text-xs text-amber-600 dark:text-amber-500">Expiring</div>
+            <div className="text-xs text-[var(--warning)]">Expiring</div>
           </div>
-          <div className="bg-red-50 dark:bg-red-900/30 rounded-lg p-3 text-center border border-red-100 dark:border-red-800">
-            <div className="text-2xl font-bold text-red-700 dark:text-red-400">{expiredVials.length}</div>
-            <div className="text-xs text-red-600 dark:text-red-500">Expired</div>
+          <div className="bg-[var(--error-muted)] rounded-lg p-3 text-center border border-[var(--error)]/30">
+            <div className="text-2xl font-bold text-[var(--error)]">{expiredVials.length}</div>
+            <div className="text-xs text-[var(--error)]">Expired</div>
           </div>
         </div>
       )}
@@ -197,8 +197,8 @@ export default function InventoryPage() {
               <Card
                 className={cn(
                   'transition-all cursor-pointer hover:shadow-md hover:bg-[var(--muted)]/50 active:scale-[0.99]',
-                  status === 'expired' && 'opacity-60 border-red-200 dark:border-red-800 bg-red-50/30 dark:bg-red-900/20',
-                  status === 'expiring-soon' && 'border-amber-200 dark:border-amber-800 bg-amber-50/30 dark:bg-amber-900/20'
+                  status === 'expired' && 'opacity-60 border-[var(--error)]/30 bg-[var(--error-muted)]',
+                  status === 'expiring-soon' && 'border-[var(--warning)]/30 bg-[var(--warning-muted)]'
                 )}
               >
                 <CardContent className="p-4">
