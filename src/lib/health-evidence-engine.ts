@@ -699,15 +699,50 @@ async function fetchMetrics(
  * We'll simulate confounds based on notes containing keywords
  * In a real app, these would be stored in a dedicated table
  */
+// Keyword patterns for detecting confound events from dose log notes
+const CONFOUND_KEYWORDS: Record<string, string[]> = {
+  illness: ['sick', 'ill', 'cold', 'flu', 'fever', 'infection', 'covid', 'nausea', 'vomiting', 'food poisoning'],
+  travel: ['travel', 'traveling', 'travelling', 'flight', 'jet lag', 'jetlag', 'trip', 'timezone'],
+  alcohol: ['alcohol', 'drinking', 'drunk', 'hangover', 'wine', 'beer', 'cocktail'],
+  stress: ['stressed', 'stress', 'anxiety', 'anxious', 'insomnia', 'couldn\'t sleep', 'poor sleep', 'bad sleep'],
+}
+
 async function fetchContextEvents(
   userId: string,
   startDate: Date,
   endDate: Date
 ): Promise<ContextEvent[]> {
-  // For now, we don't have a dedicated context events table
-  // Return empty array - this could be expanded to parse dose log notes
-  // or add a ContextEvent model in the future
-  return []
+  // Parse dose log notes for confound keywords
+  const doseLogs = await prisma.doseLog.findMany({
+    where: {
+      userId,
+      scheduledDate: { gte: startDate, lte: endDate },
+      notes: { not: null },
+    },
+    select: {
+      scheduledDate: true,
+      notes: true,
+    },
+  })
+
+  const events: ContextEvent[] = []
+
+  for (const log of doseLogs) {
+    if (!log.notes) continue
+    const notesLower = log.notes.toLowerCase()
+
+    for (const [confoundType, keywords] of Object.entries(CONFOUND_KEYWORDS)) {
+      if (keywords.some(kw => notesLower.includes(kw))) {
+        events.push({
+          date: log.scheduledDate,
+          type: confoundType,
+        })
+        break // One confound type per log entry to avoid double-counting
+      }
+    }
+  }
+
+  return events
 }
 
 // ─── Mechanism Detection ─────────────────────────────────────────────────────
