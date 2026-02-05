@@ -180,7 +180,7 @@ const METRIC_RECOMMENDATIONS: Record<string, {
 export function getRecommendations(
   metricType: string,
   trend: 'improving' | 'declining' | 'stable',
-  polarity: 'higher_better' | 'lower_better' = 'higher_better'
+  polarity: 'higher_better' | 'lower_better' | 'neutral' = 'higher_better'
 ): ActionableRecommendation[] {
   // Adjust for polarity (e.g., body_fat declining is "improving")
   let effectiveTrend = trend
@@ -201,7 +201,7 @@ export function getRecommendations(
 export function formatTopRecommendations(
   metricType: string,
   trend: 'improving' | 'declining' | 'stable',
-  polarity: 'higher_better' | 'lower_better' = 'higher_better',
+  polarity: 'higher_better' | 'lower_better' | 'neutral' = 'higher_better',
   maxCount: number = 2
 ): string {
   const recs = getRecommendations(metricType, trend, polarity)

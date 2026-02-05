@@ -175,16 +175,16 @@ export function normalizeMetricUnit(metricType: MetricType): MetricUnit {
     sleep_score: 'score',
     hrv: 'ms',
     rhr: 'bpm',
-    weight: 'kg',
+    weight: 'lbs',
     steps: 'steps',
     bed_temperature: 'celsius',
     time_in_bed: 'minutes',
     // Body composition
     body_fat_percentage: 'percent',
-    lean_body_mass: 'kg',
+    lean_body_mass: 'lbs',
     bmi: 'score',
-    bone_mass: 'kg',
-    muscle_mass: 'kg',
+    bone_mass: 'lbs',
+    muscle_mass: 'lbs',
     body_water: 'percent',
     // Activity
     active_calories: 'kcal',
@@ -229,7 +229,7 @@ export function formatMetricValue(value: number, metricType: MetricType): string
     case 'lean_body_mass':
     case 'bone_mass':
     case 'muscle_mass':
-      return `${value.toFixed(1)} kg`
+      return `${value.toFixed(1)} lbs`
     case 'steps':
       return value.toLocaleString()
     case 'bed_temperature':

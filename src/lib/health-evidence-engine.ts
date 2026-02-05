@@ -68,7 +68,7 @@ export interface EnhancedSignal {
   }
 
   interpretation: {
-    polarity: 'higher_better' | 'lower_better'
+    polarity: 'higher_better' | 'lower_better' | 'neutral'
     isImprovement: boolean
     explanation: string
   }
@@ -1069,10 +1069,11 @@ function computeAllSignals(
       Math.abs(percentChange) < 2 ? 'stable' :
       absoluteChange > 0 ? 'up' : 'down'
 
-    const polarity = (METRIC_POLARITY[metricType] || 'higher_better') as 'higher_better' | 'lower_better'
-    const isImprovement =
-      (polarity === 'higher_better' && direction === 'up') ||
-      (polarity === 'lower_better' && direction === 'down')
+    const polarity = METRIC_POLARITY[metricType] || 'higher_better'
+    const isImprovement = polarity === 'neutral'
+      ? false // Neutral metrics have no inherent improvement direction
+      : (polarity === 'higher_better' && direction === 'up') ||
+        (polarity === 'lower_better' && direction === 'down')
 
     const explanation = generateInterpretationExplanation(
       metricType,

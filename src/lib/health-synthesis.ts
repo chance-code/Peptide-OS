@@ -172,12 +172,12 @@ export interface HealthTrend {
 }
 
 export interface HealthScore {
-  overall: number
-  sleep: number
-  recovery: number
-  activity: number
-  bodyComp: number  // Body composition score (when data available)
-  readiness: number // New: daily readiness score
+  overall: number | null
+  sleep: number | null
+  recovery: number | null
+  activity: number | null
+  bodyComp: number | null  // Body composition score (when data available)
+  readiness: number | null // Daily readiness score
   breakdown: Array<{
     metric: MetricType
     score: number
@@ -506,9 +506,9 @@ export async function calculateHealthTrends(
       changePercent,
       trend,
       momentum: calculateMomentum(changePercent, previousChangePercent),
-      // Confidence based on data density (points per period), not just raw count
-      confidence: current.length >= 5 && previous.length >= 3 ? 'high'
-        : current.length >= 3 && previous.length >= 2 ? 'medium' : 'low',
+      // Confidence based on data density — require meaningful sample sizes
+      confidence: current.length >= 10 && previous.length >= 7 ? 'high'
+        : current.length >= 5 && previous.length >= 3 ? 'medium' : 'low',
       dataPoints: current.length,
       consistency: calculateConsistency(current.map(m => m.value)),
       personalBest,
@@ -935,19 +935,29 @@ export async function calculateHealthScore(userId: string): Promise<HealthScore>
   }
 
   const avgScore = (scores: number[]) =>
-    scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 70
+    scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null
 
   const sleep = avgScore(categoryScores.sleep)
   const recoveryScore = avgScore(categoryScores.recovery)
   const activity = avgScore(categoryScores.activity)
   const bodyCompScore = avgScore(categoryScores.bodyComp)
   const hasBodyComp = categoryScores.bodyComp.length > 0
-  const readiness = recovery?.score || Math.round((sleep * 0.5 + recoveryScore * 0.5))
 
-  // Adjust weights based on body comp data availability
-  const overall = hasBodyComp
-    ? Math.round(sleep * 0.35 + recoveryScore * 0.30 + activity * 0.20 + bodyCompScore * 0.15)
-    : Math.round(sleep * 0.4 + recoveryScore * 0.35 + activity * 0.25)
+  // Only compute overall/readiness if we have actual data
+  const hasAnyData = sleep !== null || recoveryScore !== null || activity !== null
+  const readiness = recovery?.score || (sleep !== null && recoveryScore !== null
+    ? Math.round((sleep * 0.5 + recoveryScore * 0.5)) : null)
+
+  // Compute overall score only when we have real category data
+  let overall: number | null = null
+  if (hasAnyData) {
+    const s = sleep ?? 50
+    const r = recoveryScore ?? 50
+    const a = activity ?? 50
+    overall = hasBodyComp
+      ? Math.round(s * 0.35 + r * 0.30 + a * 0.20 + (bodyCompScore ?? 50) * 0.15)
+      : Math.round(s * 0.4 + r * 0.35 + a * 0.25)
+  }
 
   return { overall, sleep, recovery: recoveryScore, activity, bodyComp: bodyCompScore, readiness, breakdown }
 }

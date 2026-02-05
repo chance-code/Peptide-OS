@@ -10,13 +10,16 @@ export const METRIC_BOUNDS: Record<string, {
   stableThreshold?: number // metric-specific % threshold for "stable" (default 5%)
 }> = {
   // Sleep metrics (stored in minutes in DB)
-  sleep_duration: { min: 0, max: 840, unit: 'min', maxDailyChange: 240, maxWeeklyChange: 25, stableThreshold: 5 },
-  deep_sleep: { min: 0, max: 360, unit: 'min', maxDailyChange: 120, maxWeeklyChange: 50, stableThreshold: 10 },
-  rem_sleep: { min: 0, max: 300, unit: 'min', maxDailyChange: 120, maxWeeklyChange: 50, stableThreshold: 10 },
-  light_sleep: { min: 0, max: 600, unit: 'min', maxDailyChange: 180, maxWeeklyChange: 50, stableThreshold: 10 },
+  // Physiologic maximums: deep ~3h, REM ~3.5h, light ~7h, total ~12h
+  sleep_duration: { min: 0, max: 720, unit: 'min', maxDailyChange: 240, maxWeeklyChange: 25, stableThreshold: 5 },
+  deep_sleep: { min: 0, max: 180, unit: 'min', maxDailyChange: 90, maxWeeklyChange: 50, stableThreshold: 10 },
+  rem_sleep: { min: 0, max: 210, unit: 'min', maxDailyChange: 90, maxWeeklyChange: 50, stableThreshold: 10 },
+  light_sleep: { min: 0, max: 420, unit: 'min', maxDailyChange: 180, maxWeeklyChange: 50, stableThreshold: 10 },
   sleep_efficiency: { min: 0, max: 100, unit: '%', maxDailyChange: 20, maxWeeklyChange: 30, stableThreshold: 3 },
   sleep_score: { min: 0, max: 100, unit: 'score', maxDailyChange: 30, maxWeeklyChange: 25, stableThreshold: 5 },
-  time_in_bed: { min: 0, max: 960, unit: 'min', maxDailyChange: 240, maxWeeklyChange: 30, stableThreshold: 5 },
+  time_in_bed: { min: 0, max: 840, unit: 'min', maxDailyChange: 240, maxWeeklyChange: 30, stableThreshold: 5 },
+  waso: { min: 0, max: 300, unit: 'min', maxDailyChange: 60, maxWeeklyChange: 50, stableThreshold: 10 },
+  sleep_latency: { min: 0, max: 180, unit: 'min', maxDailyChange: 60, maxWeeklyChange: 50, stableThreshold: 10 },
 
   // Heart & Recovery metrics
   hrv: { min: 5, max: 200, unit: 'ms', maxDailyChange: 30, maxWeeklyChange: 40, stableThreshold: 8 },
@@ -120,13 +123,42 @@ export function validateAndCorrectMetric(
   }
 
   // Sleep duration: detect if sent in hours instead of minutes
-  if ((metricType === 'sleep_duration' || metricType === 'deep_sleep' || metricType === 'rem_sleep' ||
-       metricType === 'light_sleep' || metricType === 'time_in_bed') && value > 0 && value <= 24) {
-    // Value looks like hours, bounds expect minutes
-    if (bounds.max > 100 && value < bounds.min) {
+  const sleepMinuteMetrics = ['sleep_duration', 'deep_sleep', 'rem_sleep', 'light_sleep', 'time_in_bed']
+  if (sleepMinuteMetrics.includes(metricType) && value > 0) {
+    const unitLower = (unit || '').toLowerCase()
+    // If unit explicitly says hours, convert
+    if (unitLower === 'hrs' || unitLower === 'hours' || unitLower === 'h' || unitLower === 'hr') {
       const corrected = value * 60
       if (corrected >= bounds.min && corrected <= bounds.max) {
         return { valid: true, correctedValue: corrected, correctedUnit: 'min', reason: 'Converted hours to minutes' }
+      }
+    }
+    // Heuristic: value <= 24 and bounds expect minutes (max > 60) → likely hours
+    if (value <= 24 && bounds.max > 60 && unitLower !== 'min' && unitLower !== 'minutes') {
+      const corrected = value * 60
+      if (corrected >= bounds.min && corrected <= bounds.max) {
+        return { valid: true, correctedValue: corrected, correctedUnit: 'min', reason: 'Converted hours to minutes (heuristic)' }
+      }
+    }
+  }
+
+  // Weight/body comp: detect kg values when we expect lbs
+  const weightMetrics = ['weight', 'lean_body_mass', 'muscle_mass', 'bone_mass']
+  if (weightMetrics.includes(metricType)) {
+    const unitLower = (unit || '').toLowerCase()
+    // If unit explicitly says kg, convert to lbs
+    if (unitLower === 'kg' || unitLower === 'kilogram' || unitLower === 'kilograms') {
+      const corrected = value * 2.20462
+      if (corrected >= bounds.min && corrected <= bounds.max) {
+        return { valid: true, correctedValue: corrected, correctedUnit: 'lbs', reason: 'Converted kg to lbs' }
+      }
+    }
+    // Heuristic: for weight, values 20-100 with bounds expecting lbs (min=50, max=500)
+    // are likely kg if they seem too low for lbs
+    if (metricType === 'weight' && value >= 20 && value < 50 && bounds.min >= 50) {
+      const corrected = value * 2.20462
+      if (corrected >= bounds.min && corrected <= bounds.max) {
+        return { valid: true, correctedValue: corrected, correctedUnit: 'lbs', reason: 'Converted kg to lbs (heuristic)' }
       }
     }
   }

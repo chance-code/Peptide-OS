@@ -92,7 +92,7 @@ export function computeBaseline(
 export function compareToBaseline(
   current: number,
   baseline: MetricBaseline,
-  polarity: 'higher_better' | 'lower_better' = 'higher_better'
+  polarity: 'higher_better' | 'lower_better' | 'neutral' = 'higher_better'
 ): BaselineDelta {
   const absoluteDelta = current - baseline.mean
   const percentDelta = safePercentChange(current, baseline.mean) ?? 0
@@ -135,18 +135,22 @@ export function compareToBaseline(
 function generateDeltaDescription(
   zScore: number,
   percentDelta: number,
-  polarity: 'higher_better' | 'lower_better'
+  polarity: 'higher_better' | 'lower_better' | 'neutral'
 ): string {
   const absZ = Math.abs(zScore)
   const absPercent = Math.abs(percentDelta)
   const isUp = zScore > 0
-  const isGood = (polarity === 'higher_better' && isUp) || (polarity === 'lower_better' && !isUp)
+  const isGood = polarity === 'neutral' ? null : (polarity === 'higher_better' && isUp) || (polarity === 'lower_better' && !isUp)
 
   // Format z-score for display
   const zDisplay = `${isUp ? '+' : ''}${zScore.toFixed(1)}σ`
 
   if (absZ < 0.3) {
     return 'At baseline'
+  } else if (isGood === null) {
+    // Neutral polarity — describe direction without judgment
+    const label = absZ < 1.0 ? 'slightly' : absZ < 2.0 ? 'notably' : 'significantly'
+    return `${zDisplay} (${label} ${isUp ? 'above' : 'below'} baseline)`
   } else if (absZ < 1.0) {
     return `${zDisplay} ${isGood ? '(slightly better)' : '(slightly lower)'}`
   } else if (absZ < 2.0) {
@@ -184,7 +188,7 @@ export interface TrendMomentum {
 
 export function calculateMomentum(
   values: DailyMetricValue[],
-  polarity: 'higher_better' | 'lower_better' = 'higher_better',
+  polarity: 'higher_better' | 'lower_better' | 'neutral' = 'higher_better',
   metricType?: string
 ): TrendMomentum | null {
   if (values.length < 21) return null
@@ -335,7 +339,7 @@ export function classifySignal(
   metricType: string,
   recentValues: DailyMetricValue[],
   baseline: MetricBaseline,
-  polarity: 'higher_better' | 'lower_better' = 'higher_better'
+  polarity: 'higher_better' | 'lower_better' | 'neutral' = 'higher_better'
 ): ClassifiedSignal | null {
   if (recentValues.length === 0) return null
 
@@ -424,7 +428,7 @@ export function classifySignal(
 }
 
 // Export metric polarity map
-export const METRIC_POLARITY: Record<string, 'higher_better' | 'lower_better'> = {
+export const METRIC_POLARITY: Record<string, 'higher_better' | 'lower_better' | 'neutral'> = {
   // Heart & Recovery
   hrv: 'higher_better',
   rhr: 'lower_better',
@@ -439,9 +443,9 @@ export const METRIC_POLARITY: Record<string, 'higher_better' | 'lower_better'> =
   sleep_latency: 'lower_better',
   temp_deviation: 'lower_better',
   // Vitals
-  respiratory_rate: 'lower_better',
+  respiratory_rate: 'neutral', // Context-dependent; aligned with synthesis
   blood_oxygen: 'higher_better',
-  body_temperature: 'lower_better',
+  body_temperature: 'neutral', // Context-dependent; aligned with synthesis
   // Activity
   steps: 'higher_better',
   active_calories: 'higher_better',
@@ -452,7 +456,7 @@ export const METRIC_POLARITY: Record<string, 'higher_better' | 'lower_better'> =
   // Fitness
   vo2_max: 'higher_better',
   // Body Composition
-  weight: 'higher_better', // Weight direction is context-dependent; default to higher
+  weight: 'neutral', // Weight direction is context-dependent
   body_fat_percentage: 'lower_better',
   bmi: 'lower_better',
   lean_body_mass: 'higher_better',
