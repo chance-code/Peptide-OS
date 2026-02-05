@@ -1,18 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { getProvider, HealthProviderType } from '@/lib/health-providers'
+import { getProvider } from '@/lib/health-providers'
 
-// Import providers to register them
-import '@/lib/health-providers/oura'
+// Import provider to register it
 import '@/lib/health-providers/whoop'
 
-// GET /api/health/integrations/[provider]/callback - OAuth callback handler
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ provider: string }> }
-) {
-  const { provider } = await params
-  const providerType = provider as HealthProviderType
+// GET /oauth/whoop - OAuth callback handler for WHOOP
+export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
 
   const code = searchParams.get('code')
@@ -25,7 +19,7 @@ export async function GET(
 
   // Handle OAuth errors
   if (error) {
-    console.error(`OAuth error for ${provider}:`, error, errorDescription)
+    console.error('WHOOP OAuth error:', error, errorDescription)
     return NextResponse.redirect(
       `${baseUrl}/health?error=${encodeURIComponent(errorDescription || error)}`
     )
@@ -41,16 +35,16 @@ export async function GET(
   const userId = state
 
   // Get the provider implementation
-  const providerImpl = getProvider(providerType)
+  const providerImpl = getProvider('whoop')
   if (!providerImpl || !providerImpl.exchangeCode) {
     return NextResponse.redirect(
-      `${baseUrl}/health?error=${encodeURIComponent('Unknown provider')}`
+      `${baseUrl}/health?error=${encodeURIComponent('Provider not configured')}`
     )
   }
 
   try {
     // Exchange authorization code for tokens
-    const redirectUri = `${baseUrl}/api/health/integrations/${provider}/callback`
+    const redirectUri = `${baseUrl}/oauth/whoop`
     const tokens = await providerImpl.exchangeCode(code, redirectUri)
 
     // Calculate token expiry
@@ -63,7 +57,7 @@ export async function GET(
     // Create or update the integration
     await prisma.healthIntegration.upsert({
       where: {
-        userId_provider: { userId, provider: providerType }
+        userId_provider: { userId, provider: 'whoop' }
       },
       update: {
         accessToken: tokens.accessToken,
@@ -74,7 +68,7 @@ export async function GET(
       },
       create: {
         userId,
-        provider: providerType,
+        provider: 'whoop',
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
         tokenExpiry,
@@ -83,20 +77,18 @@ export async function GET(
     })
 
     // Trigger initial sync in the background
-    triggerInitialSync(userId, providerType, tokens.accessToken)
+    triggerInitialSync(userId, tokens.accessToken)
 
     // Redirect to health page with success
-    return NextResponse.redirect(
-      `${baseUrl}/health?connected=${provider}`
-    )
+    return NextResponse.redirect(`${baseUrl}/health?connected=whoop`)
   } catch (error) {
-    console.error(`Error exchanging code for ${provider}:`, error)
+    console.error('Error exchanging WHOOP code:', error)
 
     // Store the error in the integration
     try {
       await prisma.healthIntegration.upsert({
         where: {
-          userId_provider: { userId, provider: providerType }
+          userId_provider: { userId, provider: 'whoop' }
         },
         update: {
           isConnected: false,
@@ -104,7 +96,7 @@ export async function GET(
         },
         create: {
           userId,
-          provider: providerType,
+          provider: 'whoop',
           isConnected: false,
           syncError: error instanceof Error ? error.message : 'Unknown error'
         }
@@ -120,13 +112,9 @@ export async function GET(
 }
 
 // Trigger initial sync (non-blocking)
-async function triggerInitialSync(
-  userId: string,
-  provider: HealthProviderType,
-  accessToken: string
-) {
+async function triggerInitialSync(userId: string, accessToken: string) {
   try {
-    const providerImpl = getProvider(provider)
+    const providerImpl = getProvider('whoop')
     if (!providerImpl) return
 
     // Fetch metrics from the last 30 days
@@ -137,8 +125,8 @@ async function triggerInitialSync(
     const syncLog = await prisma.healthSyncLog.create({
       data: {
         userId,
-        provider,
-        status: 'success', // Will update if fails
+        provider: 'whoop',
+        status: 'success',
         startedAt: new Date()
       }
     })
@@ -153,7 +141,7 @@ async function triggerInitialSync(
           where: {
             userId_provider_metricType_recordedAt: {
               userId,
-              provider,
+              provider: 'whoop',
               metricType: metric.metricType,
               recordedAt: metric.recordedAt
             }
@@ -165,7 +153,7 @@ async function triggerInitialSync(
           },
           create: {
             userId,
-            provider,
+            provider: 'whoop',
             metricType: metric.metricType,
             value: metric.value,
             unit: metric.unit,
@@ -183,7 +171,7 @@ async function triggerInitialSync(
     await Promise.all([
       prisma.healthIntegration.update({
         where: {
-          userId_provider: { userId, provider }
+          userId_provider: { userId, provider: 'whoop' }
         },
         data: {
           lastSyncAt: new Date(),
@@ -200,14 +188,13 @@ async function triggerInitialSync(
       })
     ])
 
-    console.log(`Initial sync for ${provider}: ${metricsCount} metrics stored`)
+    console.log(`WHOOP initial sync: ${metricsCount} metrics stored`)
   } catch (error) {
-    console.error(`Initial sync error for ${provider}:`, error)
+    console.error('WHOOP initial sync error:', error)
 
-    // Update integration with error
     await prisma.healthIntegration.update({
       where: {
-        userId_provider: { userId, provider }
+        userId_provider: { userId, provider: 'whoop' }
       },
       data: {
         syncError: error instanceof Error ? error.message : 'Sync failed'

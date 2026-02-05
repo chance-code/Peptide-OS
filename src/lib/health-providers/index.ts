@@ -3,7 +3,7 @@
 
 import { METRIC_REGISTRY, formatMetric, getDisplayName } from '../health-metric-contract'
 
-export type HealthProviderType = 'apple_health' | 'oura'
+export type HealthProviderType = 'apple_health' | 'oura' | 'whoop'
 
 export type MetricType =
   | 'sleep_duration'
@@ -43,6 +43,9 @@ export type MetricType =
   | 'stress_high'
   | 'recovery_high'
   | 'resilience_level'
+  // WHOOP-specific
+  | 'strain_score'
+  | 'recovery_score'
 
 export type MetricUnit =
   | 'minutes'
@@ -169,6 +172,16 @@ export function getProviderInfo(): ProviderInfo[] {
       requiresCredentials: false,
       isNativeOnly: false,
       icon: 'circle'
+    },
+    {
+      name: 'whoop',
+      displayName: 'WHOOP',
+      description: 'Sync strain, recovery, HRV, sleep, and workout data from your WHOOP band',
+      supportedMetrics: ['hrv', 'rhr', 'blood_oxygen', 'sleep_duration', 'deep_sleep', 'rem_sleep', 'sleep_efficiency', 'sleep_score', 'exercise_minutes', 'active_calories'],
+      requiresOAuth: true,
+      requiresCredentials: false,
+      isNativeOnly: false,
+      icon: 'activity'
     }
   ]
 }

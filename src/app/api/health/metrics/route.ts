@@ -2,14 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getAuthenticatedUserId } from '@/lib/api-auth'
 import { MetricType } from '@/lib/health-providers'
+import { SOURCE_PRIORITY } from '@/lib/health-synthesis'
 
-// Source priority for deduplication: when multiple providers report the same metric
-// on the same day, keep only the highest-priority source.
-// Lower index = higher priority.
-const SOURCE_PRIORITY_ORDER: string[] = ['apple_health', 'oura']
-
-function getProviderPriority(provider: string): number {
-  const idx = SOURCE_PRIORITY_ORDER.indexOf(provider)
+function getProviderPriority(provider: string, metricType: string): number {
+  const priority = SOURCE_PRIORITY[metricType as keyof typeof SOURCE_PRIORITY] || ['apple_health', 'oura', 'whoop']
+  const idx = priority.indexOf(provider)
   return idx === -1 ? 999 : idx
 }
 
@@ -79,7 +76,7 @@ export async function GET(request: NextRequest) {
       const dateKey = metric.recordedAt.toISOString().split('T')[0]
       const key = `${metric.metricType}::${dateKey}`
       const existing = dedupMap.get(key)
-      if (!existing || getProviderPriority(metric.provider) < getProviderPriority(existing.provider)) {
+      if (!existing || getProviderPriority(metric.provider, metric.metricType) < getProviderPriority(existing.provider, existing.metricType)) {
         dedupMap.set(key, metric)
       }
     }

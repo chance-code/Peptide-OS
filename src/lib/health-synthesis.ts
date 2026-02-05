@@ -27,20 +27,20 @@ function clampPercent(pct: number): number {
 // CONFIGURATION
 // ============================================================================
 
-const SOURCE_PRIORITY: Record<MetricType, string[]> = {
-  // Sleep - prefer Oura > Eight Sleep (bed sensor) > Apple Health (watch aggregation)
-  sleep_duration: ['oura', 'eight_sleep', 'apple_health'],
-  rem_sleep: ['oura', 'eight_sleep', 'apple_health'],
-  deep_sleep: ['oura', 'eight_sleep', 'apple_health'],
-  sleep_score: ['oura', 'eight_sleep', 'apple_health'],
-  sleep_efficiency: ['oura', 'eight_sleep', 'apple_health'],
-  waso: ['oura', 'eight_sleep', 'apple_health'],
-  sleep_latency: ['oura', 'eight_sleep', 'apple_health'],
-  bed_temperature: ['oura', 'eight_sleep', 'apple_health'],
-  time_in_bed: ['oura', 'eight_sleep', 'apple_health'],
-  // Heart & HRV - Apple Watch > Oura > Eight Sleep (bed sensor less accurate for heart)
-  hrv: ['apple_health', 'oura', 'eight_sleep'],
-  rhr: ['apple_health', 'oura', 'eight_sleep'],
+export const SOURCE_PRIORITY: Record<string, string[]> = {
+  // Sleep - prefer Oura > WHOOP > Apple Health (watch aggregation)
+  sleep_duration: ['oura', 'whoop', 'apple_health'],
+  rem_sleep: ['oura', 'whoop', 'apple_health'],
+  deep_sleep: ['oura', 'whoop', 'apple_health'],
+  sleep_score: ['oura', 'whoop', 'apple_health'],
+  sleep_efficiency: ['oura', 'whoop', 'apple_health'],
+  waso: ['oura', 'whoop', 'apple_health'],
+  sleep_latency: ['oura', 'whoop', 'apple_health'],
+  bed_temperature: ['oura', 'apple_health'],
+  time_in_bed: ['oura', 'whoop', 'apple_health'],
+  // Heart & HRV - Apple Watch > WHOOP > Oura
+  hrv: ['apple_health', 'whoop', 'oura'],
+  rhr: ['apple_health', 'whoop', 'oura'],
   // Body Composition (primarily from scales via Apple Health)
   weight: ['apple_health', 'oura'],
   body_fat_percentage: ['apple_health'],
@@ -50,13 +50,13 @@ const SOURCE_PRIORITY: Record<MetricType, string[]> = {
   muscle_mass: ['apple_health'],
   body_water: ['apple_health'],
   // Activity
-  steps: ['apple_health', 'oura'],
-  active_calories: ['apple_health', 'oura'],
+  steps: ['apple_health', 'oura', 'whoop'],
+  active_calories: ['apple_health', 'oura', 'whoop'],
   basal_calories: ['apple_health'],
-  exercise_minutes: ['apple_health', 'oura'],
+  exercise_minutes: ['apple_health', 'oura', 'whoop'],
   stand_hours: ['apple_health'],
-  vo2_max: ['apple_health', 'oura'],
-  walking_running_distance: ['apple_health', 'oura'],
+  vo2_max: ['apple_health', 'oura', 'whoop'],
+  walking_running_distance: ['apple_health', 'oura', 'whoop'],
   // Vitals
   respiratory_rate: ['apple_health', 'oura'],
   blood_oxygen: ['apple_health', 'oura'],
@@ -66,7 +66,10 @@ const SOURCE_PRIORITY: Record<MetricType, string[]> = {
   temperature_deviation: ['oura'],
   stress_high: ['oura'],
   recovery_high: ['oura'],
-  resilience_level: ['oura']
+  resilience_level: ['oura'],
+  // WHOOP-specific metrics
+  strain_score: ['whoop'],
+  recovery_score: ['whoop'],
 }
 
 // Polarity map derived from the metric contract (single source of truth)

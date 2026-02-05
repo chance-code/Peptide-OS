@@ -369,6 +369,24 @@ export const METRIC_REGISTRY: Record<string, MetricDefinition> = {
     format: fmtScore,
   },
 
+  // ── WHOOP-specific ──────────────────────────────────────────────────
+  strain_score: {
+    key: 'strain_score', displayName: 'Strain', category: 'activity',
+    unit: 'score', displayUnit: '', polarity: 'neutral',
+    bounds: { min: 0, max: 21 },
+    optimalRange: { min: 8, optimal: 14, max: 18 },
+    maxDailyChange: null, maxWeeklyChange: 50, stableThreshold: 10,
+    format: (v) => v.toFixed(1),
+  },
+  recovery_score: {
+    key: 'recovery_score', displayName: 'Recovery', category: 'recovery',
+    unit: '%', displayUnit: '%', polarity: 'higher_better',
+    bounds: { min: 0, max: 100 },
+    optimalRange: { min: 34, optimal: 67, max: 100 },
+    maxDailyChange: null, maxWeeklyChange: 30, stableThreshold: 10,
+    format: (v) => `${Math.round(v)}%`,
+  },
+
   // ── Sleep Sub-metrics ────────────────────────────────────────────────
   bed_temperature: {
     key: 'bed_temperature', displayName: 'Bed Temperature', category: 'sleep',

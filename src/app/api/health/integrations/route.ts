@@ -5,6 +5,7 @@ import { getProvider, getProviderInfo, HealthProviderType, MetricSyncState } fro
 
 // Import providers to register them
 import '@/lib/health-providers/oura'
+import '@/lib/health-providers/whoop'
 import '@/lib/health-providers/apple-health'
 
 // GET /api/health/integrations - List user's health integrations
@@ -133,6 +134,9 @@ export async function POST(request: NextRequest) {
     switch (provider) {
       case 'oura':
         redirectUri = `${baseUrl}/oauth/oura`
+        break
+      case 'whoop':
+        redirectUri = `${baseUrl}/oauth/whoop`
         break
       default:
         redirectUri = `${baseUrl}/api/health/integrations/${provider}/callback`

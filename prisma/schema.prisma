@@ -326,7 +326,7 @@ model DeviceToken {
 model HealthIntegration {
   id            String   @id @default(cuid())
   userId        String
-  provider      String   // 'apple_health' | 'oura' | 'eight_sleep'
+  provider      String   // 'apple_health' | 'oura' | 'whoop'
 
   // OAuth tokens (encrypted at rest by Turso)
   accessToken   String?
@@ -356,7 +356,7 @@ model HealthIntegration {
 model HealthMetric {
   id          String   @id @default(cuid())
   userId      String
-  provider    String   // 'apple_health' | 'oura' | 'eight_sleep'
+  provider    String   // 'apple_health' | 'oura' | 'whoop'
 
   metricType  String   // 'sleep_duration' | 'hrv' | 'rhr' | 'sleep_score' | 'weight' | 'steps'
   value       Float

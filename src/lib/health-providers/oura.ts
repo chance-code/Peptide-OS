@@ -245,7 +245,21 @@ const ouraProvider: HealthProvider = {
 
       if (sessionResponse.ok) {
         const sessionData = await sessionResponse.json()
-        for (const session of sessionData.data as OuraSleepSession[]) {
+        const sessions = sessionData.data as OuraSleepSession[]
+
+        // Group sessions by day and pick longest per day to avoid duplicates
+        // (e.g., nap + main sleep on the same day)
+        const sessionsByDay = new Map<string, OuraSleepSession>()
+        for (const session of sessions) {
+          const day = session.day
+          const existing = sessionsByDay.get(day)
+          if (!existing || (session.total_sleep_duration || 0) > (existing.total_sleep_duration || 0)) {
+            sessionsByDay.set(day, session)
+          }
+        }
+        const dedupedSessions = Array.from(sessionsByDay.values())
+
+        for (const session of dedupedSessions) {
           metrics.push({
             metricType: 'sleep_duration',
             value: Math.round(session.total_sleep_duration / 60), // Convert seconds to minutes

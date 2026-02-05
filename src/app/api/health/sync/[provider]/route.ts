@@ -5,6 +5,7 @@ import { getProvider, HealthProviderType, MetricSyncState } from '@/lib/health-p
 
 // Import providers to register them
 import '@/lib/health-providers/oura'
+import '@/lib/health-providers/whoop'
 import '@/lib/health-providers/apple-health'
 
 // Parse per-metric sync state from the enabledMetrics JSON field

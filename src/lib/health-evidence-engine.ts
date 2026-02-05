@@ -17,6 +17,7 @@ import { prisma } from './prisma'
 import { METRIC_POLARITY } from './health-baselines'
 import { MetricType, getMetricDisplayName } from './health-providers'
 import { normalizeProtocolName } from './supplement-normalization'
+import { SOURCE_PRIORITY } from './health-synthesis'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -677,12 +678,32 @@ async function fetchMetrics(
       metricType: true,
       value: true,
       recordedAt: true,
+      provider: true,
     },
     orderBy: { recordedAt: 'asc' },
   })
 
-  const byType = new Map<string, MetricData[]>()
+  // Dedup by (metricType, day) keeping highest-priority provider
+  const deduped = new Map<string, typeof metrics[0]>()
   for (const m of metrics) {
+    const dateStr = m.recordedAt.toISOString().split('T')[0]
+    const key = `${m.metricType}:${dateStr}`
+    const existing = deduped.get(key)
+    if (!existing) {
+      deduped.set(key, m)
+    } else {
+      const priority = SOURCE_PRIORITY[m.metricType as keyof typeof SOURCE_PRIORITY] || ['apple_health', 'oura', 'whoop']
+      const existingIdx = priority.indexOf(existing.provider)
+      const newIdx = priority.indexOf(m.provider)
+      if (newIdx !== -1 && (existingIdx === -1 || newIdx < existingIdx)) {
+        deduped.set(key, m)
+      }
+    }
+  }
+  const dedupedMetrics = Array.from(deduped.values())
+
+  const byType = new Map<string, MetricData[]>()
+  for (const m of dedupedMetrics) {
     if (!byType.has(m.metricType)) {
       byType.set(m.metricType, [])
     }

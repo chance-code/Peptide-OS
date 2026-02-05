@@ -134,6 +134,41 @@ export async function POST(request: NextRequest) {
     }
     const dedupedMetrics = Array.from(deduped.values())
 
+    // Validate sleep stage proportions before storage
+    const sleepMetricsByDay = new Map<string, { duration?: number; deep?: number; rem?: number }>()
+
+    for (const metric of dedupedMetrics) {
+      const dayStr = new Date(metric.recordedAt).toISOString().split('T')[0]
+      if (!sleepMetricsByDay.has(dayStr)) {
+        sleepMetricsByDay.set(dayStr, {})
+      }
+      const day = sleepMetricsByDay.get(dayStr)!
+      if (metric.metricType === 'sleep_duration') day.duration = metric.value
+      if (metric.metricType === 'deep_sleep') day.deep = metric.value
+      if (metric.metricType === 'rem_sleep') day.rem = metric.value
+    }
+
+    // Scale down stages if they exceed total duration
+    for (const [dayStr, day] of sleepMetricsByDay) {
+      if (day.duration && day.deep !== undefined && day.rem !== undefined) {
+        const stageSum = day.deep + day.rem
+        if (stageSum > day.duration) {
+          const scale = day.duration / stageSum
+          for (const metric of dedupedMetrics) {
+            const mDay = new Date(metric.recordedAt).toISOString().split('T')[0]
+            if (mDay === dayStr) {
+              if (metric.metricType === 'deep_sleep') {
+                metric.value = Math.round(metric.value * scale * 100) / 100
+              }
+              if (metric.metricType === 'rem_sleep') {
+                metric.value = Math.round(metric.value * scale * 100) / 100
+              }
+            }
+          }
+        }
+      }
+    }
+
     // Batch upsert metrics (chunks of 80 to stay within SQLite variable limits)
     let metricsCount = 0
     const CHUNK_SIZE = 80

@@ -195,7 +195,7 @@ describe('getUnifiedMetrics', () => {
     expect(hrvMetrics).toBeDefined()
     expect(hrvMetrics!.length).toBe(1) // Deduped to one entry per date
 
-    // For HRV, SOURCE_PRIORITY is ['apple_health', 'oura', 'eight_sleep']
+    // For HRV, SOURCE_PRIORITY is ['apple_health', 'whoop', 'oura']
     // So apple_health should be selected as the primary source
     expect(hrvMetrics![0].source).toBe('apple_health')
     expect(hrvMetrics![0].value).toBe(52)
