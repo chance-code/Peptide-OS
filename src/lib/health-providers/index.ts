@@ -1,12 +1,18 @@
 // Health Provider Infrastructure
 // Unified interface for Apple HealthKit and Oura integrations
 
+import { METRIC_REGISTRY, formatMetric, getDisplayName } from '../health-metric-contract'
+
 export type HealthProviderType = 'apple_health' | 'oura'
 
 export type MetricType =
   | 'sleep_duration'
   | 'rem_sleep'
   | 'sleep_score'
+  | 'sleep_efficiency'
+  | 'waso'
+  | 'sleep_latency'
+  | 'deep_sleep'
   | 'hrv'
   | 'rhr'
   | 'weight'
@@ -168,137 +174,27 @@ export function getProviderInfo(): ProviderInfo[] {
 }
 
 // Helper to normalize metric units for storage
+// Delegates to METRIC_REGISTRY from health-metric-contract.ts
 export function normalizeMetricUnit(metricType: MetricType): MetricUnit {
-  const unitMap: Record<MetricType, MetricUnit> = {
-    sleep_duration: 'minutes',
-    rem_sleep: 'minutes',
-    sleep_score: 'score',
-    hrv: 'ms',
-    rhr: 'bpm',
-    weight: 'lbs',
-    steps: 'steps',
-    bed_temperature: 'celsius',
-    time_in_bed: 'minutes',
-    // Body composition
-    body_fat_percentage: 'percent',
-    lean_body_mass: 'lbs',
-    bmi: 'score',
-    bone_mass: 'lbs',
-    muscle_mass: 'lbs',
-    body_water: 'percent',
-    // Activity
-    active_calories: 'kcal',
-    basal_calories: 'kcal',
-    exercise_minutes: 'minutes',
-    stand_hours: 'hours',
-    vo2_max: 'ml_kg_min',
-    walking_running_distance: 'km',
-    // Vitals
-    respiratory_rate: 'breaths_min',
-    blood_oxygen: 'percent',
-    body_temperature: 'celsius',
-    // Oura readiness & recovery
-    readiness_score: 'score',
-    temperature_deviation: 'celsius',
-    stress_high: 'minutes',
-    recovery_high: 'minutes',
-    resilience_level: 'score'
+  const unitMapping: Record<string, MetricUnit> = {
+    'min': 'minutes', 'ms': 'ms', 'bpm': 'bpm', 'score': 'score',
+    'lbs': 'lbs', 'steps': 'steps', '°C': 'celsius', '%': 'percent',
+    'kcal': 'kcal', 'hrs': 'hours', 'mL/kg/min': 'ml_kg_min',
+    'mi': 'km', 'br/min': 'breaths_min', '': 'score',
   }
-  return unitMap[metricType]
+  const def = METRIC_REGISTRY[metricType]
+  if (!def) return 'score'
+  return unitMapping[def.unit] ?? 'score'
 }
 
 // Helper to format metric values for display
+// Delegates to METRIC_REGISTRY from health-metric-contract.ts
 export function formatMetricValue(value: number, metricType: MetricType): string {
-  switch (metricType) {
-    case 'sleep_duration':
-    case 'rem_sleep':
-    case 'time_in_bed':
-    case 'exercise_minutes': {
-      const hours = Math.floor(value / 60)
-      const mins = Math.round(value % 60)
-      return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`
-    }
-    case 'sleep_score':
-    case 'bmi':
-      return `${Math.round(value)}`
-    case 'hrv':
-      return `${Math.round(value)} ms`
-    case 'rhr':
-      return `${Math.round(value)} bpm`
-    case 'weight':
-    case 'lean_body_mass':
-    case 'bone_mass':
-    case 'muscle_mass':
-      return `${value.toFixed(1)} lbs`
-    case 'steps':
-      return value.toLocaleString()
-    case 'bed_temperature':
-    case 'body_temperature':
-      return `${value.toFixed(1)}°C`
-    case 'body_fat_percentage':
-    case 'body_water':
-    case 'blood_oxygen':
-      return `${value.toFixed(1)}%`
-    case 'active_calories':
-    case 'basal_calories':
-      return `${Math.round(value)} kcal`
-    case 'stand_hours':
-      return `${Math.round(value)}h`
-    case 'vo2_max':
-      return `${value.toFixed(1)} mL/kg/min`
-    case 'walking_running_distance':
-      return `${value.toFixed(2)} km`
-    case 'respiratory_rate':
-      return `${value.toFixed(1)} br/min`
-    case 'readiness_score':
-    case 'resilience_level':
-      return `${Math.round(value)}`
-    case 'temperature_deviation':
-      return `${value >= 0 ? '+' : ''}${value.toFixed(2)}°C`
-    case 'stress_high':
-    case 'recovery_high':
-      return `${Math.round(value)}m`
-    default:
-      return String(value)
-  }
+  return formatMetric(metricType, value)
 }
 
 // Helper to get human-readable metric name
+// Delegates to METRIC_REGISTRY from health-metric-contract.ts
 export function getMetricDisplayName(metricType: MetricType): string {
-  const nameMap: Record<MetricType, string> = {
-    sleep_duration: 'Sleep Duration',
-    rem_sleep: 'REM Sleep',
-    sleep_score: 'Sleep Score',
-    hrv: 'HRV',
-    rhr: 'Resting Heart Rate',
-    weight: 'Weight',
-    steps: 'Steps',
-    bed_temperature: 'Bed Temperature',
-    time_in_bed: 'Time in Bed',
-    // Body composition
-    body_fat_percentage: 'Body Fat',
-    lean_body_mass: 'Lean Mass',
-    bmi: 'BMI',
-    bone_mass: 'Bone Mass',
-    muscle_mass: 'Muscle Mass',
-    body_water: 'Body Water',
-    // Activity
-    active_calories: 'Active Calories',
-    basal_calories: 'Basal Calories',
-    exercise_minutes: 'Exercise',
-    stand_hours: 'Stand Hours',
-    vo2_max: 'VO2 Max',
-    walking_running_distance: 'Distance',
-    // Vitals
-    respiratory_rate: 'Respiratory Rate',
-    blood_oxygen: 'Blood Oxygen',
-    body_temperature: 'Body Temp',
-    // Oura readiness & recovery
-    readiness_score: 'Readiness Score',
-    temperature_deviation: 'Temp Deviation',
-    stress_high: 'High Stress',
-    recovery_high: 'Recovery Time',
-    resilience_level: 'Resilience'
-  }
-  return nameMap[metricType]
+  return getDisplayName(metricType)
 }

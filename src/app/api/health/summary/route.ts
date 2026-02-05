@@ -1,9 +1,9 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUserId } from '@/lib/api-auth'
 import { getUnifiedHealthSummary } from '@/lib/health-synthesis'
 
 // GET /api/health/summary - Get unified health summary
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const authResult = await getAuthenticatedUserId()
     if (!authResult.success) {
@@ -11,7 +11,10 @@ export async function GET() {
     }
     const { userId } = authResult
 
-    const summary = await getUnifiedHealthSummary(userId)
+    const { searchParams } = new URL(request.url)
+    const window = Math.min(Math.max(parseInt(searchParams.get('window') || '7', 10) || 7, 7), 90)
+
+    const summary = await getUnifiedHealthSummary(userId, window)
 
     return NextResponse.json(summary, {
       headers: {

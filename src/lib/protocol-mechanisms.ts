@@ -3,6 +3,8 @@
 // Used for generating contextual health insights
 // Last updated: 2026-02-04 with comprehensive research
 
+import { normalizeProtocolName } from './supplement-normalization'
+
 export interface ProtocolMechanism {
   name: string
   category: 'peptide' | 'supplement' | 'medication'
@@ -1049,6 +1051,12 @@ export function findProtocolMechanism(protocolName: string): ProtocolMechanism |
   const aliasMatch = PROTOCOL_ALIASES[aliasKey] || PROTOCOL_ALIASES[normalized]
   if (aliasMatch && PROTOCOL_MECHANISMS[aliasMatch]) {
     return PROTOCOL_MECHANISMS[aliasMatch]
+  }
+
+  // Extended normalization — catches misspellings, abbreviations, brand names
+  const { canonical } = normalizeProtocolName(protocolName)
+  if (canonical !== protocolName && PROTOCOL_MECHANISMS[canonical]) {
+    return PROTOCOL_MECHANISMS[canonical]
   }
 
   // Fuzzy match on keys and names

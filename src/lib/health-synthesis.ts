@@ -6,6 +6,7 @@ import { MetricType, getMetricDisplayName, formatMetricValue } from './health-pr
 import { findProtocolMechanism, getProtocolInsight, isChangeExpected, confidenceScore } from './protocol-mechanisms'
 import { getRecommendations, formatTopRecommendations } from './health-claims'
 import { safeDivide, safePercentChange, getStableThreshold, validateMetricValue } from './health-constants'
+import { derivePolarityMap, deriveOptimalRanges } from './health-metric-contract'
 
 // Active protocol type for protocol-aware insights
 interface ActiveProtocol {
@@ -30,7 +31,11 @@ const SOURCE_PRIORITY: Record<MetricType, string[]> = {
   // Sleep - prefer Oura for sleep metrics (more accurate than Apple Health aggregation)
   sleep_duration: ['oura', 'apple_health'],
   rem_sleep: ['oura', 'apple_health'],
+  deep_sleep: ['oura', 'apple_health'],
   sleep_score: ['oura', 'apple_health'],
+  sleep_efficiency: ['oura', 'apple_health'],
+  waso: ['oura', 'apple_health'],
+  sleep_latency: ['oura', 'apple_health'],
   bed_temperature: ['oura', 'apple_health'],
   time_in_bed: ['oura', 'apple_health'],
   // Heart & HRV
@@ -64,82 +69,11 @@ const SOURCE_PRIORITY: Record<MetricType, string[]> = {
   resilience_level: ['oura']
 }
 
-const METRIC_POLARITY: Record<MetricType, 'higher_better' | 'lower_better' | 'neutral'> = {
-  // Sleep
-  sleep_duration: 'higher_better',
-  rem_sleep: 'higher_better',
-  sleep_score: 'higher_better',
-  bed_temperature: 'neutral',
-  time_in_bed: 'higher_better',
-  // Heart & HRV
-  hrv: 'higher_better',
-  rhr: 'lower_better',
-  // Body Composition
-  weight: 'neutral',
-  body_fat_percentage: 'lower_better',
-  lean_body_mass: 'higher_better',
-  bmi: 'neutral', // Depends on context
-  bone_mass: 'higher_better',
-  muscle_mass: 'higher_better',
-  body_water: 'neutral',
-  // Activity
-  steps: 'higher_better',
-  active_calories: 'higher_better',
-  basal_calories: 'neutral',
-  exercise_minutes: 'higher_better',
-  stand_hours: 'higher_better',
-  vo2_max: 'higher_better',
-  walking_running_distance: 'higher_better',
-  // Vitals
-  respiratory_rate: 'neutral', // Depends on context
-  blood_oxygen: 'higher_better',
-  body_temperature: 'neutral',
-  // Oura readiness & recovery
-  readiness_score: 'higher_better',
-  temperature_deviation: 'neutral', // Zero deviation is optimal
-  stress_high: 'lower_better',
-  recovery_high: 'higher_better',
-  resilience_level: 'higher_better'
-}
+// Polarity map derived from the metric contract (single source of truth)
+const METRIC_POLARITY = derivePolarityMap() as Record<MetricType, 'higher_better' | 'lower_better' | 'neutral'>
 
-// Optimal ranges for health metrics
-const OPTIMAL_RANGES: Record<MetricType, { min: number; optimal: number; max: number; unit: string }> = {
-  // Sleep
-  sleep_duration: { min: 360, optimal: 450, max: 540, unit: 'min' },
-  rem_sleep: { min: 60, optimal: 90, max: 120, unit: 'min' },
-  sleep_score: { min: 60, optimal: 85, max: 100, unit: 'score' },
-  bed_temperature: { min: 16, optimal: 18.5, max: 21, unit: '°C' },
-  time_in_bed: { min: 420, optimal: 480, max: 540, unit: 'min' },
-  // Heart & HRV
-  hrv: { min: 20, optimal: 50, max: 120, unit: 'ms' },
-  rhr: { min: 40, optimal: 55, max: 75, unit: 'bpm' },
-  // Body Composition (ranges are person-dependent, using general guides)
-  weight: { min: 0, optimal: 0, max: 0, unit: 'kg' }, // Very individual
-  body_fat_percentage: { min: 6, optimal: 15, max: 25, unit: '%' },
-  lean_body_mass: { min: 0, optimal: 0, max: 0, unit: 'kg' }, // Individual
-  bmi: { min: 18.5, optimal: 22, max: 25, unit: '' },
-  bone_mass: { min: 0, optimal: 0, max: 0, unit: 'kg' }, // Individual
-  muscle_mass: { min: 0, optimal: 0, max: 0, unit: 'kg' }, // Individual
-  body_water: { min: 45, optimal: 55, max: 65, unit: '%' },
-  // Activity
-  steps: { min: 5000, optimal: 10000, max: 20000, unit: 'steps' },
-  active_calories: { min: 200, optimal: 500, max: 1000, unit: 'kcal' },
-  basal_calories: { min: 1200, optimal: 1800, max: 2500, unit: 'kcal' },
-  exercise_minutes: { min: 15, optimal: 30, max: 90, unit: 'min' },
-  stand_hours: { min: 6, optimal: 12, max: 16, unit: 'hr' },
-  vo2_max: { min: 30, optimal: 45, max: 60, unit: 'mL/kg/min' },
-  walking_running_distance: { min: 2, optimal: 5, max: 15, unit: 'km' },
-  // Vitals
-  respiratory_rate: { min: 12, optimal: 14, max: 20, unit: 'br/min' },
-  blood_oxygen: { min: 95, optimal: 98, max: 100, unit: '%' },
-  body_temperature: { min: 36, optimal: 36.8, max: 37.5, unit: '°C' },
-  // Oura readiness & recovery
-  readiness_score: { min: 60, optimal: 85, max: 100, unit: 'score' },
-  temperature_deviation: { min: -0.5, optimal: 0, max: 0.5, unit: '°C' },
-  stress_high: { min: 0, optimal: 0, max: 60, unit: 'min' },
-  recovery_high: { min: 60, optimal: 180, max: 360, unit: 'min' },
-  resilience_level: { min: 20, optimal: 80, max: 100, unit: 'score' }
-}
+// Optimal ranges derived from the metric contract (single source of truth)
+const OPTIMAL_RANGES = deriveOptimalRanges() as Record<MetricType, { min: number; optimal: number; max: number; unit: string }>
 
 // ============================================================================
 // TYPES
@@ -171,6 +105,12 @@ export interface HealthTrend {
   personalBestDate?: string
 }
 
+export interface ScoreAttribution {
+  topPositive: { category: string; metric: string; contribution: string } | null
+  topNegative: { category: string; metric: string; contribution: string } | null
+  categoryBreakdown: Array<{ category: string; score: number; weight: number; delta: number | null }>
+}
+
 export interface HealthScore {
   overall: number | null
   sleep: number | null
@@ -185,6 +125,7 @@ export interface HealthScore {
     trend: 'up' | 'down' | 'stable'
     vsOptimal: number // % of optimal
   }>
+  scoreAttribution: ScoreAttribution | null
 }
 
 export interface SynthesizedInsight {
@@ -239,6 +180,9 @@ export interface SleepArchitecture {
   consistencyScore: number // How consistent is sleep timing
   avgBedTemp?: number
   optimalTempNights?: number
+  avgWaso?: number              // Wake after sleep onset (minutes)
+  avgSleepLatency?: number     // Time to fall asleep (minutes)
+  avgSleepEfficiency?: number  // Direct efficiency metric from device (%)
   recentTrend: 'improving' | 'declining' | 'stable'
 }
 
@@ -403,7 +347,7 @@ export async function getUnifiedMetrics(
 // ADVANCED ANALYTICS
 // ============================================================================
 
-function calculateConsistency(values: number[]): number {
+export function calculateConsistency(values: number[]): number {
   if (values.length < 2) return 100
   const mean = values.reduce((a, b) => a + b, 0) / values.length
   if (mean === 0 || !isFinite(mean)) return 50 // Can't compute CV without positive mean
@@ -414,7 +358,7 @@ function calculateConsistency(values: number[]): number {
   return Math.max(0, Math.min(100, 100 - cv * 100 * 2))
 }
 
-function calculateMomentum(
+export function calculateMomentum(
   currentChange: number,
   previousChange: number
 ): 'accelerating' | 'decelerating' | 'steady' {
@@ -532,7 +476,7 @@ export async function analyzeSleepArchitecture(userId: string): Promise<SleepArc
 
   const metrics = await getUnifiedMetrics(userId, startDate, endDate, [
     'sleep_duration', 'sleep_score', 'time_in_bed', 'bed_temperature',
-    'rem_sleep'
+    'rem_sleep', 'waso', 'sleep_latency', 'sleep_efficiency'
   ])
 
   const duration = metrics.get('sleep_duration') || []
@@ -540,6 +484,9 @@ export async function analyzeSleepArchitecture(userId: string): Promise<SleepArc
   const timeInBed = metrics.get('time_in_bed') || []
   const bedTemp = metrics.get('bed_temperature') || []
   const remMetrics = metrics.get('rem_sleep') || []
+  const wasoMetrics = metrics.get('waso') || []
+  const latencyMetrics = metrics.get('sleep_latency') || []
+  const efficiencyMetrics = metrics.get('sleep_efficiency') || []
 
   if (duration.length < 3) return null
 
@@ -590,6 +537,18 @@ export async function analyzeSleepArchitecture(userId: string): Promise<SleepArc
     m.value >= optimalRange.min && m.value <= optimalRange.max
   ).length
 
+  const avgWaso = wasoMetrics.length > 0
+    ? wasoMetrics.reduce((s, m) => s + m.value, 0) / wasoMetrics.length
+    : undefined
+
+  const avgSleepLatency = latencyMetrics.length > 0
+    ? latencyMetrics.reduce((s, m) => s + m.value, 0) / latencyMetrics.length
+    : undefined
+
+  const avgSleepEfficiency = efficiencyMetrics.length > 0
+    ? efficiencyMetrics.reduce((s, m) => s + m.value, 0) / efficiencyMetrics.length
+    : undefined
+
   // Determine recent trend
   const recentScores = scores.slice(-7)
   const olderScores = scores.slice(-14, -7)
@@ -603,14 +562,21 @@ export async function analyzeSleepArchitecture(userId: string): Promise<SleepArc
     else if (change < -5) recentTrend = 'declining'
   }
 
+  // Prefer the directly-measured sleep efficiency from the device if available,
+  // falling back to the computed efficiency from duration/time_in_bed
+  const finalEfficiency = avgSleepEfficiency ?? efficiency
+
   return {
     avgDuration,
     avgScore,
     avgTimeInBed,
-    efficiency,
+    efficiency: finalEfficiency,
     consistencyScore,
     avgBedTemp,
     optimalTempNights,
+    avgWaso,
+    avgSleepLatency,
+    avgSleepEfficiency,
     recentTrend
   }
 }
@@ -856,10 +822,11 @@ export async function calculateHealthScore(userId: string): Promise<HealthScore>
 
   const weights: Partial<Record<MetricType, { category: 'sleep' | 'recovery' | 'activity' | 'bodyComp'; weight: number }>> = {
     // Sleep metrics
-    sleep_duration: { category: 'sleep', weight: 0.35 },
-    sleep_score: { category: 'sleep', weight: 0.45 },
-    time_in_bed: { category: 'sleep', weight: 0.1 },
-    bed_temperature: { category: 'sleep', weight: 0.1 },
+    sleep_duration: { category: 'sleep', weight: 0.30 },
+    sleep_score: { category: 'sleep', weight: 0.35 },
+    sleep_efficiency: { category: 'sleep', weight: 0.15 },
+    time_in_bed: { category: 'sleep', weight: 0.10 },
+    bed_temperature: { category: 'sleep', weight: 0.10 },
     // Recovery metrics
     hrv: { category: 'recovery', weight: 0.4 },
     rhr: { category: 'recovery', weight: 0.3 },
@@ -915,7 +882,7 @@ export async function calculateHealthScore(userId: string): Promise<HealthScore>
       }
     }
 
-    score = Math.max(0, Math.min(100, Math.round(score)))
+    score = isNaN(score) ? 50 : Math.max(0, Math.min(100, Math.round(score)))
 
     breakdown.push({
       metric: trend.metricType,
@@ -959,7 +926,84 @@ export async function calculateHealthScore(userId: string): Promise<HealthScore>
       : Math.round(s * 0.4 + r * 0.35 + a * 0.25)
   }
 
-  return { overall, sleep, recovery: recoveryScore, activity, bodyComp: bodyCompScore, readiness, breakdown }
+  // ── Score Attribution ──────────────────────────────────────────────
+  let scoreAttribution: ScoreAttribution | null = null
+  if (breakdown.length > 0) {
+    // Find top positive and top negative contributors by comparing score vs. 50 (neutral)
+    // A score > 50 is positive contribution, < 50 is negative contribution
+    // Weight the contribution by the metric's weight
+    type BreakdownEntry = typeof breakdown[number]
+    const withContribution = breakdown.map(b => {
+      const w = weights[b.metric]
+      const delta = b.score - 50
+      const weightedDelta = delta * (w?.weight ?? 0)
+      const matchingTrend = trends.find(t => t.metricType === b.metric)
+      return { ...b, delta, weightedDelta, category: w?.category ?? 'unknown', trend: matchingTrend }
+    })
+
+    // Sort by weighted delta descending for positives, ascending for negatives
+    const sortedPositive = withContribution
+      .filter(b => b.weightedDelta > 0)
+      .sort((a, b) => b.weightedDelta - a.weightedDelta)
+    const sortedNegative = withContribution
+      .filter(b => b.weightedDelta < 0)
+      .sort((a, b) => a.weightedDelta - b.weightedDelta)
+
+    const topPositive = sortedPositive[0]
+      ? (() => {
+          const t = sortedPositive[0]
+          const displayName = getMetricDisplayName(t.metric).toLowerCase()
+          const pctAbove = t.vsOptimal - 100
+          const contribution = pctAbove >= 0
+            ? `${displayName} is ${Math.abs(pctAbove)}% above your baseline`
+            : `${displayName} is performing well at ${t.vsOptimal}% of optimal`
+          return {
+            category: t.category,
+            metric: t.metric,
+            contribution: `${t.category.charAt(0).toUpperCase() + t.category.slice(1)}: ${contribution}`,
+          }
+        })()
+      : null
+
+    const topNegative = sortedNegative[0]
+      ? (() => {
+          const t = sortedNegative[0]
+          const displayName = getMetricDisplayName(t.metric).toLowerCase()
+          const trendInfo = t.trend
+          const changeDesc = trendInfo
+            ? `${displayName} ${trendInfo.changePercent < 0 ? 'dropped' : 'rose'} ${Math.abs(trendInfo.changePercent).toFixed(0)}% this week`
+            : `${displayName} is below optimal`
+          return {
+            category: t.category,
+            metric: t.metric,
+            contribution: `${t.category.charAt(0).toUpperCase() + t.category.slice(1)}: ${changeDesc}`,
+          }
+        })()
+      : null
+
+    // Category breakdown with weights and deltas
+    const categoryWeights = hasBodyComp
+      ? { sleep: 0.35, recovery: 0.30, activity: 0.20, bodyComp: 0.15 }
+      : { sleep: 0.40, recovery: 0.35, activity: 0.25, bodyComp: 0 }
+
+    const categoryBreakdown: ScoreAttribution['categoryBreakdown'] = [
+      { category: 'sleep', score: sleep ?? 0, weight: categoryWeights.sleep, delta: sleep !== null && overall !== null ? sleep - overall : null },
+      { category: 'recovery', score: recoveryScore ?? 0, weight: categoryWeights.recovery, delta: recoveryScore !== null && overall !== null ? recoveryScore - overall : null },
+      { category: 'activity', score: activity ?? 0, weight: categoryWeights.activity, delta: activity !== null && overall !== null ? activity - overall : null },
+    ]
+    if (hasBodyComp) {
+      categoryBreakdown.push({
+        category: 'bodyComp',
+        score: bodyCompScore ?? 0,
+        weight: categoryWeights.bodyComp,
+        delta: bodyCompScore !== null && overall !== null ? bodyCompScore - overall : null,
+      })
+    }
+
+    scoreAttribution = { topPositive, topNegative, categoryBreakdown }
+  }
+
+  return { overall, sleep, recovery: recoveryScore, activity, bodyComp: bodyCompScore, readiness, breakdown, scoreAttribution }
 }
 
 // ============================================================================
@@ -1518,8 +1562,11 @@ function computeDataQuality(
     const staleDays = lastDate ? Math.floor((now.getTime() - new Date(lastDate).getTime()) / (1000 * 60 * 60 * 24)) : periodDays
     if (staleDays <= 1) score += 10
     else if (staleDays <= 3) score += 5
-    else if (staleDays > 7) {
-      score -= 10
+    else if (staleDays <= 7) {
+      score -= 5
+      reasons.push(`Aging (${staleDays}d old)`)
+    } else {
+      score -= Math.min(20, staleDays * 2)
       reasons.push(`Stale (${staleDays}d old)`)
     }
 
@@ -1557,10 +1604,10 @@ function computeDataQuality(
   return { overall, perMetric }
 }
 
-export async function getUnifiedHealthSummary(userId: string) {
+export async function getUnifiedHealthSummary(userId: string, window: number = 7) {
   const [score, trends, insights, recovery, sleepArch, dayPatterns] = await Promise.all([
     calculateHealthScore(userId),
-    calculateHealthTrends(userId, 7),
+    calculateHealthTrends(userId, window),
     generateSynthesizedInsights(userId),
     calculateRecoveryStatus(userId),
     analyzeSleepArchitecture(userId),

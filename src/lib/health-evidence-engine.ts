@@ -479,7 +479,7 @@ function normalCDF(z: number): number {
 /**
  * Compute enhanced effect size with confidence intervals and significance testing
  */
-function computeEffectSize(before: number[], after: number[]): EffectSizeResult {
+export function computeEffectSize(before: number[], after: number[]): EffectSizeResult {
   const n1 = before.length
   const n2 = after.length
 
@@ -715,7 +715,7 @@ async function fetchContextEvents(
 /**
  * Detect mechanisms based on observed signals
  */
-function detectMechanisms(signals: EnhancedSignal[]): Mechanism[] {
+export function detectMechanisms(signals: EnhancedSignal[]): Mechanism[] {
   const detected: Mechanism[] = []
   const signalMap = new Map<string, 'up' | 'down' | 'stable'>()
 

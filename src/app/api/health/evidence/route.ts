@@ -20,6 +20,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUserId } from '@/lib/api-auth'
 import { computePremiumEvidence, type PremiumProtocolEvidence } from '@/lib/health-evidence-engine'
+import { findProtocolMechanism } from '@/lib/protocol-mechanisms'
 
 export const dynamic = 'force-dynamic'
 
@@ -54,15 +55,24 @@ export async function GET(request: NextRequest) {
       includeRobustness,
     })
 
+    // Enrich each evidence item with expectedTimeline from the mechanism database
+    const enrichedEvidence = evidence.map(e => {
+      const timeline = computeExpectedTimeline(e.protocolName, e.daysOnProtocol)
+      return {
+        ...e,
+        expectedTimeline: timeline,
+      }
+    })
+
     // Generate summary for the response
-    const summary = generateEvidenceSummary(evidence)
+    const summary = generateEvidenceSummary(enrichedEvidence)
 
     return NextResponse.json(
       {
-        evidence,
+        evidence: enrichedEvidence,
         summary,
         meta: {
-          protocolCount: evidence.length,
+          protocolCount: enrichedEvidence.length,
           requestedProtocolId: protocolId || null,
           includesDetails: includeDetails,
           includesRobustness: includeRobustness,
@@ -82,6 +92,72 @@ export async function GET(request: NextRequest) {
       { error: 'Failed to compute protocol evidence' },
       { status: 500 }
     )
+  }
+}
+
+/**
+ * Compute expected timeline data from the protocol mechanism database.
+ *
+ * Aggregates onset/peak/plateau windows across all expected effects for
+ * a protocol, then determines which phase the user is currently in based
+ * on how many days they have been on the protocol.
+ */
+function computeExpectedTimeline(
+  protocolName: string,
+  daysOnProtocol: number
+): {
+  onsetWeeks: number[]
+  peakWeeks: number[]
+  plateauWeeks: number[]
+  currentDay: number
+  currentPhaseLabel: string
+} | null {
+  const mechanism = findProtocolMechanism(protocolName)
+  if (!mechanism) return null
+
+  const effects = Object.values(mechanism.expectedEffects)
+  if (effects.length === 0) return null
+
+  // Aggregate timeline ranges across all expected effects
+  // onsetWeeks = the range of earliest expected effect start times
+  // peakWeeks  = the range of peak effect windows (end of each effect's timeline)
+  // plateauWeeks = beyond peak, where effects stabilize (1.5x the max peak time)
+  const allOnsetMin = effects.map(e => e.timelineWeeks[0])
+  const allOnsetMax = effects.map(e => e.timelineWeeks[0])
+  const allPeakMin = effects.map(e => e.timelineWeeks[1])
+  const allPeakMax = effects.map(e => e.timelineWeeks[1])
+
+  const onsetWeeks = [Math.min(...allOnsetMin), Math.max(...allOnsetMax)]
+  const peakWeeks = [Math.min(...allPeakMin), Math.max(...allPeakMax)]
+  // Plateau begins after the peak window ends, extending to ~1.5x the max peak
+  const plateauWeeks = [Math.max(...allPeakMax), Math.round(Math.max(...allPeakMax) * 1.5)]
+
+  // Convert to days for phase comparison
+  const onsetStartDays = onsetWeeks[0] * 7
+  const onsetEndDays = onsetWeeks[1] * 7
+  const peakEndDays = peakWeeks[1] * 7
+  const plateauEndDays = plateauWeeks[1] * 7
+
+  // Determine current phase label
+  let currentPhaseLabel: string
+  if (daysOnProtocol < onsetStartDays) {
+    currentPhaseLabel = 'Before expected onset'
+  } else if (daysOnProtocol <= onsetEndDays) {
+    currentPhaseLabel = 'In typical onset window'
+  } else if (daysOnProtocol <= peakEndDays) {
+    currentPhaseLabel = 'In peak effect window'
+  } else if (daysOnProtocol <= plateauEndDays) {
+    currentPhaseLabel = 'In sustained phase'
+  } else {
+    currentPhaseLabel = 'Beyond typical timeline'
+  }
+
+  return {
+    onsetWeeks,
+    peakWeeks,
+    plateauWeeks,
+    currentDay: daysOnProtocol,
+    currentPhaseLabel,
   }
 }
 

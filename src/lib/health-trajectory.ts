@@ -297,6 +297,227 @@ export function computeBodyCompState(metrics: SeedMetric[]): BodyCompState {
   }
 }
 
+// ─── Enhanced Body Composition ──────────────────────────────────────
+
+export interface EnhancedBodyCompState extends BodyCompState {
+  leanToFatRatio?: {
+    current: number
+    trend: 'improving' | 'stable' | 'declining'
+    weeklyChange: number
+  }
+  metabolicAdaptation?: {
+    detected: boolean
+    severity: 'none' | 'mild' | 'moderate' | 'severe'
+    indicators: { basalCaloriesTrend: string; weightTrend: string }
+    recommendation: string
+  }
+  timeToGoal?: {
+    targetWeight?: number
+    targetBodyFat?: number
+    estimatedWeeks: number | null
+    confidence: 'high' | 'medium' | 'low' | 'insufficient_data'
+  }
+  weeklyRates: {
+    weightChangePerWeek: number | null
+    fatChangePerWeek: number | null
+    massChangePerWeek: number | null
+  }
+  narratives: {
+    primary: string
+    metabolic: string
+    prediction: string
+  }
+}
+
+export function computeEnhancedBodyComp(
+  metrics: SeedMetric[],
+  targets?: { weight?: number; bodyFat?: number }
+): EnhancedBodyCompState {
+  // Start with the base body comp state
+  const base = computeBodyCompState(metrics)
+
+  const today = new Date()
+  const fourWeeksAgo = subDays(today, 28)
+  const sevenDaysAgo = subDays(today, 7)
+
+  // Helper: compute average for a metric type in a date range
+  const avgInRange = (type: string, start: Date, end: Date): number | null => {
+    const vals = metrics
+      .filter(m => m.metricType === type)
+      .filter(m => {
+        const d = parseISO(m.date)
+        return d >= start && d <= end
+      })
+    if (vals.length === 0) return null
+    return vals.reduce((s, v) => s + v.value, 0) / vals.length
+  }
+
+  // Helper: compute weekly rate of change
+  const weeklyRate = (type: string): number | null => {
+    const vals = metrics
+      .filter(m => m.metricType === type)
+      .sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime())
+    if (vals.length < 3) return null
+    const first = vals[0]
+    const last = vals[vals.length - 1]
+    const daysDiff = differenceInDays(parseISO(last.date), parseISO(first.date))
+    if (daysDiff < 7) return null
+    const weeksDiff = daysDiff / 7
+    return (last.value - first.value) / weeksDiff
+  }
+
+  const weightRate = weeklyRate('weight')
+  const fatRate = weeklyRate('body_fat_percentage')
+  const massType = base.muscleMass ? 'muscle_mass' : 'lean_body_mass'
+  const massRate = weeklyRate(massType)
+
+  // ─── Lean-to-Fat Ratio ───
+  let leanToFatRatio: EnhancedBodyCompState['leanToFatRatio'] = undefined
+  if (base.weight && base.bodyFatPct) {
+    const fatMass = (base.bodyFatPct.value / 100) * base.weight.value
+    const leanMass = base.weight.value - fatMass
+    const currentRatio = fatMass > 0 ? leanMass / fatMass : 0
+
+    // Compare recent 7d vs prior 28d
+    const recentFat = avgInRange('body_fat_percentage', sevenDaysAgo, today)
+    const recentWeight = avgInRange('weight', sevenDaysAgo, today)
+    const priorFat = avgInRange('body_fat_percentage', fourWeeksAgo, sevenDaysAgo)
+    const priorWeight = avgInRange('weight', fourWeeksAgo, sevenDaysAgo)
+
+    let trend: 'improving' | 'stable' | 'declining' = 'stable'
+    let weeklyChange = 0
+    if (recentFat != null && recentWeight != null && priorFat != null && priorWeight != null) {
+      const recentFatMass = (recentFat / 100) * recentWeight
+      const recentLean = recentWeight - recentFatMass
+      const priorFatMass = (priorFat / 100) * priorWeight
+      const priorLean = priorWeight - priorFatMass
+      const recentRatio = recentFatMass > 0 ? recentLean / recentFatMass : 0
+      const priorRatio = priorFatMass > 0 ? priorLean / priorFatMass : 0
+      const ratioChange = safePercentChange(recentRatio, priorRatio) ?? 0
+      weeklyChange = ratioChange / 3 // approximate per-week
+      if (ratioChange > 2) trend = 'improving'
+      else if (ratioChange < -2) trend = 'declining'
+    }
+
+    leanToFatRatio = {
+      current: Math.round(currentRatio * 100) / 100,
+      trend,
+      weeklyChange: Math.round(weeklyChange * 100) / 100,
+    }
+  }
+
+  // ─── Metabolic Adaptation Detection ───
+  // Basal calories declining >3%/4wk AND weight stalled (<0.5% change/3wk)
+  let metabolicAdaptation: EnhancedBodyCompState['metabolicAdaptation'] = {
+    detected: false,
+    severity: 'none',
+    indicators: { basalCaloriesTrend: 'stable', weightTrend: 'stable' },
+    recommendation: '',
+  }
+
+  const basalRecent = avgInRange('basal_calories', sevenDaysAgo, today)
+  const basalPrior = avgInRange('basal_calories', fourWeeksAgo, sevenDaysAgo)
+  const weightRecent = avgInRange('weight', sevenDaysAgo, today)
+  const weightPrior = avgInRange('weight', subDays(today, 21), sevenDaysAgo)
+
+  if (basalRecent != null && basalPrior != null && weightRecent != null && weightPrior != null) {
+    const basalChange = safePercentChange(basalRecent, basalPrior) ?? 0
+    const weightChange = Math.abs(safePercentChange(weightRecent, weightPrior) ?? 0)
+
+    const basalTrend = basalChange < -3 ? 'declining' : basalChange > 3 ? 'increasing' : 'stable'
+    const wTrend = weightChange < 0.5 ? 'stalled' : weightRecent > weightPrior ? 'gaining' : 'losing'
+
+    if (basalChange < -3 && weightChange < 0.5) {
+      const severity = basalChange < -8 ? 'severe' : basalChange < -5 ? 'moderate' : 'mild'
+      metabolicAdaptation = {
+        detected: true,
+        severity,
+        indicators: { basalCaloriesTrend: basalTrend, weightTrend: wTrend },
+        recommendation: severity === 'severe'
+          ? 'Consider a diet break or reverse diet. Metabolic rate has significantly decreased.'
+          : severity === 'moderate'
+          ? 'Your metabolism may be adapting. Consider increasing calories slightly or adding refeed days.'
+          : 'Mild metabolic slowdown detected. Monitor closely and ensure adequate protein intake.',
+      }
+    } else {
+      metabolicAdaptation.indicators = { basalCaloriesTrend: basalTrend, weightTrend: wTrend }
+    }
+  }
+
+  // ─── Time to Goal ───
+  let timeToGoal: EnhancedBodyCompState['timeToGoal'] = undefined
+  if (targets && (targets.weight != null || targets.bodyFat != null)) {
+    let estimatedWeeks: number | null = null
+    let confidence: 'high' | 'medium' | 'low' | 'insufficient_data' = 'insufficient_data'
+
+    if (targets.weight != null && base.weight && weightRate != null && weightRate !== 0) {
+      const remaining = targets.weight - base.weight.value
+      // Only estimate if moving in the right direction
+      if ((remaining > 0 && weightRate > 0) || (remaining < 0 && weightRate < 0)) {
+        estimatedWeeks = Math.round(remaining / weightRate)
+        if (estimatedWeeks > 0 && estimatedWeeks < 104) {
+          const dataPoints = metrics.filter(m => m.metricType === 'weight').length
+          confidence = dataPoints >= 14 ? 'high' : dataPoints >= 7 ? 'medium' : 'low'
+        } else {
+          estimatedWeeks = null
+          confidence = 'insufficient_data'
+        }
+      }
+    } else if (targets.bodyFat != null && base.bodyFatPct && fatRate != null && fatRate !== 0) {
+      const remaining = targets.bodyFat - base.bodyFatPct.value
+      if ((remaining > 0 && fatRate > 0) || (remaining < 0 && fatRate < 0)) {
+        estimatedWeeks = Math.round(remaining / fatRate)
+        if (estimatedWeeks > 0 && estimatedWeeks < 104) {
+          const dataPoints = metrics.filter(m => m.metricType === 'body_fat_percentage').length
+          confidence = dataPoints >= 14 ? 'high' : dataPoints >= 7 ? 'medium' : 'low'
+        } else {
+          estimatedWeeks = null
+          confidence = 'insufficient_data'
+        }
+      }
+    }
+
+    timeToGoal = {
+      targetWeight: targets.weight,
+      targetBodyFat: targets.bodyFat,
+      estimatedWeeks,
+      confidence,
+    }
+  }
+
+  // ─── Narratives ───
+  const primaryNarrative = base.headline
+  let metabolicNarrative = 'No metabolic concerns detected.'
+  if (metabolicAdaptation.detected) {
+    metabolicNarrative = `Metabolic adaptation ${metabolicAdaptation.severity}: basal calories ${metabolicAdaptation.indicators.basalCaloriesTrend}, weight ${metabolicAdaptation.indicators.weightTrend}.`
+  }
+  let predictionNarrative = 'Set body composition goals to see projections.'
+  if (timeToGoal?.estimatedWeeks != null) {
+    if (targets?.weight != null) {
+      predictionNarrative = `At current pace (${weightRate != null ? (weightRate > 0 ? '+' : '') + weightRate.toFixed(1) : '?'} lbs/wk), reaching ${targets.weight} lbs in ~${timeToGoal.estimatedWeeks} weeks.`
+    } else if (targets?.bodyFat != null) {
+      predictionNarrative = `At current pace (${fatRate != null ? (fatRate > 0 ? '+' : '') + fatRate.toFixed(1) : '?'}%/wk), reaching ${targets.bodyFat}% BF in ~${timeToGoal.estimatedWeeks} weeks.`
+    }
+  }
+
+  return {
+    ...base,
+    leanToFatRatio,
+    metabolicAdaptation,
+    timeToGoal,
+    weeklyRates: {
+      weightChangePerWeek: weightRate != null ? Math.round(weightRate * 100) / 100 : null,
+      fatChangePerWeek: fatRate != null ? Math.round(fatRate * 100) / 100 : null,
+      massChangePerWeek: massRate != null ? Math.round(massRate * 100) / 100 : null,
+    },
+    narratives: {
+      primary: primaryNarrative,
+      metabolic: metabolicNarrative,
+      prediction: predictionNarrative,
+    },
+  }
+}
+
 // ─── Internal helpers ────────────────────────────────────────────────
 
 function selectWindow(metrics: SeedMetric[]): {
@@ -367,7 +588,7 @@ function computePerMetricSignals(metrics: SeedMetric[], window: 7 | 14 | 30 | 90
     const consistency = totalChanges > 0 ? sameDir / totalChanges : 0.5
 
     // Data point weight
-    const dataPointWeight = Math.min(1, values.length / (window * 0.7))
+    const dataPointWeight = Math.min(1, values.length / window)
 
     // Signal strength
     const strength = Math.min(1, Math.abs(percentChange) / 10) * consistency * dataPointWeight

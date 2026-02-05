@@ -3,6 +3,7 @@
 
 import { subDays, differenceInDays, parseISO, format } from 'date-fns'
 import { clampPercent, validateChangePercent, safeDivide, safePercentChange, type MetricType } from './health-constants'
+import { derivePolarityMap } from './health-metric-contract'
 
 export interface MetricBaseline {
   metricType: string
@@ -427,40 +428,106 @@ export function classifySignal(
   }
 }
 
-// Export metric polarity map
-export const METRIC_POLARITY: Record<string, 'higher_better' | 'lower_better' | 'neutral'> = {
-  // Heart & Recovery
-  hrv: 'higher_better',
-  rhr: 'lower_better',
-  // Sleep
-  sleep_duration: 'higher_better',
-  deep_sleep: 'higher_better',
-  rem_sleep: 'higher_better',
-  sleep_efficiency: 'higher_better',
-  sleep_score: 'higher_better',
-  readiness_score: 'higher_better',
-  waso: 'lower_better',
-  sleep_latency: 'lower_better',
-  temp_deviation: 'lower_better',
-  // Vitals
-  respiratory_rate: 'neutral', // Context-dependent; aligned with synthesis
-  blood_oxygen: 'higher_better',
-  body_temperature: 'neutral', // Context-dependent; aligned with synthesis
-  // Activity
-  steps: 'higher_better',
-  active_calories: 'higher_better',
-  basal_calories: 'higher_better',
-  exercise_minutes: 'higher_better',
-  stand_hours: 'higher_better',
-  walking_running_distance: 'higher_better',
-  // Fitness
-  vo2_max: 'higher_better',
-  // Body Composition
-  weight: 'neutral', // Weight direction is context-dependent
-  body_fat_percentage: 'lower_better',
-  bmi: 'lower_better',
-  lean_body_mass: 'higher_better',
-  muscle_mass: 'higher_better',
-  bone_mass: 'higher_better',
-  body_water: 'higher_better',
+// ─── Multi-Window Baselines ──────────────────────────────────────────
+
+export interface MultiWindowBaseline {
+  w7?: MetricBaseline
+  w28?: MetricBaseline
+  w90?: MetricBaseline
 }
+
+export function computeMultiWindowBaseline(
+  values: DailyMetricValue[],
+  endDate: Date = new Date()
+): MultiWindowBaseline {
+  return {
+    w7: computeBaseline(values, 7, endDate, 3) ?? undefined,
+    w28: computeBaseline(values, 28, endDate, 5) ?? undefined,
+    w90: computeBaseline(values, 90, endDate, 10) ?? undefined,
+  }
+}
+
+// ─── Weekly Pattern Detection ────────────────────────────────────────
+
+export interface WeeklyPattern {
+  metricType: string
+  dayAverages: { day: number; dayName: string; avg: number; count: number }[]
+  bestDay: { day: number; dayName: string; avg: number }
+  worstDay: { day: number; dayName: string; avg: number }
+}
+
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+export function computeWeeklyPattern(
+  values: DailyMetricValue[],
+  minWeeks: number = 3
+): WeeklyPattern | null {
+  if (values.length < minWeeks * 7) return null
+
+  // Group by day of week
+  const buckets: { sum: number; count: number }[] = Array.from({ length: 7 }, () => ({ sum: 0, count: 0 }))
+
+  for (const v of values) {
+    const dow = parseISO(v.date).getDay()
+    buckets[dow].sum += v.value
+    buckets[dow].count++
+  }
+
+  const dayAverages = buckets
+    .map((b, i) => ({
+      day: i,
+      dayName: DAY_NAMES[i],
+      avg: b.count > 0 ? round(b.sum / b.count, 2) : 0,
+      count: b.count,
+    }))
+    .filter(d => d.count >= minWeeks)
+
+  if (dayAverages.length < 5) return null // Need most days represented
+
+  const sorted = [...dayAverages].sort((a, b) => b.avg - a.avg)
+
+  return {
+    metricType: '', // Set by caller
+    dayAverages,
+    bestDay: { day: sorted[0].day, dayName: sorted[0].dayName, avg: sorted[0].avg },
+    worstDay: { day: sorted[sorted.length - 1].day, dayName: sorted[sorted.length - 1].dayName, avg: sorted[sorted.length - 1].avg },
+  }
+}
+
+// ─── Personal Zones (Percentile Bands) ───────────────────────────────
+
+export interface PersonalZones {
+  veryLow: number   // p10
+  low: number        // p25
+  normal: number     // p50 (median)
+  high: number       // p75
+  veryHigh: number   // p90
+}
+
+export function computePersonalZones(
+  values: DailyMetricValue[],
+  minDataPoints: number = 14
+): PersonalZones | null {
+  if (values.length < minDataPoints) return null
+
+  const sorted = values.map(v => v.value).sort((a, b) => a - b)
+
+  // Remove extreme outliers (beyond 3 IQR)
+  const q1 = percentile(sorted, 25)
+  const q3 = percentile(sorted, 75)
+  const iqr = q3 - q1
+  const clean = sorted.filter(v => v >= q1 - 3 * iqr && v <= q3 + 3 * iqr)
+
+  if (clean.length < minDataPoints) return null
+
+  return {
+    veryLow: round(percentile(clean, 10), 2),
+    low: round(percentile(clean, 25), 2),
+    normal: round(percentile(clean, 50), 2),
+    high: round(percentile(clean, 75), 2),
+    veryHigh: round(percentile(clean, 90), 2),
+  }
+}
+
+// Polarity map derived from the metric contract (single source of truth)
+export const METRIC_POLARITY: Record<string, 'higher_better' | 'lower_better' | 'neutral'> = derivePolarityMap()
