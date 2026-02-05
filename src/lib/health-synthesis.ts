@@ -3,6 +3,15 @@
 
 import { prisma } from './prisma'
 import { MetricType, getMetricDisplayName, formatMetricValue } from './health-providers'
+import { findProtocolMechanism, getProtocolInsight, isChangeExpected, confidenceScore } from './protocol-mechanisms'
+import { getRecommendations, formatTopRecommendations } from './health-claims'
+import { safeDivide, safePercentChange, getStableThreshold, validateMetricValue } from './health-constants'
+
+// Active protocol type for protocol-aware insights
+interface ActiveProtocol {
+  name: string
+  startDate: Date
+}
 
 // ============================================================================
 // HELPERS
@@ -18,9 +27,9 @@ function clampPercent(pct: number): number {
 // ============================================================================
 
 const SOURCE_PRIORITY: Record<MetricType, string[]> = {
-  // Sleep
-  sleep_duration: ['apple_health', 'oura', 'eight_sleep'],
-  rem_sleep: ['apple_health', 'oura'],
+  // Sleep - prefer Oura for sleep metrics (more accurate than Apple Health aggregation)
+  sleep_duration: ['oura', 'eight_sleep', 'apple_health'],
+  rem_sleep: ['oura', 'apple_health'],
   sleep_score: ['oura', 'eight_sleep', 'apple_health'],
   bed_temperature: ['eight_sleep', 'oura', 'apple_health'],
   time_in_bed: ['eight_sleep', 'oura', 'apple_health'],
@@ -224,9 +233,9 @@ export interface ProtocolImpact {
 
 export interface SleepArchitecture {
   avgDuration: number
-  avgScore: number
-  avgTimeInBed: number
-  efficiency: number // duration / time_in_bed
+  avgScore: number | null      // null if no sleep_score data
+  avgTimeInBed: number | null  // null if no time_in_bed data
+  efficiency: number | null    // null if time_in_bed unavailable
   consistencyScore: number // How consistent is sleep timing
   avgBedTemp?: number
   optimalTempNights?: number
@@ -352,10 +361,12 @@ export async function getUnifiedMetrics(
 function calculateConsistency(values: number[]): number {
   if (values.length < 2) return 100
   const mean = values.reduce((a, b) => a + b, 0) / values.length
+  if (mean === 0 || !isFinite(mean)) return 50 // Can't compute CV without positive mean
   const variance = values.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / values.length
   const stdDev = Math.sqrt(variance)
-  const cv = (stdDev / mean) * 100 // Coefficient of variation
-  return Math.max(0, Math.min(100, 100 - cv * 2))
+  const cv = safeDivide(stdDev, Math.abs(mean))
+  if (cv === null) return 50
+  return Math.max(0, Math.min(100, 100 - cv * 100 * 2))
 }
 
 function calculateMomentum(
@@ -374,7 +385,7 @@ export async function calculateHealthTrends(
   periodDays: number = 7
 ): Promise<HealthTrend[]> {
   const endDate = new Date()
-  const midDate = new Date()
+  let midDate = new Date()
   midDate.setDate(midDate.getDate() - periodDays)
   const startDate = new Date()
   startDate.setDate(startDate.getDate() - periodDays * 3) // Get 3 periods for momentum
@@ -383,14 +394,25 @@ export async function calculateHealthTrends(
   const trends: HealthTrend[] = []
 
   for (const [metricType, metrics] of allMetrics) {
-    const current = metrics.filter(m => new Date(m.date) >= midDate)
+    // For body comp metrics, use a longer window since measurements are less frequent
+    const isBodyComp = ['weight', 'body_fat_percentage', 'lean_body_mass', 'muscle_mass', 'bmi'].includes(metricType)
+    let effectiveMidDate = midDate
+
+    if (isBodyComp && metrics.length >= 4) {
+      // Use half the available data as "current" period for body comp
+      const sortedDates = metrics.map(m => new Date(m.date)).sort((a, b) => a.getTime() - b.getTime())
+      const midIndex = Math.floor(sortedDates.length / 2)
+      effectiveMidDate = sortedDates[midIndex]
+    }
+
+    const current = metrics.filter(m => new Date(m.date) >= effectiveMidDate)
     const previous = metrics.filter(m => {
       const d = new Date(m.date)
-      return d >= new Date(midDate.getTime() - periodDays * 24 * 60 * 60 * 1000) && d < midDate
+      return d < effectiveMidDate
     })
     const older = metrics.filter(m => {
       const d = new Date(m.date)
-      return d < new Date(midDate.getTime() - periodDays * 24 * 60 * 60 * 1000)
+      return d < new Date(effectiveMidDate.getTime() - periodDays * 24 * 60 * 60 * 1000)
     })
 
     if (current.length < 2) continue
@@ -404,14 +426,16 @@ export async function calculateHealthTrends(
       : previousAvg
 
     const change = currentAvg - previousAvg
-    const changePercent = previousAvg !== 0 ? clampPercent((change / previousAvg) * 100) : 0
+    const changePercent = safePercentChange(currentAvg, previousAvg) ?? 0
     const previousChange = previousAvg - olderAvg
-    const previousChangePercent = olderAvg !== 0 ? clampPercent((previousChange / olderAvg) * 100) : 0
+    const previousChangePercent = safePercentChange(previousAvg, olderAvg) ?? 0
 
     const polarity = METRIC_POLARITY[metricType]
     let trend: 'improving' | 'declining' | 'stable'
 
-    if (Math.abs(changePercent) < 3) {
+    // Use metric-specific stable threshold to filter noise
+    const stableThreshold = getStableThreshold(metricType)
+    if (Math.abs(changePercent) < stableThreshold) {
       trend = 'stable'
     } else if (polarity === 'higher_better') {
       trend = change > 0 ? 'improving' : 'declining'
@@ -437,7 +461,9 @@ export async function calculateHealthTrends(
       changePercent,
       trend,
       momentum: calculateMomentum(changePercent, previousChangePercent),
-      confidence: current.length >= 5 ? 'high' : current.length >= 3 ? 'medium' : 'low',
+      // Confidence based on data density (points per period), not just raw count
+      confidence: current.length >= 5 && previous.length >= 3 ? 'high'
+        : current.length >= 3 && previous.length >= 2 ? 'medium' : 'low',
       dataPoints: current.length,
       consistency: calculateConsistency(current.map(m => m.value)),
       personalBest,
@@ -473,12 +499,15 @@ export async function analyzeSleepArchitecture(userId: string): Promise<SleepArc
   const avgDuration = duration.reduce((s, m) => s + m.value, 0) / duration.length
   const avgScore = scores.length > 0
     ? scores.reduce((s, m) => s + m.value, 0) / scores.length
-    : 0
+    : null // Don't fabricate a score
   const avgTimeInBed = timeInBed.length > 0
     ? timeInBed.reduce((s, m) => s + m.value, 0) / timeInBed.length
-    : avgDuration * 1.1
+    : null // Don't fabricate time-in-bed
 
-  const efficiency = avgTimeInBed > 0 ? (avgDuration / avgTimeInBed) * 100 : 85
+  // Only compute efficiency if we have actual time-in-bed data
+  const efficiency = avgTimeInBed && avgTimeInBed > 0
+    ? (safeDivide(avgDuration, avgTimeInBed) ?? 0.85) * 100
+    : null
   const consistencyScore = calculateConsistency(duration.map(m => m.value))
 
   const avgBedTemp = bedTemp.length > 0
@@ -498,7 +527,7 @@ export async function analyzeSleepArchitecture(userId: string): Promise<SleepArc
   if (recentScores.length >= 3 && olderScores.length >= 3) {
     const recentAvg = recentScores.reduce((s, m) => s + m.value, 0) / recentScores.length
     const olderAvg = olderScores.reduce((s, m) => s + m.value, 0) / olderScores.length
-    const change = olderAvg !== 0 ? clampPercent(((recentAvg - olderAvg) / olderAvg) * 100) : 0
+    const change = safePercentChange(recentAvg, olderAvg) ?? 0
     if (change > 5) recentTrend = 'improving'
     else if (change < -5) recentTrend = 'declining'
   }
@@ -525,30 +554,42 @@ export async function calculateRecoveryStatus(userId: string): Promise<RecoveryS
   if (!hrvTrend && !rhrTrend && !sleepTrend) return null
 
   // Calculate recovery score based on available metrics
-  let score = 70 // Base score
-  let factors = 0
+  // Use weighted average of actual data, not a base score
+  const scores: { value: number; weight: number }[] = []
 
   if (hrvTrend) {
     const hrvOptimal = OPTIMAL_RANGES.hrv.optimal
-    const hrvScore = Math.min(100, (hrvTrend.currentValue / hrvOptimal) * 100)
-    score += (hrvScore - 70) * 0.4
-    factors++
+    const hrvRatio = safeDivide(hrvTrend.currentValue, hrvOptimal)
+    const hrvScore = hrvRatio !== null ? Math.min(100, hrvRatio * 100) : null
+    if (hrvScore !== null) scores.push({ value: hrvScore, weight: 0.4 })
   }
 
   if (rhrTrend) {
     const rhrOptimal = OPTIMAL_RANGES.rhr.optimal
+    const rhrRange = OPTIMAL_RANGES.rhr.max - rhrOptimal
     // Lower RHR is better
     const rhrScore = rhrTrend.currentValue <= rhrOptimal
       ? 100
-      : Math.max(50, 100 - ((rhrTrend.currentValue - rhrOptimal) / 20) * 50)
-    score += (rhrScore - 70) * 0.3
-    factors++
+      : rhrRange > 0
+        ? Math.max(50, 100 - (safeDivide(rhrTrend.currentValue - rhrOptimal, rhrRange) ?? 0) * 50)
+        : 70
+    scores.push({ value: rhrScore, weight: 0.3 })
   }
 
   if (sleepTrend) {
     const sleepScore = Math.min(100, sleepTrend.currentValue)
-    score += (sleepScore - 70) * 0.3
-    factors++
+    scores.push({ value: sleepScore, weight: 0.3 })
+  }
+
+  // Compute weighted average of available scores
+  let score: number
+  if (scores.length === 0) {
+    return null // No data at all — don't fabricate a recovery score
+  } else {
+    const totalWeight = scores.reduce((s, sc) => s + sc.weight, 0)
+    score = totalWeight > 0
+      ? scores.reduce((s, sc) => s + sc.value * sc.weight, 0) / totalWeight
+      : 70
   }
 
   score = Math.max(0, Math.min(100, Math.round(score)))
@@ -558,10 +599,13 @@ export async function calculateRecoveryStatus(userId: string): Promise<RecoveryS
     score >= 70 ? 'good' :
     score >= 55 ? 'moderate' : 'poor'
 
+  // Only rate sleep quality if we have actual sleep data
+  const sleepVal = sleepTrend?.currentValue
   const sleepQuality: RecoveryStatus['sleepQuality'] =
-    (sleepTrend?.currentValue || 0) >= 85 ? 'excellent' :
-    (sleepTrend?.currentValue || 0) >= 70 ? 'good' :
-    (sleepTrend?.currentValue || 0) >= 55 ? 'fair' : 'poor'
+    sleepVal == null ? 'fair' : // Default to 'fair' when no data, not 'poor'
+    sleepVal >= 85 ? 'excellent' :
+    sleepVal >= 70 ? 'good' :
+    sleepVal >= 55 ? 'fair' : 'poor'
 
   const recommendations: Record<RecoveryStatus['status'], string> = {
     excellent: 'Your recovery is optimal. Great day for intense training or challenging work.',
@@ -686,7 +730,7 @@ export async function analyzeProtocolImpact(userId: string): Promise<ProtocolImp
       const beforeAvg = before.reduce((s, m) => s + m.value, 0) / before.length
       const afterAvg = after.reduce((s, m) => s + m.value, 0) / after.length
       const change = afterAvg - beforeAvg
-      const changePercent = beforeAvg !== 0 ? clampPercent((change / beforeAvg) * 100) : 0
+      const changePercent = safePercentChange(afterAvg, beforeAvg) ?? 0
 
       const polarity = METRIC_POLARITY[metricType]
       let impact = changePercent
@@ -773,7 +817,9 @@ export async function calculateHealthScore(userId: string): Promise<HealthScore>
 
     let score: number
     const polarity = METRIC_POLARITY[trend.metricType]
-    const vsOptimal = range.optimal !== 0 ? (trend.currentValue / range.optimal) * 100 : 100
+    const vsOptimal = safeDivide(trend.currentValue, range.optimal) !== null
+      ? (safeDivide(trend.currentValue, range.optimal)! * 100)
+      : 100
 
     // For body comp metrics without fixed optimal ranges, score based on trend direction
     if (range.optimal === 0 && w.category === 'bodyComp') {
@@ -785,11 +831,17 @@ export async function calculateHealthScore(userId: string): Promise<HealthScore>
     } else if (polarity === 'lower_better') {
       if (trend.currentValue <= range.optimal) score = 100
       else if (trend.currentValue >= range.max) score = 50
-      else score = 100 - ((trend.currentValue - range.optimal) / (range.max - range.optimal)) * 50
+      else {
+        const denom = range.max - range.optimal
+        score = denom > 0 ? 100 - (safeDivide(trend.currentValue - range.optimal, denom) ?? 0) * 50 : 75
+      }
     } else {
       if (trend.currentValue >= range.optimal) score = 100
       else if (trend.currentValue <= range.min) score = 50
-      else score = 50 + ((trend.currentValue - range.min) / (range.optimal - range.min)) * 50
+      else {
+        const denom = range.optimal - range.min
+        score = denom > 0 ? 50 + (safeDivide(trend.currentValue - range.min, denom) ?? 0) * 50 : 75
+      }
     }
 
     score = Math.max(0, Math.min(100, Math.round(score)))
@@ -799,8 +851,10 @@ export async function calculateHealthScore(userId: string): Promise<HealthScore>
       score,
       weight: w.weight,
       trend: trend.trend === 'improving' ? 'up' : trend.trend === 'declining' ? 'down' : 'stable',
-      vsOptimal: range.optimal !== 0
-        ? Math.round(polarity === 'lower_better' ? (range.optimal / trend.currentValue) * 100 : vsOptimal)
+      vsOptimal: range.optimal !== 0 && trend.currentValue !== 0
+        ? Math.round(polarity === 'lower_better'
+            ? (safeDivide(range.optimal, trend.currentValue) ?? 1) * 100
+            : vsOptimal)
         : Math.round(score)
     })
 
@@ -872,13 +926,13 @@ export async function generateSynthesizedInsights(userId: string): Promise<Synth
 
   // 2. Sleep Architecture Insights
   if (sleepArch) {
-    if (sleepArch.efficiency < 80) {
+    if (sleepArch.efficiency !== null && sleepArch.efficiency < 80) {
       insights.push({
         id: 'sleep-efficiency-low',
         type: 'recommendation',
         priority: 'high',
         title: 'Sleep Efficiency Below Optimal',
-        description: `You're spending ${formatMetricValue(sleepArch.avgTimeInBed, 'time_in_bed')} in bed but only sleeping ${formatMetricValue(sleepArch.avgDuration, 'sleep_duration')} (${sleepArch.efficiency.toFixed(0)}% efficiency).`,
+        description: `You're spending ${formatMetricValue(sleepArch.avgTimeInBed ?? 0, 'time_in_bed')} in bed but only sleeping ${formatMetricValue(sleepArch.avgDuration, 'sleep_duration')} (${sleepArch.efficiency?.toFixed(0) ?? '?'}% efficiency).`,
         details: 'High sleep efficiency (>85%) indicates good sleep quality.',
         metrics: ['sleep_duration', 'time_in_bed'],
         actionable: 'Try going to bed only when sleepy, and get up if you can\'t sleep after 20 min.'
@@ -986,35 +1040,97 @@ export async function generateSynthesizedInsights(userId: string): Promise<Synth
     }
   }
 
-  // 4. Protocol Impact Analysis
+  // 4. Protocol Impact Analysis with Mechanism Context
   for (const impact of protocolImpacts.slice(0, 2)) {
+    const mechanism = findProtocolMechanism(impact.peptideName)
+    const weeksOnProtocol = Math.floor(impact.daysSinceStart / 7)
+
     if (impact.overallImpact === 'positive' && impact.impactScore > 10) {
       const significantMetrics = impact.metrics.filter(m => m.isSignificant && m.changePercent > 0)
+
+      // Enhance description with protocol-specific context
+      let description = `After ${impact.daysSinceStart} days, overall health metrics improved by ${impact.impactScore}%.`
+      let details = significantMetrics.map(m =>
+        `${getMetricDisplayName(m.metricType)}: ${m.changePercent > 0 ? '+' : ''}${m.changePercent.toFixed(0)}%`
+      ).join(', ')
+
+      // Add mechanism-specific insight for top improving metric
+      if (mechanism && significantMetrics.length > 0) {
+        const topMetric = significantMetrics[0]
+        const { expected, explanation } = isChangeExpected(
+          impact.peptideName,
+          topMetric.metricType,
+          'improving',
+          weeksOnProtocol
+        )
+        if (expected) {
+          const protocolInsight = getProtocolInsight(
+            impact.peptideName,
+            topMetric.metricType,
+            weeksOnProtocol < 2 ? 'earlyImproving' : 'improving',
+            topMetric.changePercent
+          )
+          if (protocolInsight) {
+            description = protocolInsight
+          }
+        }
+      }
+
+      // Add early timeline note if protocol is young
+      if (weeksOnProtocol < 2) {
+        details += ` (Week ${weeksOnProtocol} on protocol—effects may still be developing)`
+      }
+
       insights.push({
         id: `protocol-${impact.protocolId}`,
         type: 'correlation',
         priority: 'high',
         title: `${impact.peptideName} Showing Results`,
-        description: `After ${impact.daysSinceStart} days, overall health metrics improved by ${impact.impactScore}%.`,
-        details: significantMetrics.map(m =>
-          `${getMetricDisplayName(m.metricType)}: ${m.changePercent > 0 ? '+' : ''}${m.changePercent.toFixed(0)}%`
-        ).join(', '),
+        description,
+        details,
         metrics: significantMetrics.map(m => m.metricType),
         relatedProtocol: { id: impact.protocolId, name: impact.peptideName },
         dataPoints: significantMetrics.reduce((s, m) => s + m.dataPointsAfter, 0),
         confidence: impact.metrics.filter(m => m.dataPointsAfter >= 7).length > 2 ? 85 : 60
       })
     } else if (impact.overallImpact === 'negative' && impact.impactScore < -10) {
+      let description = `Health metrics have declined ${Math.abs(impact.impactScore)}% since starting ${impact.peptideName}.`
+      let details = 'This may be normal adaptation or worth discussing with your provider.'
+      let actionable = 'Monitor for another week. If decline continues, consider adjusting dosing or timing.'
+
+      // Check if decline is expected for any metric based on mechanism
+      if (mechanism) {
+        const decliningMetrics = impact.metrics.filter(m => m.changePercent < -5)
+        for (const metric of decliningMetrics) {
+          const { expected, explanation } = isChangeExpected(
+            impact.peptideName,
+            metric.metricType,
+            'declining',
+            weeksOnProtocol
+          )
+          if (expected) {
+            // Decline is actually expected (e.g., weight on Semaglutide)
+            const insight = getProtocolInsight(impact.peptideName, metric.metricType, 'declining', metric.changePercent)
+            if (insight) {
+              description = insight
+              details = explanation
+              actionable = `This is within expected ${impact.peptideName} effects. Continue monitoring.`
+              break
+            }
+          }
+        }
+      }
+
       insights.push({
         id: `protocol-concern-${impact.protocolId}`,
         type: 'concern',
         priority: 'medium',
         title: `Review ${impact.peptideName} Protocol`,
-        description: `Health metrics have declined ${Math.abs(impact.impactScore)}% since starting ${impact.peptideName}.`,
-        details: 'This may be normal adaptation or worth discussing with your provider.',
+        description,
+        details,
         metrics: impact.metrics.filter(m => m.changePercent < -5).map(m => m.metricType),
         relatedProtocol: { id: impact.protocolId, name: impact.peptideName },
-        actionable: 'Monitor for another week. If decline continues, consider adjusting dosing or timing.'
+        actionable
       })
     }
   }
@@ -1071,6 +1187,10 @@ export async function generateSynthesizedInsights(userId: string): Promise<Synth
         metrics: ['sleep_score', 'hrv']
       })
     } else if (sleepTrend.trend !== hrvTrend.trend && sleepTrend.trend !== 'stable' && hrvTrend.trend !== 'stable') {
+      // Get actionable recommendations based on which metric is declining
+      const decliningMetric = hrvTrend.trend === 'declining' ? 'hrv' : 'sleep_score'
+      const actionableRecs = formatTopRecommendations(decliningMetric, 'declining', 'higher_better', 2)
+
       insights.push({
         id: 'sleep-hrv-divergence',
         type: 'observation',
@@ -1078,7 +1198,8 @@ export async function generateSynthesizedInsights(userId: string): Promise<Synth
         title: 'Sleep & HRV Diverging',
         description: `Sleep is ${sleepTrend.trend} while HRV is ${hrvTrend.trend}. This divergence is worth monitoring.`,
         details: 'Factors like stress, alcohol, or overtraining can cause HRV to diverge from sleep quality.',
-        metrics: ['sleep_score', 'hrv']
+        metrics: ['sleep_score', 'hrv'],
+        actionable: actionableRecs || 'Check for stress, alcohol, or overtraining factors.'
       })
     }
   }
@@ -1122,13 +1243,16 @@ export async function generateSynthesizedInsights(userId: string): Promise<Synth
         metrics: ['exercise_minutes', 'body_fat_percentage'],
       })
     } else if (activityTrend.trend === 'declining' && bodyFatTrend.trend === 'declining') {
+      // Get actionable recommendations for exercise decline
+      const exerciseRecs = formatTopRecommendations('exercise_minutes', 'declining', 'higher_better', 2)
+
       insights.push({
         id: 'activity-bodycomp-decline',
         type: 'concern',
         priority: 'medium',
         title: 'Reduced Activity Affecting Body Composition',
         description: `Exercise is down ${Math.abs(activityTrend.changePercent).toFixed(0)}% and body fat is trending up. Maintaining activity helps preserve body composition.`,
-        actionable: 'Look for opportunities to increase training frequency or daily movement.',
+        actionable: exerciseRecs || 'Look for opportunities to increase training frequency or daily movement.',
         metrics: ['exercise_minutes', 'body_fat_percentage'],
       })
     }
@@ -1138,15 +1262,76 @@ export async function generateSynthesizedInsights(userId: string): Promise<Synth
   const sleepDurationTrend = trends.find(t => t.metricType === 'sleep_duration')
   if (sleepDurationTrend && stepsTrend) {
     if (sleepDurationTrend.trend === 'declining' && stepsTrend.trend === 'declining') {
+      // Get actionable recommendations for sleep decline
+      const sleepRecs = formatTopRecommendations('sleep_duration', 'declining', 'higher_better', 2)
+
       insights.push({
         id: 'sleep-activity-decline',
         type: 'concern',
         priority: 'medium',
         title: 'Sleep Decline Impacting Activity',
         description: `Both sleep (${sleepDurationTrend.changePercent.toFixed(0)}%) and daily activity (${stepsTrend.changePercent.toFixed(0)}%) are declining. Poor sleep often reduces motivation and energy for movement.`,
-        actionable: 'Focus on sleep quality first — improved sleep typically restores activity levels naturally.',
+        actionable: sleepRecs || 'Focus on sleep quality first — improved sleep typically restores activity levels naturally.',
         metrics: ['sleep_duration', 'steps'],
       })
+    }
+  }
+
+  // 11. Protocol-aware trend insights
+  // Convert protocol impacts to active protocols for context checking
+  const activeProtocols: ActiveProtocol[] = protocolImpacts.map(p => ({
+    name: p.peptideName,
+    startDate: p.startDate
+  }))
+
+  // Check if any significant trend is explained by an active protocol
+  for (const trend of trends) {
+    if (Math.abs(trend.changePercent) < 5) continue // Only significant changes
+    if (trend.trend === 'stable') continue // Skip stable trends for protocol context
+
+    for (const protocol of activeProtocols) {
+      const weeksOnProtocol = Math.floor((Date.now() - protocol.startDate.getTime()) / (7 * 24 * 60 * 60 * 1000))
+      const { expected, confidence, explanation } = isChangeExpected(
+        protocol.name,
+        trend.metricType,
+        trend.trend,
+        weeksOnProtocol
+      )
+
+      if (expected && confidence !== 'low') {
+        // Get protocol-specific insight
+        const status: 'earlyImproving' | 'improving' | 'declining' | 'stable' | 'noData' =
+          weeksOnProtocol < 2
+            ? 'earlyImproving'
+            : trend.trend === 'improving' ? 'improving' : trend.trend === 'declining' ? 'declining' : 'stable'
+
+        const protocolInsight = getProtocolInsight(protocol.name, trend.metricType, status, trend.changePercent)
+
+        if (protocolInsight) {
+          // Check if we already have an insight for this protocol+metric
+          const existingInsight = insights.find(i =>
+            i.relatedProtocol?.name === protocol.name &&
+            i.metrics.includes(trend.metricType)
+          )
+
+          if (!existingInsight) {
+            insights.push({
+              id: `protocol-trend-${protocol.name}-${trend.metricType}`,
+              type: trend.trend === 'improving' ? 'improvement' : 'observation',
+              priority: confidence === 'high' ? 'high' : 'medium',
+              title: `${trend.displayName} ${trend.trend === 'improving' ? 'Improving' : 'Changing'} on ${protocol.name}`,
+              description: protocolInsight,
+              details: weeksOnProtocol < 2
+                ? `Week ${weeksOnProtocol} on ${protocol.name}—still early in the protocol timeline.`
+                : explanation,
+              metrics: [trend.metricType],
+              relatedProtocol: { id: `protocol-${protocol.name}`, name: protocol.name },
+              confidence: confidence === 'high' ? 85 : confidence === 'medium' ? 70 : 50
+            })
+          }
+        }
+        break // Only use most relevant protocol per trend
+      }
     }
   }
 
@@ -1161,6 +1346,85 @@ export async function generateSynthesizedInsights(userId: string): Promise<Synth
 // MAIN SUMMARY FUNCTION
 // ============================================================================
 
+// ============================================================================
+// DATA QUALITY SCORING
+// ============================================================================
+
+interface MetricQualityScore {
+  metricType: string
+  score: number       // 0-100
+  reasons: string[]
+  dataPoints: number
+  daysCovered: number
+  lastDataDate: string | null
+  staleDays: number   // how many days since last data point
+}
+
+function computeDataQuality(
+  metrics: Map<MetricType, UnifiedDailyMetric[]>,
+  periodDays: number = 30
+): { overall: number; perMetric: MetricQualityScore[] } {
+  const perMetric: MetricQualityScore[] = []
+  const now = new Date()
+
+  for (const [metricType, values] of metrics) {
+    if (values.length === 0) continue
+
+    const reasons: string[] = []
+    let score = 50 // Base score
+
+    // Data density: what % of days have data?
+    const densityRatio = Math.min(1, values.length / periodDays)
+    const densityScore = Math.round(densityRatio * 40)
+    score += densityScore
+    if (densityRatio < 0.3) reasons.push('Sparse data')
+    else if (densityRatio >= 0.7) reasons.push('Good data coverage')
+
+    // Recency: how recent is the latest data point?
+    const sortedByDate = [...values].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    const lastDate = sortedByDate[0]?.date
+    const staleDays = lastDate ? Math.floor((now.getTime() - new Date(lastDate).getTime()) / (1000 * 60 * 60 * 24)) : periodDays
+    if (staleDays <= 1) score += 10
+    else if (staleDays <= 3) score += 5
+    else if (staleDays > 7) {
+      score -= 10
+      reasons.push(`Stale (${staleDays}d old)`)
+    }
+
+    // Consistency: low CV = higher quality signal
+    const vals = values.map(v => v.value)
+    const mean = vals.reduce((a, b) => a + b, 0) / vals.length
+    if (mean > 0 && vals.length >= 3) {
+      const variance = vals.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / vals.length
+      const cv = Math.sqrt(variance) / mean
+      if (cv < 0.1) score += 5
+      else if (cv > 0.5) {
+        score -= 5
+        reasons.push('High variability')
+      }
+    }
+
+    // Clamp
+    score = Math.max(0, Math.min(100, score))
+
+    perMetric.push({
+      metricType,
+      score,
+      reasons,
+      dataPoints: values.length,
+      daysCovered: new Set(values.map(v => v.date)).size,
+      lastDataDate: lastDate || null,
+      staleDays,
+    })
+  }
+
+  const overall = perMetric.length > 0
+    ? Math.round(perMetric.reduce((s, m) => s + m.score, 0) / perMetric.length)
+    : 0
+
+  return { overall, perMetric }
+}
+
 export async function getUnifiedHealthSummary(userId: string) {
   const [score, trends, insights, recovery, sleepArch, dayPatterns] = await Promise.all([
     calculateHealthScore(userId),
@@ -1171,6 +1435,13 @@ export async function getUnifiedHealthSummary(userId: string) {
     analyzeDayPatterns(userId)
   ])
 
+  // Compute data quality for the summary period
+  const endDate = new Date()
+  const startDate = new Date()
+  startDate.setDate(startDate.getDate() - 30)
+  const allMetrics = await getUnifiedMetrics(userId, startDate, endDate)
+  const dataQuality = computeDataQuality(allMetrics, 30)
+
   return {
     score,
     trends: trends.slice(0, 8),
@@ -1178,6 +1449,10 @@ export async function getUnifiedHealthSummary(userId: string) {
     recovery,
     sleepArchitecture: sleepArch,
     dayPatterns,
+    dataQuality: {
+      overall: dataQuality.overall,
+      metrics: dataQuality.perMetric.slice(0, 10),
+    },
     lastUpdated: new Date().toISOString()
   }
 }

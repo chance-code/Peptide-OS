@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getAuthenticatedUserId } from '@/lib/api-auth'
 import { MetricSyncState } from '@/lib/health-providers'
+import { validateAndCorrectMetric } from '@/lib/health-constants'
 
 // Accepted metric types from Apple Health
 const VALID_METRIC_TYPES = new Set([
@@ -49,14 +50,32 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate and filter metrics
-    const validMetrics = body.metrics.filter(m =>
-      VALID_METRIC_TYPES.has(m.metricType) &&
-      typeof m.value === 'number' &&
-      !isNaN(m.value) &&
-      m.unit &&
-      m.recordedAt
-    )
+    // Validate, filter, and correct metrics (sanity firewall)
+    const rejectedMetrics: Array<{ metricType: string; value: number; reason: string }> = []
+    const validMetrics: IngestMetric[] = []
+
+    for (const m of body.metrics) {
+      // Basic field checks
+      if (!VALID_METRIC_TYPES.has(m.metricType) || typeof m.value !== 'number' || !isFinite(m.value) || !m.unit || !m.recordedAt) {
+        continue
+      }
+
+      // Physiologic bounds check with auto-correction
+      const validation = validateAndCorrectMetric(m.metricType, m.value, m.unit)
+
+      if (!validation.valid) {
+        rejectedMetrics.push({ metricType: m.metricType, value: m.value, reason: validation.reason || 'Failed validation' })
+        continue
+      }
+
+      // Apply corrections if needed (e.g., decimal SpO2 → percentage)
+      if (validation.correctedValue !== undefined) {
+        m.value = validation.correctedValue
+        if (validation.correctedUnit) m.unit = validation.correctedUnit
+      }
+
+      validMetrics.push(m)
+    }
 
     // Ensure integration exists and is connected
     const integration = await prisma.healthIntegration.findUnique({
@@ -191,9 +210,15 @@ export async function POST(request: NextRequest) {
       })
     ])
 
+    // Log rejected metrics for debugging
+    if (rejectedMetrics.length > 0) {
+      console.warn(`[Health Ingest] Rejected ${rejectedMetrics.length} metrics:`, rejectedMetrics.slice(0, 10))
+    }
+
     return NextResponse.json({
       success: true,
       metricsCount,
+      rejectedCount: rejectedMetrics.length,
       lastSyncAt: now,
       metricSyncState: newSyncState,
       permissions: body.permissions,

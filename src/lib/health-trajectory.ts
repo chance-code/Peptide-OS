@@ -4,7 +4,7 @@
 
 import { subDays, parseISO, differenceInDays, format } from 'date-fns'
 import { METRIC_POLARITY, computeBaseline, type MetricBaseline, type DailyMetricValue } from './health-baselines'
-import { clampPercent, validateChangePercent, validateMetricValue, type MetricType } from './health-constants'
+import { clampPercent, validateChangePercent, validateMetricValue, safeDivide, safePercentChange, type MetricType } from './health-constants'
 import type { SeedMetric } from './demo-data/seed-metrics'
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -186,7 +186,22 @@ export function computeTrajectory(
 
 export function computeBodyCompState(metrics: SeedMetric[]): BodyCompState {
   const today = new Date()
-  const windowStart = subDays(today, 30)
+
+  // Find the earliest body comp data to determine available window
+  const bodyCompTypes = ['weight', 'body_fat_percentage', 'lean_body_mass', 'muscle_mass']
+  const bodyCompMetrics = metrics.filter(m => bodyCompTypes.includes(m.metricType))
+
+  // Default to 30 days, but expand to include all available data if needed
+  let windowStart = subDays(today, 30)
+  const pointsIn30Days = bodyCompMetrics.filter(m => parseISO(m.date) >= windowStart).length
+
+  if (pointsIn30Days < 4 && bodyCompMetrics.length >= 4) {
+    // Not enough data in 30-day window, but we have data — use all available
+    const earliestDate = bodyCompMetrics
+      .map(m => parseISO(m.date))
+      .reduce((min, d) => d < min ? d : min, today)
+    windowStart = earliestDate
+  }
 
   // Get latest values
   const getLatest = (type: string) => {
@@ -201,7 +216,7 @@ export function computeBodyCompState(metrics: SeedMetric[]): BodyCompState {
   const leanMass = getLatest('lean_body_mass')
   const muscleMass = getLatest('muscle_mass')
 
-  // Compute trends using 14-30 day window
+  // Compute trends using available window
   const computeDir = (type: string): 'up' | 'down' | 'stable' => {
     const vals = metrics
       .filter(m => m.metricType === type && parseISO(m.date) >= windowStart)
@@ -212,7 +227,7 @@ export function computeBodyCompState(metrics: SeedMetric[]): BodyCompState {
     const secondHalf = vals.slice(half)
     const firstAvg = firstHalf.reduce((s, v) => s + v.value, 0) / firstHalf.length
     const secondAvg = secondHalf.reduce((s, v) => s + v.value, 0) / secondHalf.length
-    const pctChange = firstAvg !== 0 ? clampPercent(((secondAvg - firstAvg) / firstAvg) * 100) : 0
+    const pctChange = safePercentChange(secondAvg, firstAvg) ?? 0
     if (Math.abs(pctChange) < 1) return 'stable'
     return pctChange > 0 ? 'up' : 'down'
   }
@@ -221,8 +236,7 @@ export function computeBodyCompState(metrics: SeedMetric[]): BodyCompState {
   const fatDir = computeDir('body_fat_percentage')
   const massDir = computeDir(muscleMass ? 'muscle_mass' : 'lean_body_mass')
 
-  // Count data points in window
-  const bodyCompTypes = ['weight', 'body_fat_percentage', 'lean_body_mass', 'muscle_mass']
+  // Count data points in window (reuse bodyCompTypes from above)
   const totalPoints = metrics.filter(m =>
     bodyCompTypes.includes(m.metricType) && parseISO(m.date) >= windowStart
   ).length
@@ -334,9 +348,8 @@ function computePerMetricSignals(metrics: SeedMetric[], window: 7 | 14 | 30 | 90
     const firstAvg = firstHalf.reduce((s, v) => s + v.value, 0) / firstHalf.length
     const secondAvg = secondHalf.reduce((s, v) => s + v.value, 0) / secondHalf.length
 
-    // Calculate and validate percent change (guard zero denominators)
-    let percentChange = firstAvg !== 0 ? ((secondAvg - firstAvg) / firstAvg) * 100 : 0
-    percentChange = clampPercent(percentChange)
+    // Calculate and validate percent change (safe division)
+    let percentChange = safePercentChange(secondAvg, firstAvg) ?? 0
     percentChange = validateChangePercent(metricType as MetricType, percentChange, window >= 7 ? 'weekly' : 'daily')
 
     // Consistency: fraction of day-over-day changes in same direction
@@ -385,9 +398,11 @@ function aggregateCategory(signals: TrajectorySignal[], category: 'sleep' | 'rec
   const catSignals = signals.filter(s => s.category === category)
 
   if (catSignals.length === 0) {
+    // No signals = no data, not "stable". Set weight to 0 so this category
+    // doesn't influence overall direction. topMetric='' signals "no data" to callers.
     return {
       direction: 'stable',
-      weight: weights[category],
+      weight: 0,  // Zero weight — this category has no data to contribute
       topMetric: '',
       topMetricChange: 0,
       momentum: 'steady',
@@ -485,38 +500,52 @@ function computeConfidenceScore(
 ): number {
   let score = 0
 
-  // Data contribution — longer windows yield higher confidence
-  if (window >= 90) score += 40
-  else if (window >= 30) score += 30
-  else if (window >= 14) score += 20
-  else score += 10
+  // Data density: how many signals do we actually have?
+  // This is more important than raw window size
+  const signalCount = signals.length
+  if (signalCount >= 8) score += 25
+  else if (signalCount >= 5) score += 15
+  else if (signalCount >= 3) score += 10
+  else score += 5
+
+  // Window contribution — but scaled by actual data density
+  // A 90-day window with 3 signals is NOT as confident as 30 days with 10 signals
+  const densityRatio = window > 0 ? Math.min(1, signalCount / (window * 0.1)) : 0
+  if (window >= 90) score += Math.round(25 * densityRatio)
+  else if (window >= 30) score += Math.round(20 * densityRatio)
+  else if (window >= 14) score += Math.round(15 * densityRatio)
+  else score += Math.round(10 * densityRatio)
 
   // Agreement bonus — do categories agree?
   const directions = [sleep.direction, recovery.direction, activity.direction]
   if (bodyComp) directions.push(bodyComp.direction)
   const allSame = directions.every(d => d === directions[0])
-  if (allSame) score += 20
+  if (allSame) score += 15
+
+  // Category diversity: how many categories have actual signals?
+  const categoriesWithData = new Set(signals.map(s => s.category)).size
+  score += Math.min(15, categoriesWithData * 5)
 
   // Consistency bonus
   const avgConsistency = signals.length > 0
     ? signals.reduce((s, v) => s + v.consistency, 0) / signals.length
     : 0
-  if (avgConsistency > 0.7) score += 15
+  if (avgConsistency > 0.7) score += 10
 
   // Body comp presence bonus — body comp data improves trajectory reliability
-  if (bodyComp) {
-    score += 10
+  if (bodyComp && bodyComp.topMetric !== '') {
+    score += 5
   }
 
   // Volatility penalty — check coefficient of variation of signal strengths
   if (signals.length > 2) {
     const strengths = signals.map(s => s.strength)
     const mean = strengths.reduce((a, b) => a + b, 0) / strengths.length
-    if (mean > 0) {
-      const variance = strengths.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / strengths.length
-      const cv = (Math.sqrt(variance) / mean) * 100
-      if (cv > 25) score -= 10
-    }
+    const cv = mean > 0 ? safeDivide(
+      Math.sqrt(strengths.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / strengths.length),
+      mean
+    ) : null
+    if (cv !== null && cv * 100 > 25) score -= 10
   }
 
   return Math.max(20, Math.min(95, score))

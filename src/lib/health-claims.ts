@@ -4,6 +4,226 @@
 import { subDays, parseISO, format, differenceInDays } from 'date-fns'
 import { MetricBaseline, compareToBaseline, METRIC_POLARITY, calculateVolatility } from './health-baselines'
 import type { SeedMetric, SeedIntervention, SeedContextEvent } from './demo-data/seed-metrics'
+import { findProtocolMechanism, getProtocolInsight, isChangeExpected, confidenceScore } from './protocol-mechanisms'
+
+// ─── Actionable Recommendations ─────────────────────────────────────────────
+
+export interface ActionableRecommendation {
+  action: string           // What to do
+  reason: string           // Why this helps
+  priority: 'high' | 'medium' | 'low'
+  timeframe?: string       // When to expect results
+}
+
+const METRIC_RECOMMENDATIONS: Record<string, {
+  declining: ActionableRecommendation[]
+  improving: ActionableRecommendation[]
+  stable: ActionableRecommendation[]
+}> = {
+  'hrv': {
+    declining: [
+      { action: 'Reduce training intensity for 2-3 days', reason: 'Low HRV often indicates accumulated stress or incomplete recovery', priority: 'high', timeframe: '2-3 days' },
+      { action: 'Prioritize 8+ hours of sleep', reason: 'Sleep is the primary driver of HRV recovery', priority: 'high' },
+      { action: 'Check for illness or unusual stress', reason: 'HRV drops often precede getting sick', priority: 'medium' },
+      { action: 'Avoid alcohol and late caffeine', reason: 'Both significantly suppress overnight HRV', priority: 'medium' }
+    ],
+    improving: [
+      { action: 'Maintain current recovery practices', reason: 'Your body is adapting well', priority: 'low' },
+      { action: 'Consider slightly increasing training load', reason: 'Higher HRV indicates capacity for more stress', priority: 'medium' }
+    ],
+    stable: [
+      { action: 'Continue current routine', reason: 'Consistency is key for HRV', priority: 'low' }
+    ]
+  },
+  'deep_sleep': {
+    declining: [
+      { action: 'Take magnesium glycinate before bed', reason: 'Magnesium supports deep sleep architecture', priority: 'high' },
+      { action: 'Keep bedroom temperature at 65-68°F', reason: 'Cooler temperatures promote deep sleep', priority: 'high' },
+      { action: 'Avoid screens 1 hour before bed', reason: 'Blue light suppresses melatonin and deep sleep', priority: 'medium' },
+      { action: 'Finish eating 3+ hours before bed', reason: 'Digestion interferes with deep sleep', priority: 'medium' }
+    ],
+    improving: [
+      { action: 'Keep doing what you\'re doing', reason: 'Your sleep hygiene is working', priority: 'low' }
+    ],
+    stable: []
+  },
+  'rhr': {
+    declining: [
+      { action: 'Take a rest day', reason: 'Elevated RHR indicates accumulated fatigue', priority: 'high' },
+      { action: 'Hydrate well (aim for clear urine)', reason: 'Dehydration elevates resting heart rate', priority: 'medium' },
+      { action: 'Check for overtraining signs', reason: 'Chronic RHR elevation suggests overreaching', priority: 'medium' }
+    ],
+    improving: [
+      { action: 'Continue current training approach', reason: 'Lower RHR indicates improved cardiovascular fitness', priority: 'low' }
+    ],
+    stable: []
+  },
+  'body_fat_percentage': {
+    declining: [
+      { action: 'Maintain current nutrition approach', reason: 'Fat loss is occurring—stay consistent', priority: 'low' },
+      { action: 'Ensure adequate protein (1g/lb bodyweight)', reason: 'Protein preserves muscle during fat loss', priority: 'medium' }
+    ],
+    improving: [
+      { action: 'Track calorie intake for 1 week', reason: 'Awareness often reveals hidden calories', priority: 'high' },
+      { action: 'Increase daily movement (steps)', reason: 'NEAT is a major factor in body composition', priority: 'medium' },
+      { action: 'Review carb timing around workouts', reason: 'Strategic carb placement optimizes body composition', priority: 'low' }
+    ],
+    stable: []
+  },
+  'sleep_efficiency': {
+    declining: [
+      { action: 'Only use bed for sleep', reason: 'Strengthens sleep-bed association', priority: 'high' },
+      { action: 'Get up if awake >20 min', reason: 'Lying awake weakens sleep drive', priority: 'medium' },
+      { action: 'Wake at the same time daily', reason: 'Anchors circadian rhythm', priority: 'high' }
+    ],
+    improving: [],
+    stable: []
+  },
+  'steps': {
+    declining: [
+      { action: 'Take a 10-minute walk after each meal', reason: '3 short walks add 3,000+ steps easily', priority: 'high' },
+      { action: 'Set hourly movement reminders', reason: 'Breaks up sedentary time', priority: 'medium' }
+    ],
+    improving: [
+      { action: 'Great job! Consider adding variety', reason: 'Mix in different types of movement', priority: 'low' }
+    ],
+    stable: []
+  },
+  'weight': {
+    declining: [
+      { action: 'Ensure adequate protein intake', reason: 'Prevents muscle loss during weight loss', priority: 'high' },
+      { action: 'Don\'t cut calories too aggressively', reason: 'Sustainable loss is 0.5-1% bodyweight/week', priority: 'medium' }
+    ],
+    improving: [
+      { action: 'Review recent dietary changes', reason: 'Identify what shifted', priority: 'medium' },
+      { action: 'Check sodium and hydration', reason: 'Water weight can mask fat changes', priority: 'low' }
+    ],
+    stable: []
+  },
+  'sleep_duration': {
+    declining: [
+      { action: 'Set a consistent bedtime alarm', reason: 'Signals your brain to wind down', priority: 'high' },
+      { action: 'Avoid caffeine after 2pm', reason: 'Caffeine has a 6-hour half-life', priority: 'medium' },
+      { action: 'Create a 30-min wind-down routine', reason: 'Helps transition from alertness to sleep', priority: 'medium' }
+    ],
+    improving: [
+      { action: 'Maintain your current sleep schedule', reason: 'Consistency reinforces good sleep habits', priority: 'low' }
+    ],
+    stable: []
+  },
+  'rem_sleep': {
+    declining: [
+      { action: 'Avoid alcohol before bed', reason: 'Alcohol severely suppresses REM sleep', priority: 'high' },
+      { action: 'Reduce late-night stress', reason: 'Stress hormones interfere with REM', priority: 'medium' },
+      { action: 'Ensure adequate total sleep time', reason: 'REM occurs mainly in later sleep cycles', priority: 'medium' }
+    ],
+    improving: [],
+    stable: []
+  },
+  'vo2_max': {
+    declining: [
+      { action: 'Add 2-3 cardio sessions per week', reason: 'VO2 max responds to aerobic training', priority: 'high' },
+      { action: 'Include interval training', reason: 'HIIT is more time-efficient for VO2 gains', priority: 'medium' },
+      { action: 'Check for overtraining', reason: 'Fatigue can temporarily suppress VO2 readings', priority: 'low' }
+    ],
+    improving: [
+      { action: 'Continue current cardio routine', reason: 'Your aerobic fitness is improving', priority: 'low' }
+    ],
+    stable: []
+  },
+  'exercise_minutes': {
+    declining: [
+      { action: 'Schedule workouts like meetings', reason: 'Blocked time is harder to skip', priority: 'high' },
+      { action: 'Try shorter, more frequent sessions', reason: 'Even 15-20 min counts', priority: 'medium' },
+      { action: 'Find an accountability partner', reason: 'Social commitment increases adherence', priority: 'low' }
+    ],
+    improving: [
+      { action: 'Great momentum! Ensure adequate recovery', reason: 'Avoid overtraining as volume increases', priority: 'medium' }
+    ],
+    stable: []
+  },
+  'active_calories': {
+    declining: [
+      { action: 'Increase daily step count', reason: 'Walking burns significant calories over time', priority: 'high' },
+      { action: 'Add resistance training', reason: 'Muscle burns more calories at rest', priority: 'medium' }
+    ],
+    improving: [],
+    stable: []
+  },
+  'lean_body_mass': {
+    declining: [
+      { action: 'Increase protein to 1g per lb bodyweight', reason: 'Protein is essential for muscle preservation', priority: 'high' },
+      { action: 'Add or increase resistance training', reason: 'Muscle responds to progressive overload', priority: 'high' },
+      { action: 'Ensure you\'re not in too large a calorie deficit', reason: 'Extreme deficits cause muscle loss', priority: 'medium' }
+    ],
+    improving: [
+      { action: 'Maintain protein intake and training', reason: 'You\'re building lean mass effectively', priority: 'low' }
+    ],
+    stable: []
+  },
+  'muscle_mass': {
+    declining: [
+      { action: 'Increase protein to 1g per lb bodyweight', reason: 'Protein is essential for muscle preservation', priority: 'high' },
+      { action: 'Add or increase resistance training', reason: 'Muscle responds to progressive overload', priority: 'high' },
+      { action: 'Ensure you\'re not in too large a calorie deficit', reason: 'Extreme deficits cause muscle loss', priority: 'medium' }
+    ],
+    improving: [
+      { action: 'Maintain protein intake and training', reason: 'You\'re building muscle effectively', priority: 'low' }
+    ],
+    stable: []
+  }
+}
+
+/**
+ * Get actionable recommendations for a metric based on its trend
+ */
+export function getRecommendations(
+  metricType: string,
+  trend: 'improving' | 'declining' | 'stable',
+  polarity: 'higher_better' | 'lower_better' = 'higher_better'
+): ActionableRecommendation[] {
+  // Adjust for polarity (e.g., body_fat declining is "improving")
+  let effectiveTrend = trend
+  if (polarity === 'lower_better') {
+    if (trend === 'improving') effectiveTrend = 'declining'
+    else if (trend === 'declining') effectiveTrend = 'improving'
+  }
+
+  const recommendations = METRIC_RECOMMENDATIONS[metricType]
+  if (!recommendations) return []
+
+  return recommendations[effectiveTrend] || []
+}
+
+/**
+ * Format recommendations into a readable string for actionable field
+ */
+export function formatTopRecommendations(
+  metricType: string,
+  trend: 'improving' | 'declining' | 'stable',
+  polarity: 'higher_better' | 'lower_better' = 'higher_better',
+  maxCount: number = 2
+): string {
+  const recs = getRecommendations(metricType, trend, polarity)
+  if (recs.length === 0) return ''
+
+  const topRecs = recs
+    .sort((a, b) => {
+      const priorityOrder = { high: 0, medium: 1, low: 2 }
+      return priorityOrder[a.priority] - priorityOrder[b.priority]
+    })
+    .slice(0, maxCount)
+
+  return topRecs.map(r => r.action).join('. ') + '.'
+}
+
+// ─── Core Types ─────────────────────────────────────────────────────────────
+
+// Active protocol type for protocol-aware insights
+export interface ActiveProtocol {
+  name: string
+  startDate: Date
+}
 
 export interface EffectSize {
   cohensD: number           // Standardized effect size
@@ -17,6 +237,15 @@ export interface ConfidenceLevel {
   level: 'high' | 'medium' | 'low'
   score: number             // 0-100
   reasons: string[]
+}
+
+// Statistically grounded confidence scoring
+export interface StatisticalConfidence {
+  level: 'high' | 'medium' | 'low'
+  sampleSize: number
+  consistency: number // 0-1, higher is more consistent
+  isSignificant: boolean
+  explanation: string
 }
 
 export interface Receipt {
@@ -242,11 +471,13 @@ function generateInterventionClaims(
     )
     const confoundTypes = [...new Set(confounds.map(c => c.type))]
 
-    // Calculate confidence
+    // Calculate confidence using statistical method with actual values
     const confidence = calculateConfidence(
       afterData.length,
       confoundTypes.length,
-      effectSize.cohensD
+      effectSize.cohensD,
+      afterValues,
+      effectSize.percentChange
     )
 
     // Only create claim if effect is meaningful
@@ -337,6 +568,27 @@ function generateDeltaClaims(
     const isPositive = (polarity === 'higher_better' && delta.direction === 'above') ||
                        (polarity === 'lower_better' && delta.direction === 'below')
 
+    // Calculate statistical confidence for delta claims
+    // Sample size: baseline data points, Significance: z-score > 2
+    const deltaIsSignificant = Math.abs(delta.zScore) > 2
+    const n = baseline.dataPoints
+    let deltaLevel: 'high' | 'medium' | 'low'
+    if (n >= 14 && deltaIsSignificant) {
+      deltaLevel = 'high'
+    } else if (n >= 7 && (deltaIsSignificant || n >= 14)) {
+      deltaLevel = 'medium'
+    } else {
+      deltaLevel = 'low'
+    }
+
+    const deltaReasons: string[] = []
+    if (n >= 14) deltaReasons.push(`Strong baseline (${n} days)`)
+    else if (n >= 7) deltaReasons.push(`Adequate baseline (${n} days)`)
+    else deltaReasons.push(`Limited baseline (${n} days)`)
+
+    if (deltaIsSignificant) deltaReasons.push('Statistically significant (>2σ)')
+    else deltaReasons.push('Within normal variation')
+
     claims.push({
       id: `delta_${metricType}_${currentMetric.date}`,
       type: 'observation',
@@ -348,9 +600,9 @@ function generateDeltaClaims(
       metricType,
 
       confidence: {
-        level: baseline.dataPoints >= 20 ? 'high' : baseline.dataPoints >= 10 ? 'medium' : 'low',
-        score: Math.min(95, 50 + baseline.dataPoints * 2),
-        reasons: [`Based on ${baseline.dataPoints} days of baseline data`]
+        level: deltaLevel,
+        score: Math.min(95, 30 + (n >= 14 ? 30 : n >= 7 ? 20 : 5) + (deltaIsSignificant ? 20 : 0)),
+        reasons: deltaReasons
       },
 
       receipt: {
@@ -401,20 +653,9 @@ function generateWarningClaims(
     'rhr', 'blood_oxygen',
   ]
 
-  // Contextual recommendations per metric
-  const warningRecommendations: Record<string, string> = {
-    body_fat_percentage: 'Review nutrition and training. Consider body composition recheck.',
-    weight: 'Track alongside body fat % — weight alone doesn\'t tell the full story.',
-    lean_body_mass: 'Ensure adequate protein intake and resistance training.',
-    muscle_mass: 'Check training volume and protein intake. Consider recovery quality.',
-    steps: 'Look for opportunities to increase daily movement.',
-    active_calories: 'Activity is trending down — consider adjusting training plan.',
-    exercise_minutes: 'Exercise frequency declining — check schedule and energy levels.',
-    vo2_max: 'Cardiovascular fitness declining — consider adding cardio sessions.',
-    rhr: 'Rising resting heart rate can indicate stress, overtraining, or poor recovery.',
+  // Fallback recommendations for metrics not in METRIC_RECOMMENDATIONS
+  const fallbackRecommendations: Record<string, string> = {
     blood_oxygen: 'Declining blood oxygen — monitor and consult provider if persistent.',
-    rem_sleep: 'REM sleep supports memory and learning. Check alcohol, stress, or late caffeine.',
-    sleep_duration: 'Prioritize sleep hygiene and consistent bedtime.',
   }
 
   for (const metricType of declineMetrics) {
@@ -447,6 +688,16 @@ function generateWarningClaims(
                       (polarity === 'lower_better' && change > warningThreshold)
 
     if (isDecline) {
+      // Calculate statistical confidence for warning claims
+      const allValues = [...prior, ...recent].map(m => m.value)
+      const warningStatConf = calculateStatisticalConfidence(allValues, change)
+      const warningConfidence = statisticalToConfidenceLevel(warningStatConf, 0)
+
+      // Get actionable recommendations from the recommendations system
+      const actionableText = formatTopRecommendations(metricType, 'declining', polarity, 2)
+        || fallbackRecommendations[metricType]
+        || 'Review recent changes to sleep habits, training load, or stress'
+
       claims.push({
         id: `warning_${metricType}`,
         type: 'warning',
@@ -454,15 +705,11 @@ function generateWarningClaims(
 
         headline: `${getMetricDisplayName(metricType)} declining`,
         evidence: `Down ${Math.abs(change).toFixed(0)}% over the past ${halfLen * 2} days`,
-        actionable: warningRecommendations[metricType] || 'Review recent changes to sleep habits, training load, or stress',
+        actionable: actionableText,
 
         metricType,
 
-        confidence: {
-          level: 'medium',
-          score: 70,
-          reasons: [`Based on ${halfLen * 2}-day comparison`, 'May be influenced by recent events']
-        },
+        confidence: warningConfidence,
 
         receipt: {
           sampleSize: { before: prior.length, after: recent.length },
@@ -519,6 +766,13 @@ function generateCorrelationClaims(
       const pctDiff = normalAvg !== 0 ? clampPercent((diff / normalAvg) * 100) : 0
 
       if (Math.abs(pctDiff) > 10) {
+        // Calculate statistical confidence for alcohol correlation
+        const alcoholValues = alcoholNights.map(m => m.value)
+        const alcoholStatConf = calculateStatisticalConfidence(alcoholValues, pctDiff)
+        const alcoholCorrelationConf = statisticalToConfidenceLevel(alcoholStatConf, 0)
+        // Add comparison context to reasons
+        alcoholCorrelationConf.reasons.push(`Compared ${alcoholNights.length} alcohol vs ${normalNights.length} normal nights`)
+
         claims.push({
           id: 'correlation_alcohol_deep_sleep',
           type: 'correlation',
@@ -530,11 +784,7 @@ function generateCorrelationClaims(
 
           metricType: 'deep_sleep',
 
-          confidence: {
-            level: alcoholNights.length >= 5 ? 'high' : 'medium',
-            score: Math.min(90, 50 + alcoholNights.length * 5),
-            reasons: [`Based on ${alcoholNights.length} alcohol nights and ${normalNights.length} normal nights`]
-          },
+          confidence: alcoholCorrelationConf,
 
           receipt: {
             sampleSize: { before: normalNights.length, after: alcoholNights.length },
@@ -599,6 +849,11 @@ function generateCorrelationClaims(
       const pctDiff = badAvg !== 0 ? clampPercent(((goodAvg - badAvg) / badAvg) * 100) : 0
 
       if (Math.abs(pctDiff) > 10) {
+        // Calculate statistical confidence for sleep-activity correlation
+        const sleepActStatConf = calculateStatisticalConfidence(goodSleepSteps, pctDiff)
+        const sleepActConf = statisticalToConfidenceLevel(sleepActStatConf, 0)
+        sleepActConf.reasons.push(`Compared ${goodSleepSteps.length} good-sleep vs ${badSleepSteps.length} poor-sleep days`)
+
         claims.push({
           id: 'correlation_sleep_activity',
           type: 'correlation',
@@ -607,11 +862,7 @@ function generateCorrelationClaims(
           evidence: `After sleeping >${Math.round(sleepMedian / 60)}h: avg ${Math.round(goodAvg).toLocaleString()} steps. After shorter sleep: avg ${Math.round(badAvg).toLocaleString()} steps.`,
           actionable: 'Prioritize sleep to maintain activity levels.',
           metricType: 'steps',
-          confidence: {
-            level: goodSleepSteps.length >= 10 ? 'high' : 'medium',
-            score: Math.min(85, 50 + goodSleepSteps.length * 2),
-            reasons: [`Based on ${goodSleepSteps.length} good-sleep days and ${badSleepSteps.length} poor-sleep days`]
-          },
+          confidence: sleepActConf,
           receipt: {
             sampleSize: { before: badSleepSteps.length, after: goodSleepSteps.length },
             effectSize: { cohensD: 0, percentChange: pctDiff, absoluteChange: goodAvg - badAvg, direction: pctDiff > 0 ? 'positive' : 'negative', magnitude: Math.abs(pctDiff) > 20 ? 'large' : 'medium' },
@@ -661,6 +912,11 @@ function generateCorrelationClaims(
       const pctDiff = lowAvg !== 0 ? clampPercent((hrvDiff / lowAvg) * 100) : 0
 
       if (Math.abs(pctDiff) > 5) {
+        // Calculate statistical confidence for training-HRV correlation
+        const trainingHrvStatConf = calculateStatisticalConfidence(highExDayHRV, pctDiff)
+        const trainingHrvConf = statisticalToConfidenceLevel(trainingHrvStatConf, 0)
+        trainingHrvConf.reasons.push(`Compared ${highExDayHRV.length} high-activity vs ${lowExDayHRV.length} low-activity days`)
+
         claims.push({
           id: 'correlation_training_hrv',
           type: 'correlation',
@@ -671,11 +927,7 @@ function generateCorrelationClaims(
             ? 'Allow recovery days after intense training to maintain HRV.'
             : 'Your body recovers well from training. Maintain current intensity.',
           metricType: 'hrv',
-          confidence: {
-            level: highExDayHRV.length >= 10 ? 'high' : 'medium',
-            score: Math.min(85, 50 + highExDayHRV.length * 2),
-            reasons: [`Based on ${highExDayHRV.length} high-activity days and ${lowExDayHRV.length} low-activity days`]
-          },
+          confidence: trainingHrvConf,
           receipt: {
             sampleSize: { before: lowExDayHRV.length, after: highExDayHRV.length },
             effectSize: { cohensD: 0, percentChange: pctDiff, absoluteChange: hrvDiff, direction: hrvDiff > 0 ? 'positive' : 'negative', magnitude: Math.abs(pctDiff) > 15 ? 'large' : 'medium' },
@@ -749,6 +1001,16 @@ function generateTrendClaims(
       const direction = change > 0 ? 'up' : 'down'
       const quality = isPositive ? '' : ' (watch this)'
 
+      // Calculate statistical confidence for trend claims
+      const trendValues = metricData.slice(-window.days).map(m => m.value)
+      const trendStatConf = calculateStatisticalConfidence(trendValues, change)
+      const trendConf = statisticalToConfidenceLevel(trendStatConf, 0)
+      trendConf.reasons.push(`${window.label} trend window`)
+
+      // Determine trend for recommendations
+      const trendDirection: 'improving' | 'declining' | 'stable' = isPositive ? 'improving' : 'declining'
+      const trendActionable = formatTopRecommendations(metricType, trendDirection, polarity, 2)
+
       claims.push({
         id: `trend_${metricType}_${window.days}d`,
         type: isPositive ? 'improvement' : 'observation',
@@ -756,14 +1018,11 @@ function generateTrendClaims(
 
         headline: `${metricName} trending ${direction} ${absChange.toFixed(1)}% over ${window.label}${quality}`,
         evidence: `Recent avg: ${formatMetricValue(recentAvg, metricType)} vs prior: ${formatMetricValue(olderAvg, metricType)} (${window.days}-day window)`,
+        actionable: trendActionable || undefined,
 
         metricType,
 
-        confidence: {
-          level: metricData.length >= 30 ? 'high' : metricData.length >= 14 ? 'medium' : 'low',
-          score: Math.min(90, 50 + metricData.length),
-          reasons: [`Based on ${metricData.length} data points over ${window.label}`]
-        },
+        confidence: trendConf,
 
         receipt: {
           sampleSize: { before: olderHalf.length, after: recentHalf.length },
@@ -827,6 +1086,7 @@ function generateTemporalClaims(
       effectSize: EffectSize
       afterCount: number
       beforeCount: number
+      afterValues: number[]
     }> = []
 
     for (const metricType of allMetricTypes) {
@@ -847,6 +1107,7 @@ function generateTemporalClaims(
           effectSize: effect,
           afterCount: afterData.length,
           beforeCount: beforeData.length,
+          afterValues,
         })
       }
     }
@@ -882,7 +1143,9 @@ function generateTemporalClaims(
         confidence: calculateConfidence(
           change.afterCount,
           0, // No confound info for temporal claims
-          change.effectSize.cohensD
+          change.effectSize.cohensD,
+          change.afterValues,
+          change.effectSize.percentChange
         ),
 
         receipt: {
@@ -960,6 +1223,13 @@ function generateRecompositionClaims(
       bodyFatData.slice(0, halfBF).map(m => m.value),
       bodyFatData.slice(-halfBF).map(m => m.value)
     )
+    // Calculate statistical confidence for recomposition
+    const bfPctChange = olderBFAvg !== 0 ? ((bfChange) / olderBFAvg) * 100 : 0
+    const recompValues = bodyFatData.map(m => m.value)
+    const recompStatConf = calculateStatisticalConfidence(recompValues, bfPctChange)
+    const recompConf = statisticalToConfidenceLevel(recompStatConf, 0)
+    recompConf.reasons.push(`Multi-signal: ${bodyFatData.length} body fat + ${massData.length} ${massName} data points`)
+
     claims.push({
       id: 'body_recomposition',
       type: 'improvement',
@@ -968,11 +1238,7 @@ function generateRecompositionClaims(
       evidence: `Body fat ${bfChange.toFixed(1)}% while ${massName} +${massChange.toFixed(1)}kg. You are simultaneously losing fat and gaining muscle.`,
       actionable: 'Your training and nutrition are producing optimal body composition changes. Continue current approach.',
       metricType: 'body_fat_percentage',
-      confidence: {
-        level: Math.min(bodyFatData.length, massData.length) >= 10 ? 'high' : 'medium',
-        score: Math.min(90, 50 + Math.min(bodyFatData.length, massData.length) * 3),
-        reasons: [`Based on ${bodyFatData.length} body fat and ${massData.length} ${massName} data points`]
-      },
+      confidence: recompConf,
       receipt: {
         sampleSize: { before: halfBF, after: halfBF },
         effectSize,
@@ -997,6 +1263,13 @@ function generateRecompositionClaims(
     const weightChange = recentWAvg - olderWAvg
 
     if (Math.abs(weightChange) < 0.5 && (Math.abs(bfChange) > 0.5 || Math.abs(massChange) > 0.3)) {
+      // Calculate statistical confidence for weight-stable recomposition
+      const weightValues = weightData.map(m => m.value)
+      const weightPctChange = olderWAvg !== 0 ? ((weightChange) / olderWAvg) * 100 : 0
+      const stableRecompStatConf = calculateStatisticalConfidence(weightValues, weightPctChange)
+      const stableRecompConf = statisticalToConfidenceLevel(stableRecompStatConf, 0)
+      stableRecompConf.reasons.push(`Multi-signal: ${weightData.length} weight, ${bodyFatData.length} body fat, ${massData.length} ${massName} data points`)
+
       claims.push({
         id: 'weight_stable_recomp',
         type: 'observation',
@@ -1005,11 +1278,7 @@ function generateRecompositionClaims(
         evidence: `Weight barely moved (${weightChange > 0 ? '+' : ''}${weightChange.toFixed(1)}kg) but body fat ${bfChange > 0 ? '+' : ''}${bfChange.toFixed(1)}% and ${massName} ${massChange > 0 ? '+' : ''}${massChange.toFixed(1)}kg.`,
         actionable: 'The scale doesn\'t tell the full story. Track body composition, not just weight.',
         metricType: 'weight',
-        confidence: {
-          level: 'medium',
-          score: 70,
-          reasons: [`Based on ${weightData.length} weight, ${bodyFatData.length} body fat, and ${massData.length} ${massName} data points`]
-        },
+        confidence: stableRecompConf,
         receipt: {
           sampleSize: { before: halfW, after: halfW },
           effectSize: { cohensD: 0, percentChange: 0, absoluteChange: weightChange, direction: 'neutral', magnitude: 'negligible' },
@@ -1028,6 +1297,13 @@ function generateRecompositionClaims(
 
     // WEIGHT DROPPING, LEAN MASS STABLE = fat loss
     if (weightChange < -0.5 && Math.abs(massChange) < 0.3 && bfChange < -0.3) {
+      // Calculate statistical confidence for fat loss claim
+      const fatLossWeightValues = weightData.map(m => m.value)
+      const fatLossPctChange = olderWAvg !== 0 ? ((weightChange) / olderWAvg) * 100 : 0
+      const fatLossStatConf = calculateStatisticalConfidence(fatLossWeightValues, fatLossPctChange)
+      const fatLossConf = statisticalToConfidenceLevel(fatLossStatConf, 0)
+      fatLossConf.reasons.push(`Multi-signal: ${weightData.length} weight + ${bodyFatData.length} body fat data points`)
+
       claims.push({
         id: 'fat_loss_lean_preserved',
         type: 'improvement',
@@ -1036,11 +1312,7 @@ function generateRecompositionClaims(
         evidence: `Weight down ${Math.abs(weightChange).toFixed(1)}kg, body fat ${bfChange.toFixed(1)}%, ${massName} stable (${massChange > 0 ? '+' : ''}${massChange.toFixed(1)}kg). Weight loss is primarily fat.`,
         actionable: 'Good trajectory. Maintain protein intake to continue preserving lean mass.',
         metricType: 'weight',
-        confidence: {
-          level: 'medium',
-          score: 70,
-          reasons: [`Based on ${weightData.length} weight and ${bodyFatData.length} body fat data points`]
-        },
+        confidence: fatLossConf,
         receipt: {
           sampleSize: { before: halfW, after: halfW },
           effectSize: { cohensD: 0, percentChange: olderWAvg !== 0 ? clampPercent((weightChange / olderWAvg) * 100) : 0, absoluteChange: weightChange, direction: 'negative', magnitude: 'small' },
@@ -1194,24 +1466,150 @@ function calculateEffectSize(before: number[], after: number[]): EffectSize {
   }
 }
 
-// Calculate confidence level
+/**
+ * Calculate statistically grounded confidence based on:
+ * 1. Sample size (n < 7: low, 7-14: medium, > 14: high)
+ * 2. Effect consistency via coefficient of variation (CV)
+ * 3. Statistical significance (change exceeds 2 standard deviations)
+ */
+function calculateStatisticalConfidence(
+  values: number[],
+  changePercent: number
+): StatisticalConfidence {
+  const n = values.length
+
+  // Sample size component
+  let sampleConfidence: 'high' | 'medium' | 'low'
+  if (n >= 14) sampleConfidence = 'high'
+  else if (n >= 7) sampleConfidence = 'medium'
+  else sampleConfidence = 'low'
+
+  // Consistency (coefficient of variation)
+  const mean = n > 0 ? values.reduce((a, b) => a + b, 0) / n : 0
+  const variance = n > 0 ? values.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / n : 0
+  const stdDev = Math.sqrt(variance)
+  const cv = mean !== 0 ? (stdDev / Math.abs(mean)) * 100 : 0
+
+  // Consistency score: 0-1, where lower CV = higher consistency
+  // CV < 15% = high consistency (> 0.7), CV 15-30% = medium (0.4-0.7), CV > 30% = low (< 0.4)
+  const consistency = Math.max(0, Math.min(1, 1 - (cv / 50)))
+
+  // Significance: is change > 2 standard deviations?
+  // Convert std dev to percent of mean, then multiply by 2
+  const changeThreshold = mean !== 0 ? (stdDev / Math.abs(mean)) * 200 : 5 // 2 std devs as percent
+  const isSignificant = Math.abs(changePercent) > Math.max(changeThreshold, 5) // minimum 5% threshold
+
+  // Combined confidence level
+  let level: 'high' | 'medium' | 'low'
+  if (sampleConfidence === 'high' && consistency > 0.7 && isSignificant) {
+    level = 'high'
+  } else if (sampleConfidence !== 'low' && (consistency > 0.5 || isSignificant)) {
+    level = 'medium'
+  } else {
+    level = 'low'
+  }
+
+  // Human-readable explanation
+  const explanations: string[] = []
+  if (n < 7) explanations.push(`Only ${n} data points`)
+  if (cv > 30) explanations.push('High day-to-day variability')
+  if (!isSignificant) explanations.push('Change within normal variation')
+  if (explanations.length === 0) explanations.push('Consistent trend with sufficient data')
+
+  return {
+    level,
+    sampleSize: n,
+    consistency,
+    isSignificant,
+    explanation: explanations.join('; ')
+  }
+}
+
+/**
+ * Convert StatisticalConfidence to ConfidenceLevel format for claim compatibility
+ */
+function statisticalToConfidenceLevel(
+  stat: StatisticalConfidence,
+  confoundCount: number = 0
+): ConfidenceLevel {
+  const reasons: string[] = []
+
+  // Sample size reason
+  if (stat.sampleSize >= 14) {
+    reasons.push(`Strong sample size (${stat.sampleSize} days)`)
+  } else if (stat.sampleSize >= 7) {
+    reasons.push(`Adequate sample size (${stat.sampleSize} days)`)
+  } else {
+    reasons.push(`Limited sample size (${stat.sampleSize} days)`)
+  }
+
+  // Consistency reason
+  if (stat.consistency > 0.7) {
+    reasons.push('Low variability (consistent data)')
+  } else if (stat.consistency > 0.4) {
+    reasons.push('Moderate variability')
+  } else {
+    reasons.push('High day-to-day variability')
+  }
+
+  // Significance reason
+  if (stat.isSignificant) {
+    reasons.push('Statistically significant change')
+  } else {
+    reasons.push('Change within normal variation')
+  }
+
+  // Confound reason
+  if (confoundCount > 0) {
+    reasons.push(`${confoundCount} confound${confoundCount > 1 ? 's' : ''} present`)
+  }
+
+  // Calculate score based on statistical components
+  let score = 30 // base
+
+  // Sample size contribution (0-30 points)
+  if (stat.sampleSize >= 14) score += 30
+  else if (stat.sampleSize >= 7) score += 20
+  else score += 5
+
+  // Consistency contribution (0-20 points)
+  score += Math.round(stat.consistency * 20)
+
+  // Significance contribution (0-15 points)
+  if (stat.isSignificant) score += 15
+
+  // Confound penalty
+  score -= confoundCount * 5
+
+  score = Math.min(95, Math.max(20, score))
+
+  return { level: stat.level, score, reasons }
+}
+
+// Calculate confidence level (legacy interface, now uses statistical calculation internally)
 function calculateConfidence(
   sampleSize: number,
   confoundCount: number,
-  effectSize: number
+  effectSize: number,
+  values?: number[],
+  changePercent?: number
 ): ConfidenceLevel {
+  // If we have values and changePercent, use statistical confidence
+  if (values && values.length > 0 && changePercent !== undefined) {
+    const stat = calculateStatisticalConfidence(values, changePercent)
+    return statisticalToConfidenceLevel(stat, confoundCount)
+  }
+
+  // Fallback to sample-size based estimation when values not available
   const reasons: string[] = []
   let score = 50
 
-  // Sample size contribution
-  if (sampleSize >= 21) {
+  // Sample size contribution (using new thresholds)
+  if (sampleSize >= 14) {
     score += 30
     reasons.push(`Strong sample size (${sampleSize} days)`)
-  } else if (sampleSize >= 14) {
-    score += 20
-    reasons.push(`Good sample size (${sampleSize} days)`)
   } else if (sampleSize >= 7) {
-    score += 10
+    score += 15
     reasons.push(`Adequate sample size (${sampleSize} days)`)
   } else {
     reasons.push(`Limited sample size (${sampleSize} days)`)
@@ -1219,7 +1617,7 @@ function calculateConfidence(
 
   // Confound penalty
   if (confoundCount === 0) {
-    score += 15
+    score += 10
     reasons.push('No confounds detected')
   } else if (confoundCount <= 2) {
     score += 5
@@ -1239,6 +1637,7 @@ function calculateConfidence(
 
   score = Math.min(95, Math.max(20, score))
 
+  // Updated level thresholds aligned with statistical approach
   const level: ConfidenceLevel['level'] =
     score >= 75 ? 'high' :
     score >= 50 ? 'medium' : 'low'
@@ -1493,4 +1892,152 @@ export function groupClaimsIntoThemes(claims: Claim[]): InsightTheme[] {
   themes.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority])
 
   return themes.slice(0, 5)
+}
+
+// ─── Protocol Context Integration ───────────────────────────────────
+
+/**
+ * Generate a trend claim with protocol-specific context.
+ * Checks if any active protocol explains the observed change.
+ */
+export function generateTrendClaimWithContext(
+  metricType: string,
+  trend: 'improving' | 'declining' | 'stable',
+  changePercent: number,
+  activeProtocols: ActiveProtocol[]
+): { description: string; protocolMatch: string | null } {
+  let description = `Your ${getMetricDisplayName(metricType)} is ${trend}`
+  let protocolMatch: string | null = null
+
+  // Only check protocol context for non-stable trends
+  if (trend === 'stable') {
+    return { description, protocolMatch }
+  }
+
+  // Check if any active protocol explains this change
+  const relevantProtocols = activeProtocols
+    .map(p => {
+      const weeksOnProtocol = Math.floor((Date.now() - p.startDate.getTime()) / (7 * 24 * 60 * 60 * 1000))
+      const result = isChangeExpected(p.name, metricType, trend, weeksOnProtocol)
+      return { ...p, weeksOnProtocol, ...result }
+    })
+    .filter(p => p.expected)
+    .sort((a, b) => confidenceScore(b.confidence) - confidenceScore(a.confidence))
+
+  if (relevantProtocols.length > 0) {
+    const topProtocol = relevantProtocols[0]
+    protocolMatch = topProtocol.name
+
+    // Determine phase for insight
+    const phase = topProtocol.weeksOnProtocol < 2
+      ? 'earlyImproving'
+      : trend === 'improving' ? 'improving' : 'declining'
+
+    const protocolExplanation = getProtocolInsight(
+      topProtocol.name,
+      metricType,
+      phase,
+      changePercent
+    )
+
+    if (protocolExplanation) {
+      description = protocolExplanation
+    }
+
+    // Add early protocol warning if applicable
+    if (topProtocol.weeksOnProtocol < 2) {
+      description += ` You've been on ${topProtocol.name} for ${topProtocol.weeksOnProtocol} week${topProtocol.weeksOnProtocol !== 1 ? 's' : ''}—give it more time before drawing conclusions.`
+    }
+
+    // Note multiple relevant protocols if present
+    if (relevantProtocols.length > 1) {
+      const otherProtocols = relevantProtocols.slice(1).map(p => p.name).join(', ')
+      description += ` (Other protocols that could contribute: ${otherProtocols})`
+    }
+  }
+
+  return { description, protocolMatch }
+}
+
+/**
+ * Enhance existing claims with protocol context.
+ * Call this after generating claims to add protocol-specific explanations.
+ */
+export function enhanceClaimsWithProtocolContext(
+  claims: Claim[],
+  activeProtocols: ActiveProtocol[]
+): Claim[] {
+  if (activeProtocols.length === 0) return claims
+
+  return claims.map(claim => {
+    // Only enhance trend/improvement/decline claims that have a metric type
+    if (!claim.metricType) return claim
+    if (!['improvement', 'decline', 'observation', 'warning'].includes(claim.type)) return claim
+
+    // Determine the trend from the claim
+    const trend: 'improving' | 'declining' | 'stable' =
+      claim.type === 'improvement' ? 'improving' :
+      claim.type === 'decline' || claim.type === 'warning' ? 'declining' :
+      'stable'
+
+    // Skip stable trends - protocol context is only relevant for directional changes
+    if (trend === 'stable') return claim
+
+    const changePercent = claim.receipt.effectSize.percentChange
+
+    // Check for protocol context
+    for (const protocol of activeProtocols) {
+      const weeksOnProtocol = Math.floor((Date.now() - protocol.startDate.getTime()) / (7 * 24 * 60 * 60 * 1000))
+      const { expected } = isChangeExpected(protocol.name, claim.metricType, trend, weeksOnProtocol)
+
+      if (expected) {
+        // Determine phase for insight - map to valid status values
+        const status: 'earlyImproving' | 'improving' | 'declining' | 'stable' | 'noData' =
+          weeksOnProtocol < 2
+            ? 'earlyImproving'
+            : trend === 'improving' ? 'improving' : trend === 'declining' ? 'declining' : 'stable'
+
+        const protocolInsight = getProtocolInsight(protocol.name, claim.metricType, status, changePercent)
+
+        if (protocolInsight) {
+          // Enhance the claim with protocol context
+          let enhancedEvidence = claim.evidence
+          enhancedEvidence += ` ${protocolInsight}`
+
+          if (weeksOnProtocol < 2) {
+            enhancedEvidence += ` (Week ${weeksOnProtocol} on ${protocol.name}—early to draw conclusions)`
+          }
+
+          return {
+            ...claim,
+            evidence: enhancedEvidence,
+            // Add protocol reference if not already present
+            interventionName: claim.interventionName || protocol.name,
+          }
+        }
+        break // Only use the most relevant protocol
+      }
+    }
+
+    return claim
+  })
+}
+
+/**
+ * Get active protocols from interventions for protocol context.
+ * Helper to convert SeedIntervention to ActiveProtocol format.
+ */
+export function interventionsToActiveProtocols(interventions: SeedIntervention[]): ActiveProtocol[] {
+  return interventions
+    .filter(i => {
+      // Filter to active interventions
+      const startDate = parseISO(i.startDate)
+      const today = new Date()
+      const daysSinceStart = differenceInDays(today, startDate)
+      return daysSinceStart >= 0 // Has started
+    })
+    .map(i => ({
+      name: i.name,
+      startDate: parseISO(i.startDate)
+    }))
 }

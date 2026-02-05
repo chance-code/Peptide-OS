@@ -14,7 +14,9 @@
     "db:reset": "prisma migrate reset --force",
     "postinstall": "patch-package && prisma generate",
     "cap:sync": "npx cap sync ios",
-    "cap:open": "npx cap open ios"
+    "cap:open": "npx cap open ios",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@capacitor/app": "^8.0.0",
@@ -63,7 +65,8 @@
     "sharp": "^0.34.5",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.0.18"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"

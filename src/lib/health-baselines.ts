@@ -2,7 +2,7 @@
 // Computes personal baselines with rolling windows and robust statistics
 
 import { subDays, differenceInDays, parseISO, format } from 'date-fns'
-import { clampPercent, validateChangePercent, type MetricType } from './health-constants'
+import { clampPercent, validateChangePercent, safeDivide, safePercentChange, type MetricType } from './health-constants'
 
 export interface MetricBaseline {
   metricType: string
@@ -95,14 +95,10 @@ export function compareToBaseline(
   polarity: 'higher_better' | 'lower_better' = 'higher_better'
 ): BaselineDelta {
   const absoluteDelta = current - baseline.mean
-  const percentDelta = baseline.mean !== 0
-    ? clampPercent((absoluteDelta / baseline.mean) * 100)
-    : 0
+  const percentDelta = safePercentChange(current, baseline.mean) ?? 0
 
   // Z-score (how many standard deviations from mean)
-  const zScore = baseline.stdDev !== 0
-    ? absoluteDelta / baseline.stdDev
-    : 0
+  const zScore = safeDivide(absoluteDelta, baseline.stdDev) ?? 0
 
   // Approximate percentile from z-score
   const percentileValue = normalCDF(zScore) * 100
@@ -209,8 +205,8 @@ export function calculateMomentum(
   const older = sorted.slice(-21, -14)
   const olderAvg = older.reduce((s, v) => s + v.value, 0) / older.length
 
-  let currentTrend = middleAvg !== 0 ? clampPercent(((recentAvg - middleAvg) / middleAvg) * 100) : 0
-  let previousTrend = olderAvg !== 0 ? clampPercent(((middleAvg - olderAvg) / olderAvg) * 100) : 0
+  let currentTrend = safePercentChange(recentAvg, middleAvg) ?? 0
+  let previousTrend = safePercentChange(middleAvg, olderAvg) ?? 0
 
   // Validate change percents if metric type is provided
   if (metricType) {
@@ -255,9 +251,8 @@ export interface MetricVolatility {
 }
 
 export function calculateVolatility(baseline: MetricBaseline): MetricVolatility {
-  const cv = baseline.mean !== 0
-    ? (baseline.stdDev / Math.abs(baseline.mean)) * 100
-    : 0
+  const cvRaw = safeDivide(baseline.stdDev, Math.abs(baseline.mean))
+  const cv = cvRaw !== null ? cvRaw * 100 : 0
 
   let level: MetricVolatility['level']
   let description: string
@@ -457,7 +452,7 @@ export const METRIC_POLARITY: Record<string, 'higher_better' | 'lower_better'> =
   // Fitness
   vo2_max: 'higher_better',
   // Body Composition
-  weight: 'lower_better',
+  weight: 'higher_better', // Weight direction is context-dependent; default to higher
   body_fat_percentage: 'lower_better',
   bmi: 'lower_better',
   lean_body_mass: 'higher_better',
