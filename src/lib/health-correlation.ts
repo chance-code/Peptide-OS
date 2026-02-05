@@ -4,6 +4,7 @@
 import { prisma } from './prisma'
 import { MetricType, getMetricDisplayName, formatMetricValue } from './health-providers'
 import { clampPercent } from './health-constants'
+import { METRIC_POLARITY } from './health-baselines'
 
 export interface CorrelationResult {
   protocolId: string
@@ -251,13 +252,12 @@ export async function getInsightsSummary(userId: string): Promise<InsightSummary
 
   // Generate top insight (most significant positive change)
   let topInsight: string | null = null
+  // FIX: Use METRIC_POLARITY for all metrics, not just RHR
   const positiveCorrelations = significantCorrelations.filter(c => {
-    // For most metrics, positive delta is good
-    // For RHR, negative delta (lower heart rate) is good
-    if (c.metricType === 'rhr') {
-      return c.delta < 0
-    }
-    return c.delta > 0
+    const polarity = METRIC_POLARITY[c.metricType] || 'higher_better'
+    // For "higher_better" metrics, positive delta is good
+    // For "lower_better" metrics, negative delta is good
+    return polarity === 'higher_better' ? c.delta > 0 : c.delta < 0
   })
 
   if (positiveCorrelations.length > 0) {

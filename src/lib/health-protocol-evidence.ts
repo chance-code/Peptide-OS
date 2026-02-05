@@ -204,9 +204,15 @@ function computeObservedSignals(
 
     if (beforeMean === 0) continue
 
-    const beforeVar = beforeValues.reduce((sum, v) => sum + Math.pow(v - beforeMean, 2), 0) / beforeValues.length
-    const afterVar = afterValues.reduce((sum, v) => sum + Math.pow(v - afterMean, 2), 0) / afterValues.length
-    const pooledStd = Math.sqrt((beforeVar + afterVar) / 2)
+    // FIX: Use sample variance (n-1) and proper weighted pooled variance formula
+    const n1 = beforeValues.length
+    const n2 = afterValues.length
+    const beforeVar = beforeValues.reduce((sum, v) => sum + Math.pow(v - beforeMean, 2), 0) / (n1 - 1)
+    const afterVar = afterValues.reduce((sum, v) => sum + Math.pow(v - afterMean, 2), 0) / (n2 - 1)
+
+    // Weighted pooled standard deviation (correct formula)
+    const pooledVar = ((n1 - 1) * beforeVar + (n2 - 1) * afterVar) / (n1 + n2 - 2)
+    const pooledStd = Math.sqrt(pooledVar)
 
     const cohensD = pooledStd !== 0 ? (afterMean - beforeMean) / pooledStd : 0
     const percentChange = ((afterMean - beforeMean) / beforeMean) * 100
