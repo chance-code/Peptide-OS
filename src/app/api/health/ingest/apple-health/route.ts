@@ -53,6 +53,7 @@ export async function POST(request: NextRequest) {
 
     // Validate, filter, and correct metrics (sanity firewall)
     const rejectedMetrics: Array<{ metricType: string; value: number; reason: string }> = []
+    const correctedMetrics: Array<{ metricType: string; original: number; corrected: number; reason: string }> = []
     const validMetrics: IngestMetric[] = []
 
     for (const m of body.metrics) {
@@ -69,8 +70,9 @@ export async function POST(request: NextRequest) {
         continue
       }
 
-      // Apply corrections if needed (e.g., decimal SpO2 → percentage)
+      // Apply corrections if needed (e.g., decimal SpO2 → percentage, hours → minutes)
       if (validation.correctedValue !== undefined) {
+        correctedMetrics.push({ metricType: m.metricType, original: m.value, corrected: validation.correctedValue, reason: validation.reason || 'Auto-corrected' })
         m.value = validation.correctedValue
         if (validation.correctedUnit) m.unit = validation.correctedUnit
       }
@@ -241,15 +243,19 @@ export async function POST(request: NextRequest) {
       })
     ])
 
-    // Log rejected metrics for debugging
+    // Log rejected and corrected metrics for debugging
     if (rejectedMetrics.length > 0) {
       console.warn(`[Health Ingest] Rejected ${rejectedMetrics.length} metrics:`, rejectedMetrics.slice(0, 10))
+    }
+    if (correctedMetrics.length > 0) {
+      console.info(`[Health Ingest] Auto-corrected ${correctedMetrics.length} metrics:`, correctedMetrics.slice(0, 10))
     }
 
     return NextResponse.json({
       success: true,
       metricsCount,
       rejectedCount: rejectedMetrics.length,
+      correctedCount: correctedMetrics.length,
       lastSyncAt: now,
       metricSyncState: newSyncState,
       permissions: body.permissions,
