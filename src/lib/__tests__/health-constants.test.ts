@@ -166,18 +166,18 @@ describe('validateAndCorrectMetric', () => {
     expect(result.correctedValue).toBe(22)
   })
 
-  it('does NOT correct small sleep values when min is 0 (could be valid minutes)', () => {
-    // sleep_duration min=0, so 7.5 is valid as minutes — no correction
+  it('corrects sleep_duration from hours to minutes when unit is hrs', () => {
+    // 7.5 hours = 450 minutes — unit normalization should convert
     const result = validateAndCorrectMetric('sleep_duration', 7.5, 'hrs')
     expect(result.valid).toBe(true)
-    expect(result.correctedValue).toBeUndefined()
+    expect(result.correctedValue).toBe(450)
   })
 
-  it('does NOT correct small deep_sleep values when min is 0', () => {
-    // deep_sleep min=0, so 1.5 is valid as minutes — no correction
+  it('corrects deep_sleep from hours to minutes when unit is hrs', () => {
+    // 1.5 hours = 90 minutes — unit normalization should convert
     const result = validateAndCorrectMetric('deep_sleep', 1.5, 'hrs')
     expect(result.valid).toBe(true)
-    expect(result.correctedValue).toBeUndefined()
+    expect(result.correctedValue).toBe(90)
   })
 
   it('does NOT correct valid sleep minutes', () => {
