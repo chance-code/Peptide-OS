@@ -133,19 +133,19 @@ export const generateSeedMetrics = (): SeedMetric[] => {
     let waso = vary(35 * (2 - improve), 10)
     if (hasAlcohol) waso += vary(15, 5)
     waso = Math.max(5, waso)
-    metrics.push({ date, metricType: 'waso', value: Math.round(waso), unit: 'minutes', source: 'eight_sleep' })
+    metrics.push({ date, metricType: 'waso', value: Math.round(waso), unit: 'minutes', source: 'oura' })
 
     // Sleep Latency (baseline ~18min, improving to ~12min)
     let sleepLatency = vary(18 * (2 - improve * 0.7), 6)
     if (hadLateWorkout) sleepLatency += vary(8, 3)
     sleepLatency = Math.max(3, sleepLatency)
-    metrics.push({ date, metricType: 'sleep_latency', value: Math.round(sleepLatency), unit: 'minutes', source: 'eight_sleep' })
+    metrics.push({ date, metricType: 'sleep_latency', value: Math.round(sleepLatency), unit: 'minutes', source: 'oura' })
 
-    // Bed Temperature Deviation (Eight Sleep)
+    // Bed Temperature Deviation
     let tempDev = vary(0.1, 0.3)
     if (hasAlcohol) tempDev += vary(0.4, 0.1)
     if (isIll) tempDev += vary(0.6, 0.2)
-    metrics.push({ date, metricType: 'temp_deviation', value: Math.round(tempDev * 10) / 10, unit: 'celsius', source: 'eight_sleep' })
+    metrics.push({ date, metricType: 'temp_deviation', value: Math.round(tempDev * 10) / 10, unit: 'celsius', source: 'oura' })
 
     // Respiratory Rate (baseline ~14.5, stable)
     let respRate = vary(14.5, 0.8)

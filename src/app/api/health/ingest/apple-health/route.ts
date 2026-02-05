@@ -101,11 +101,41 @@ export async function POST(request: NextRequest) {
       }
     })
 
+    // Metrics where we keep the highest value when multiple readings exist per day
+    const KEEP_HIGHEST = new Set([
+      'steps', 'active_calories', 'basal_calories', 'exercise_minutes',
+      'stand_hours', 'walking_running_distance'
+    ])
+
+    // Deduplicate metrics by (metricType, day): normalize recordedAt to midnight UTC
+    // For cumulative/additive metrics, keep the highest value per day
+    // For other metrics, keep the latest value per day
+    const deduped = new Map<string, IngestMetric>()
+    for (const m of validMetrics) {
+      const dayDate = new Date(m.recordedAt)
+      dayDate.setUTCHours(0, 0, 0, 0)
+      const dayKey = `${m.metricType}::${dayDate.toISOString()}`
+
+      const existing = deduped.get(dayKey)
+      if (!existing) {
+        deduped.set(dayKey, { ...m, recordedAt: dayDate.toISOString() })
+      } else if (KEEP_HIGHEST.has(m.metricType)) {
+        // Keep the higher value (cumulative metrics)
+        if (m.value > existing.value) {
+          deduped.set(dayKey, { ...m, recordedAt: dayDate.toISOString() })
+        }
+      } else {
+        // Keep the latest value (overwrite with most recent sync)
+        deduped.set(dayKey, { ...m, recordedAt: dayDate.toISOString() })
+      }
+    }
+    const dedupedMetrics = Array.from(deduped.values())
+
     // Batch upsert metrics (chunks of 80 to stay within SQLite variable limits)
     let metricsCount = 0
     const CHUNK_SIZE = 80
-    for (let i = 0; i < validMetrics.length; i += CHUNK_SIZE) {
-      const chunk = validMetrics.slice(i, i + CHUNK_SIZE)
+    for (let i = 0; i < dedupedMetrics.length; i += CHUNK_SIZE) {
+      const chunk = dedupedMetrics.slice(i, i + CHUNK_SIZE)
       const results = await prisma.$transaction(
         chunk.map(metric =>
           prisma.healthMetric.upsert({

@@ -1,7 +1,7 @@
 // Health Provider Infrastructure
-// Unified interface for Apple HealthKit, Oura, and Eight Sleep integrations
+// Unified interface for Apple HealthKit and Oura integrations
 
-export type HealthProviderType = 'apple_health' | 'oura' | 'eight_sleep'
+export type HealthProviderType = 'apple_health' | 'oura'
 
 export type MetricType =
   | 'sleep_duration'
@@ -91,7 +91,7 @@ export interface HealthProvider {
   supportedMetrics: MetricType[]
   requiresOAuth: boolean
 
-  // OAuth flow (for Oura and Eight Sleep)
+  // OAuth flow (for Oura)
   getAuthUrl?(userId: string, redirectUri: string): string
   exchangeCode?(code: string, redirectUri: string): Promise<TokenResponse>
   refreshToken?(refreshToken: string): Promise<TokenResponse>
@@ -117,7 +117,7 @@ export interface ProviderInfo {
   description: string
   supportedMetrics: MetricType[]
   requiresOAuth: boolean
-  requiresCredentials: boolean // For email/password auth like Eight Sleep
+  requiresCredentials: boolean
   isNativeOnly: boolean
   icon: string
 }
@@ -163,16 +163,6 @@ export function getProviderInfo(): ProviderInfo[] {
       requiresCredentials: false,
       isNativeOnly: false,
       icon: 'circle'
-    },
-    {
-      name: 'eight_sleep',
-      displayName: 'Eight Sleep',
-      description: 'Import sleep scores and bed temperature data from your Eight Sleep mattress',
-      supportedMetrics: ['sleep_score', 'time_in_bed', 'bed_temperature'],
-      requiresOAuth: false,
-      requiresCredentials: true,
-      isNativeOnly: false,
-      icon: 'bed'
     }
   ]
 }

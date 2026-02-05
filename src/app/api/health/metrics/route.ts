@@ -3,6 +3,16 @@ import prisma from '@/lib/prisma'
 import { getAuthenticatedUserId } from '@/lib/api-auth'
 import { MetricType } from '@/lib/health-providers'
 
+// Source priority for deduplication: when multiple providers report the same metric
+// on the same day, keep only the highest-priority source.
+// Lower index = higher priority.
+const SOURCE_PRIORITY_ORDER: string[] = ['apple_health', 'oura']
+
+function getProviderPriority(provider: string): number {
+  const idx = SOURCE_PRIORITY_ORDER.indexOf(provider)
+  return idx === -1 ? 999 : idx
+}
+
 // GET /api/health/metrics - Query health metrics
 export async function GET(request: NextRequest) {
   try {
@@ -26,27 +36,24 @@ export async function GET(request: NextRequest) {
       ? new Date(startDateStr)
       : new Date(endDate.getTime() - 180 * 24 * 60 * 60 * 1000)
 
-    // Build query
+    // Build query — exclude Eight Sleep data (removed provider)
     const where: {
       userId: string
       recordedAt: { gte: Date; lte: Date }
       metricType?: { in: string[] }
-      provider?: string
+      provider?: string | { not: string }
     } = {
       userId,
       recordedAt: {
         gte: startDate,
         lte: endDate
-      }
+      },
+      provider: provider || { not: 'eight_sleep' }
     }
 
     if (metricTypesStr) {
       const metricTypes = metricTypesStr.split(',') as MetricType[]
       where.metricType = { in: metricTypes }
-    }
-
-    if (provider) {
-      where.provider = provider
     }
 
     // Fetch metrics
@@ -64,6 +71,20 @@ export async function GET(request: NextRequest) {
       }
     })
 
+    // Deduplicate by (metricType, date): when multiple providers report the same
+    // metric on the same day, keep only the highest-priority source.
+    // This prevents double-counting in baselines and trend calculations.
+    const dedupMap = new Map<string, typeof metrics[0]>()
+    for (const metric of metrics) {
+      const dateKey = metric.recordedAt.toISOString().split('T')[0]
+      const key = `${metric.metricType}::${dateKey}`
+      const existing = dedupMap.get(key)
+      if (!existing || getProviderPriority(metric.provider) < getProviderPriority(existing.provider)) {
+        dedupMap.set(key, metric)
+      }
+    }
+    const dedupedMetrics = Array.from(dedupMap.values())
+
     // Group by metric type for easier frontend consumption
     const groupedMetrics: Record<string, Array<{
       id: string
@@ -74,7 +95,7 @@ export async function GET(request: NextRequest) {
       context: unknown
     }>> = {}
 
-    for (const metric of metrics) {
+    for (const metric of dedupedMetrics) {
       if (!groupedMetrics[metric.metricType]) {
         groupedMetrics[metric.metricType] = []
       }

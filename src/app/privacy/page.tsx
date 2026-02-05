@@ -94,13 +94,6 @@ export default function PrivacyPolicyPage() {
             Apple Health data described above.
           </p>
 
-          <h3 className="text-md font-medium text-[var(--foreground)] mt-4 mb-2">Eight Sleep</h3>
-          <p className="text-[var(--muted-foreground)] mb-4">
-            If you connect your Eight Sleep account, we access sleep scores, time in bed, and
-            bed temperature data. Your Eight Sleep credentials are used only to authenticate
-            and are not stored permanently. This data is subject to the same protections as
-            Apple Health data described above.
-          </p>
         </section>
 
         <section className="mb-6">

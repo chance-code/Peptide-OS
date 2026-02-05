@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Heart, Circle, Bed, RefreshCw, Link2, Link2Off, AlertCircle, Check, Eye, EyeOff, X } from 'lucide-react'
+import { Heart, Circle, RefreshCw, Link2, Link2Off, AlertCircle, Check, Eye, EyeOff, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { HealthProviderType } from '@/lib/health-providers'
@@ -33,20 +33,17 @@ interface HealthIntegrationCardProps {
 
 const providerIcons: Record<HealthProviderType, React.ReactNode> = {
   apple_health: <Heart className="w-5 h-5" />,
-  oura: <Circle className="w-5 h-5" />,
-  eight_sleep: <Bed className="w-5 h-5" />
+  oura: <Circle className="w-5 h-5" />
 }
 
 const providerColors: Record<HealthProviderType, string> = {
   apple_health: 'from-red-500/20 to-pink-500/10 border-red-500/30',
-  oura: 'from-teal-500/20 to-cyan-500/10 border-teal-500/30',
-  eight_sleep: 'from-indigo-500/20 to-blue-500/10 border-indigo-500/30'
+  oura: 'from-teal-500/20 to-cyan-500/10 border-teal-500/30'
 }
 
 const providerAccentColors: Record<HealthProviderType, string> = {
   apple_health: 'text-red-400',
-  oura: 'text-teal-400',
-  eight_sleep: 'text-indigo-400'
+  oura: 'text-teal-400'
 }
 
 export function HealthIntegrationCard({

@@ -5,7 +5,6 @@ import { getProvider, getProviderInfo, HealthProviderType, MetricSyncState } fro
 
 // Import providers to register them
 import '@/lib/health-providers/oura'
-import '@/lib/health-providers/eight-sleep'
 import '@/lib/health-providers/apple-health'
 
 // GET /api/health/integrations - List user's health integrations
@@ -117,16 +116,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         integration,
         requiresNativePermission: true
-      })
-    }
-
-    // Handle Eight Sleep (email/password auth, not OAuth)
-    if (provider === 'eight_sleep') {
-      // This is handled by the dedicated login endpoint
-      // Just return info that credentials are required
-      return NextResponse.json({
-        requiresCredentials: true,
-        loginEndpoint: '/api/health/integrations/eight-sleep/login'
       })
     }
 

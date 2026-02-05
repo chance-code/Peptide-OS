@@ -4,7 +4,6 @@ import { getProvider, HealthProviderType } from '@/lib/health-providers'
 
 // Import providers to register them
 import '@/lib/health-providers/oura'
-import '@/lib/health-providers/eight-sleep'
 
 // GET /api/health/integrations/[provider]/callback - OAuth callback handler
 export async function GET(

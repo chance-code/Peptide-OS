@@ -62,7 +62,7 @@ This file defines the workflow gates and defaults Claude Code must follow on eve
 - **Framework**: Next.js 16 with App Router, TypeScript
 - **Auth**: NextAuth.js (JWT strategy) — Google, Apple, Credentials providers
 - **Database**: PostgreSQL via Prisma ORM
-- **Health data**: Apple HealthKit (via `@flomentumsolutions/capacitor-health-extended`), Oura (OAuth2), Eight Sleep (OAuth2)
+- **Health data**: Apple HealthKit (via `@flomentumsolutions/capacitor-health-extended`), Oura (OAuth2)
 - **State management**: Zustand (client), React Query / TanStack Query (server)
 - **UI**: Tailwind CSS, shadcn/ui components
 - **Networking layer**: Next.js API routes, `fetch()` from client
@@ -80,7 +80,7 @@ src/
 ├── components/       # Reusable UI components
 │   └── health/       # Health dashboard components
 ├── lib/              # Utilities, Prisma client, health engines
-│   └── health-providers/  # Apple Health, Oura, Eight Sleep providers
+│   └── health-providers/  # Apple Health, Oura providers
 └── store/            # Zustand store
 
 ios/App/              # iOS Capacitor project (xcodeproj, Info.plist)

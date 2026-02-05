@@ -15,7 +15,9 @@ export async function GET() {
 
     return NextResponse.json(summary, {
       headers: {
-        'Cache-Control': 'private, max-age=300' // 5 min cache
+        // No caching — after ingest, users should see fresh data immediately.
+        // The browser will always revalidate with the server.
+        'Cache-Control': 'private, max-age=0, must-revalidate'
       }
     })
   } catch (error) {

@@ -28,16 +28,16 @@ function clampPercent(pct: number): number {
 
 const SOURCE_PRIORITY: Record<MetricType, string[]> = {
   // Sleep - prefer Oura for sleep metrics (more accurate than Apple Health aggregation)
-  sleep_duration: ['oura', 'eight_sleep', 'apple_health'],
+  sleep_duration: ['oura', 'apple_health'],
   rem_sleep: ['oura', 'apple_health'],
-  sleep_score: ['oura', 'eight_sleep', 'apple_health'],
-  bed_temperature: ['eight_sleep', 'oura', 'apple_health'],
-  time_in_bed: ['eight_sleep', 'oura', 'apple_health'],
+  sleep_score: ['oura', 'apple_health'],
+  bed_temperature: ['oura', 'apple_health'],
+  time_in_bed: ['oura', 'apple_health'],
   // Heart & HRV
-  hrv: ['apple_health', 'oura', 'eight_sleep'],
-  rhr: ['apple_health', 'oura', 'eight_sleep'],
+  hrv: ['apple_health', 'oura'],
+  rhr: ['apple_health', 'oura'],
   // Body Composition (primarily from scales via Apple Health)
-  weight: ['apple_health', 'eight_sleep', 'oura'],
+  weight: ['apple_health', 'oura'],
   body_fat_percentage: ['apple_health'],
   lean_body_mass: ['apple_health'],
   bmi: ['apple_health'],
@@ -45,7 +45,7 @@ const SOURCE_PRIORITY: Record<MetricType, string[]> = {
   muscle_mass: ['apple_health'],
   body_water: ['apple_health'],
   // Activity
-  steps: ['apple_health', 'oura', 'eight_sleep'],
+  steps: ['apple_health', 'oura'],
   active_calories: ['apple_health', 'oura'],
   basal_calories: ['apple_health'],
   exercise_minutes: ['apple_health', 'oura'],
@@ -252,6 +252,48 @@ export interface RecoveryStatus {
 }
 
 // ============================================================================
+// SLEEP STAGE VALIDATION
+// ============================================================================
+
+/**
+ * Validates that sleep stages (deep, REM, light) don't exceed total sleep duration.
+ * If they do, proportionally scales the stages down to fit within total sleep.
+ * Returns corrected values and logs a warning when correction is applied.
+ */
+export function validateSleepStages(
+  sleepDuration: number,
+  deepSleep: number,
+  remSleep: number,
+  lightSleep: number
+): { deepSleep: number; remSleep: number; lightSleep: number; corrected: boolean } {
+  const stageSum = deepSleep + remSleep + lightSleep
+
+  if (stageSum <= 0 || sleepDuration <= 0) {
+    return { deepSleep, remSleep, lightSleep, corrected: false }
+  }
+
+  if (stageSum <= sleepDuration) {
+    return { deepSleep, remSleep, lightSleep, corrected: false }
+  }
+
+  // Proportionally scale stages down to fit within total sleep duration
+  const scaleFactor = sleepDuration / stageSum
+  const correctedDeep = Math.round(deepSleep * scaleFactor * 100) / 100
+  const correctedRem = Math.round(remSleep * scaleFactor * 100) / 100
+  const correctedLight = Math.round(lightSleep * scaleFactor * 100) / 100
+
+  console.warn(
+    `[Sleep Stage Validation] Stages (${stageSum.toFixed(0)} min) exceed total sleep (${sleepDuration.toFixed(0)} min). ` +
+    `Scaling down by ${(scaleFactor * 100).toFixed(1)}%: ` +
+    `deep ${deepSleep.toFixed(0)}->${correctedDeep.toFixed(0)}, ` +
+    `REM ${remSleep.toFixed(0)}->${correctedRem.toFixed(0)}, ` +
+    `light ${lightSleep.toFixed(0)}->${correctedLight.toFixed(0)}`
+  )
+
+  return { deepSleep: correctedDeep, remSleep: correctedRem, lightSleep: correctedLight, corrected: true }
+}
+
+// ============================================================================
 // CORE DATA FUNCTIONS
 // ============================================================================
 
@@ -265,9 +307,12 @@ export async function getUnifiedMetrics(
     userId: string
     recordedAt: { gte: Date; lte: Date }
     metricType?: { in: string[] }
+    provider?: { not: string }
   } = {
     userId,
-    recordedAt: { gte: startDate, lte: endDate }
+    recordedAt: { gte: startDate, lte: endDate },
+    // Exclude Eight Sleep data — removed as a provider due to duplicate sleep metrics
+    provider: { not: 'eight_sleep' }
   }
 
   if (metricTypes) {
@@ -486,15 +531,41 @@ export async function analyzeSleepArchitecture(userId: string): Promise<SleepArc
   startDate.setDate(startDate.getDate() - 14)
 
   const metrics = await getUnifiedMetrics(userId, startDate, endDate, [
-    'sleep_duration', 'sleep_score', 'time_in_bed', 'bed_temperature'
+    'sleep_duration', 'sleep_score', 'time_in_bed', 'bed_temperature',
+    'rem_sleep'
   ])
 
   const duration = metrics.get('sleep_duration') || []
   const scores = metrics.get('sleep_score') || []
   const timeInBed = metrics.get('time_in_bed') || []
   const bedTemp = metrics.get('bed_temperature') || []
+  const remMetrics = metrics.get('rem_sleep') || []
 
   if (duration.length < 3) return null
+
+  // Validate sleep stage sums: for each day with both duration and REM data,
+  // check that stages don't exceed total sleep. We validate at the daily level
+  // using the available stage metrics (deep_sleep, rem_sleep, light_sleep are
+  // stored as separate metric types, so we work with what we have).
+  for (const dayDuration of duration) {
+    const dayRem = remMetrics.find(r => r.date === dayDuration.date)
+    if (dayRem) {
+      // Extract deep_sleep and light_sleep from context if available
+      const deepFromContext = (dayDuration.context?.deepSleepMinutes as number) || 0
+      const lightFromContext = (dayDuration.context?.lightSleepMinutes as number) || 0
+      if (deepFromContext > 0 || lightFromContext > 0) {
+        const validated = validateSleepStages(
+          dayDuration.value,
+          deepFromContext,
+          dayRem.value,
+          lightFromContext
+        )
+        if (validated.corrected) {
+          dayRem.value = validated.remSleep
+        }
+      }
+    }
+  }
 
   const avgDuration = duration.reduce((s, m) => s + m.value, 0) / duration.length
   const avgScore = scores.length > 0
@@ -962,7 +1033,7 @@ export async function generateSynthesizedInsights(userId: string): Promise<Synth
           description: `Only ${optimalPct.toFixed(0)}% of nights had optimal bed temperature (16-21°C). Your average: ${sleepArch.avgBedTemp.toFixed(1)}°C.`,
           details: 'Cooler sleeping temperatures (around 18°C) promote deeper sleep.',
           metrics: ['bed_temperature'],
-          actionable: 'Consider adjusting your Eight Sleep temperature settings.'
+          actionable: 'Consider adjusting your bedroom temperature or bedding.'
         })
       }
     }
@@ -978,7 +1049,45 @@ export async function generateSynthesizedInsights(userId: string): Promise<Synth
   const massTrend = muscleMassTrend || leanMassTrend
   const massLabel = muscleMassTrend ? 'muscle mass' : 'lean mass'
 
-  if (bodyFatTrend && massTrend) {
+  // Body comp date freshness check: if weight and body_fat_percentage
+  // latest data points are more than 7 days apart, flag as low confidence
+  const MAX_BODY_COMP_GAP_DAYS = 7
+  let bodyCompFresh = true
+  if (weightTrend?.personalBestDate && bodyFatTrend?.personalBestDate) {
+    // personalBestDate may not be the latest — but the trend's data is from the
+    // current period. Use the trend data point count as a proxy: if both have
+    // recent data (dataPoints >= 2), they're reasonably fresh.
+    // For a more precise check, compare latest dates from the raw metric data.
+  }
+  // Precise freshness check using raw metrics
+  if (weightTrend && bodyFatTrend) {
+    const endDate = new Date()
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - 30)
+    const bodyCompMetrics = await getUnifiedMetrics(userId, startDate, endDate, ['weight', 'body_fat_percentage'])
+    const weightDates = (bodyCompMetrics.get('weight') || []).map(m => new Date(m.date).getTime())
+    const bfDates = (bodyCompMetrics.get('body_fat_percentage') || []).map(m => new Date(m.date).getTime())
+    if (weightDates.length > 0 && bfDates.length > 0) {
+      const latestWeight = Math.max(...weightDates)
+      const latestBf = Math.max(...bfDates)
+      const gapDays = Math.abs(latestWeight - latestBf) / (1000 * 60 * 60 * 24)
+      if (gapDays > MAX_BODY_COMP_GAP_DAYS) {
+        bodyCompFresh = false
+        insights.push({
+          id: 'body-comp-stale-gap',
+          type: 'observation',
+          priority: 'low',
+          title: 'Body Composition Data Gap',
+          description: `Your most recent weight and body fat measurements are ${Math.round(gapDays)} days apart. Combined body recomp analysis may be unreliable.`,
+          details: 'For accurate body composition tracking, try to measure weight and body fat within the same week.',
+          metrics: ['weight', 'body_fat_percentage'],
+          confidence: 40,
+        })
+      }
+    }
+  }
+
+  if (bodyFatTrend && massTrend && bodyCompFresh) {
     if (bodyFatTrend.trend === 'improving' && massTrend.trend === 'improving') {
       insights.push({
         id: 'body-recomp-synthesis',
@@ -1005,9 +1114,22 @@ export async function generateSynthesizedInsights(userId: string): Promise<Synth
         confidence: 70,
       })
     }
+  } else if (bodyFatTrend && massTrend && !bodyCompFresh) {
+    // Data is stale - reduce confidence in body comp insights
+    if (bodyFatTrend.trend === 'improving' && massTrend.trend === 'improving') {
+      insights.push({
+        id: 'body-recomp-synthesis',
+        type: 'improvement',
+        priority: 'medium',
+        title: 'Body Recomposition (Low Confidence)',
+        description: `Body fat trending down (${bodyFatTrend.changePercent.toFixed(1)}%) while ${massLabel} is increasing (+${massTrend.changePercent.toFixed(1)}%), but weight and body fat data are from different time periods.`,
+        metrics: ['body_fat_percentage', massTrend.metricType, 'weight'],
+        confidence: 40,
+      })
+    }
   }
 
-  if (weightTrend && bodyFatTrend && !massTrend) {
+  if (weightTrend && bodyFatTrend && !massTrend && bodyCompFresh) {
     // Only weight + body fat available (no lean mass)
     if (weightTrend.trend === 'stable' && bodyFatTrend.trend !== 'stable') {
       insights.push({

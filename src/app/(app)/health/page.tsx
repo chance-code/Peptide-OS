@@ -109,7 +109,6 @@ export default function HealthDashboardNew() {
   const [syncingProvider, setSyncingProvider] = useState<string | null>(null)
   const [showExplainModal, setShowExplainModal] = useState(false)
   const [showWhyModal, setShowWhyModal] = useState(false)
-  const [eightSleepReauth, setEightSleepReauth] = useState<{ show: boolean; email: string; password: string; error: string | null; loading: boolean }>({ show: false, email: '', password: '', error: null, loading: false })
   const [selectedDelta, setSelectedDelta] = useState<DeltaItem | null>(null)
   const [timeWindow, setTimeWindow] = useState<TimeWindow>(() => {
     if (typeof window === 'undefined') return 30
@@ -143,7 +142,7 @@ export default function HealthDashboardNew() {
     enabled: !!currentUserId
   })
 
-  // Sync mutation (for OAuth providers: Oura, Eight Sleep)
+  // Sync mutation (for OAuth providers: Oura)
   const syncMutation = useMutation({
     mutationFn: async (provider: string) => {
       setSyncingProvider(provider)
@@ -231,33 +230,6 @@ export default function HealthDashboardNew() {
       }
     } catch (error) {
       console.error('Failed to connect Oura:', error)
-    }
-  }
-
-  // Connect Eight Sleep (credentials flow — inline form, no navigation)
-  const connectEightSleep = () => {
-    setShowIntegrations(true)
-    setEightSleepReauth(prev => ({ ...prev, show: true, error: null }))
-  }
-
-  // Re-authenticate Eight Sleep with email/password
-  const handleEightSleepReauth = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setEightSleepReauth(prev => ({ ...prev, error: null, loading: true }))
-    try {
-      const res = await fetch('/api/health/integrations/eight-sleep/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: eightSleepReauth.email, password: eightSleepReauth.password })
-      })
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || 'Login failed')
-      }
-      setEightSleepReauth({ show: false, email: '', password: '', error: null, loading: false })
-      refetchIntegrations()
-    } catch (error) {
-      setEightSleepReauth(prev => ({ ...prev, error: error instanceof Error ? error.message : 'Login failed', loading: false }))
     }
   }
 
@@ -801,132 +773,6 @@ export default function HealthDashboardNew() {
                 )
               })()}
 
-              {/* Eight Sleep */}
-              {(() => {
-                const eightSleep = integrations?.find((i: Integration) => i.provider === 'eight_sleep')
-                const isConnected = eightSleep?.isConnected
-                const hasError = eightSleep?.syncError
-                const isAuthExpired = hasError && /expired|reconnect/i.test(eightSleep?.syncError || '')
-                return (
-                  <div className={cn(
-                    "p-3 rounded-xl border",
-                    isConnected
-                      ? hasError
-                        ? "bg-amber-950/30 border-amber-800/50"
-                        : "bg-emerald-950/30 border-emerald-800/50"
-                      : "bg-[var(--muted)] border-[var(--border)]"
-                  )}>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className={cn(
-                          "w-10 h-10 rounded-lg flex items-center justify-center",
-                          isConnected ? "bg-cyan-500/20" : "bg-[var(--border)]"
-                        )}>
-                          <Moon className={cn("w-5 h-5", isConnected ? "text-cyan-400" : "text-[var(--muted-foreground)]")} />
-                        </div>
-                        <div>
-                          <div className="font-medium text-[var(--foreground)]">
-                            Eight Sleep
-                            {!isConnected && <span className="ml-1.5 text-[10px] font-normal text-[var(--muted-foreground)]">Optional</span>}
-                          </div>
-                          {isConnected ? (
-                            <div className="text-xs text-emerald-400 flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3" />
-                              Connected
-                              {eightSleep?.lastSyncAt && (
-                                <span className="text-[var(--muted-foreground)] ml-1">
-                                  · {format(new Date(eightSleep.lastSyncAt), 'MMM d, h:mm a')}
-                                </span>
-                              )}
-                            </div>
-                          ) : (
-                            <div className="text-xs text-[var(--muted-foreground)]">Adds mattress-based sleep tracking and temperature data</div>
-                          )}
-                          {hasError && (
-                            <div className="text-xs text-amber-400 mt-1">{eightSleep.syncError}</div>
-                          )}
-                        </div>
-                      </div>
-                      {isConnected ? (
-                        isAuthExpired ? (
-                          <button
-                            onClick={() => setEightSleepReauth(prev => ({ ...prev, show: true, error: null }))}
-                            className="px-3 py-1.5 rounded-lg text-sm font-medium bg-amber-600 hover:bg-amber-500 text-white"
-                          >
-                            Re-auth
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => syncMutation.mutate('eight_sleep')}
-                            disabled={syncingProvider === 'eight_sleep'}
-                            className={cn(
-                              "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
-                              "bg-indigo-600 hover:bg-indigo-500 text-white",
-                              "disabled:opacity-50"
-                            )}
-                          >
-                            {syncingProvider === 'eight_sleep' ? (
-                              <span className="flex items-center gap-1.5">
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                Syncing
-                              </span>
-                            ) : 'Sync Now'}
-                          </button>
-                        )
-                      ) : (
-                        <button
-                          onClick={connectEightSleep}
-                          className="px-3 py-1.5 rounded-lg text-sm font-medium bg-emerald-600 hover:bg-emerald-500 text-white"
-                        >
-                          Connect
-                        </button>
-                      )}
-                    </div>
-                    {/* Inline re-auth form */}
-                    {eightSleepReauth.show && (
-                      <form onSubmit={handleEightSleepReauth} className="mt-3 pt-3 border-t border-[var(--border)]">
-                        {eightSleepReauth.error && (
-                          <div className="mb-2 text-xs text-red-400">{eightSleepReauth.error}</div>
-                        )}
-                        <div className="space-y-2">
-                          <input
-                            type="email"
-                            value={eightSleepReauth.email}
-                            onChange={e => setEightSleepReauth(prev => ({ ...prev, email: e.target.value }))}
-                            placeholder="Email"
-                            required
-                            className="w-full px-3 py-1.5 text-sm rounded-lg bg-[var(--background)] border border-[var(--border)] text-[var(--foreground)] placeholder:text-[var(--muted-foreground)]"
-                          />
-                          <input
-                            type="password"
-                            value={eightSleepReauth.password}
-                            onChange={e => setEightSleepReauth(prev => ({ ...prev, password: e.target.value }))}
-                            placeholder="Password"
-                            required
-                            className="w-full px-3 py-1.5 text-sm rounded-lg bg-[var(--background)] border border-[var(--border)] text-[var(--foreground)] placeholder:text-[var(--muted-foreground)]"
-                          />
-                          <div className="flex gap-2">
-                            <button
-                              type="submit"
-                              disabled={eightSleepReauth.loading || !eightSleepReauth.email || !eightSleepReauth.password}
-                              className="flex-1 px-3 py-1.5 rounded-lg text-sm font-medium bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50"
-                            >
-                              {eightSleepReauth.loading ? 'Signing in...' : 'Sign In'}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setEightSleepReauth({ show: false, email: '', password: '', error: null, loading: false })}
-                              className="px-3 py-1.5 rounded-lg text-sm text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        </div>
-                      </form>
-                    )}
-                  </div>
-                )
-              })()}
             </div>
           </div>
         )}

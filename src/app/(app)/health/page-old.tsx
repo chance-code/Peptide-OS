@@ -430,7 +430,7 @@ export default function HealthPage() {
                 Connect Your Health Data
               </p>
               <p className="text-xs text-[var(--muted-foreground)] mb-4">
-                Link Oura, Eight Sleep, or Apple Health to track and correlate metrics with your protocols
+                Link Oura or Apple Health to track and correlate metrics with your protocols
               </p>
               <Button variant="primary" size="sm" onClick={() => setShowIntegrations(true)}>
                 <Zap className="w-4 h-4 mr-2" />

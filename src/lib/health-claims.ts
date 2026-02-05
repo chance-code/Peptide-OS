@@ -311,12 +311,12 @@ function getThreshold(metricType: string) {
   return METRIC_THRESHOLDS[metricType] || DEFAULT_THRESHOLD
 }
 
-// Metrics available with Oura or Eight Sleep — optional extras beyond Apple Health
+// Metrics available with Oura — optional extras beyond Apple Health
 const PROVIDER_EXCLUSIVE_METRICS: Record<string, string> = {
-  deep_sleep: 'Oura Ring or Eight Sleep',
-  sleep_efficiency: 'Oura Ring or Eight Sleep',
-  waso: 'Oura Ring or Eight Sleep',
-  sleep_latency: 'Oura Ring or Eight Sleep',
+  deep_sleep: 'Oura Ring',
+  sleep_efficiency: 'Oura Ring',
+  waso: 'Oura Ring',
+  sleep_latency: 'Oura Ring',
   sleep_score: 'Oura Ring',
   readiness_score: 'Oura Ring',
 }
