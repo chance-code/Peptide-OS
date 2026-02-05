@@ -16,6 +16,7 @@ import {
 } from '@/lib/protocol-mechanisms'
 import { safeDivide, safePercentChange } from '@/lib/health-constants'
 import { getMetricDisplayName, type MetricType } from '@/lib/health-providers'
+import { derivePolarityMap } from '@/lib/health-metric-contract'
 
 // ============================================================================
 // TYPES
@@ -59,38 +60,8 @@ const BEFORE_WINDOW_DAYS = 28
 // Minimum data points required in either window for a valid comparison
 const MIN_DATA_POINTS = 3
 
-// Metric polarity — which direction is "improving"
-const METRIC_POLARITY: Record<string, 'higher_better' | 'lower_better'> = {
-  hrv: 'higher_better',
-  rhr: 'lower_better',
-  resting_heart_rate: 'lower_better',
-  sleep_duration: 'higher_better',
-  deep_sleep: 'higher_better',
-  rem_sleep: 'higher_better',
-  sleep_efficiency: 'higher_better',
-  sleep_score: 'higher_better',
-  sleep_quality: 'higher_better',
-  sleep_latency: 'lower_better',
-  time_in_bed: 'higher_better',
-  readiness_score: 'higher_better',
-  recovery_score: 'higher_better',
-  steps: 'higher_better',
-  active_calories: 'higher_better',
-  exercise_minutes: 'higher_better',
-  stand_hours: 'higher_better',
-  vo2_max: 'higher_better',
-  walking_running_distance: 'higher_better',
-  weight: 'lower_better',
-  body_fat_percentage: 'lower_better',
-  body_fat: 'lower_better',
-  bmi: 'lower_better',
-  lean_body_mass: 'higher_better',
-  muscle_mass: 'higher_better',
-  bone_mass: 'higher_better',
-  body_water: 'higher_better',
-  blood_oxygen: 'higher_better',
-  respiratory_rate: 'lower_better',
-}
+// Metric polarity — derived from single source of truth (health-metric-contract.ts)
+const METRIC_POLARITY = derivePolarityMap() as Record<string, 'higher_better' | 'lower_better'>
 
 // Stable threshold — below this %, direction is "stable"
 const STABLE_THRESHOLD = 3
