@@ -29,6 +29,7 @@ model UserProfile {
   reconstitutions    Reconstitution[]
   healthIntegrations HealthIntegration[]
   healthMetrics      HealthMetric[]
+  labResults         LabResult[]
 }
 
 // ============================================
@@ -389,4 +390,27 @@ model HealthSyncLog {
   completedAt DateTime?
 
   @@index([userId, provider])
+}
+
+// ============================================
+// LAB RESULTS
+// ============================================
+model LabResult {
+  id        String   @id @default(cuid())
+  userId    String
+  testDate  DateTime
+  labName   String?  // "Quest Diagnostics", "LabCorp"
+  notes     String?
+
+  // Markers stored as JSON array for flexibility:
+  // [{ "name": "Total Testosterone", "value": 850, "unit": "ng/dL",
+  //    "rangeLow": 300, "rangeHigh": 1000, "flag": "normal" }]
+  markers   String   @default("[]")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, testDate])
 }
