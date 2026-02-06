@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/health-notifications",
       "schedule": "0 13 * * *"
+    },
+    {
+      "path": "/api/cron/health-sync",
+      "schedule": "0 8 * * *"
     }
   ]
 }

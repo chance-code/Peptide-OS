@@ -123,7 +123,7 @@ export async function DELETE(
 
     const result = await prisma.labResult.findUnique({
       where: { id },
-      select: { userId: true },
+      select: { userId: true, testDate: true },
     })
 
     if (!result) {
@@ -134,7 +134,17 @@ export async function DELETE(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
+    // Delete the LabResult
     await prisma.labResult.delete({ where: { id } })
+
+    // Also delete any matching LabUpload records (created during PDF import)
+    try {
+      await prisma.labUpload.deleteMany({
+        where: { userId: auth.userId, testDate: result.testDate },
+      })
+    } catch {
+      // LabUpload table may not exist — ignore
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {

@@ -8,6 +8,32 @@ import '@/lib/health-providers/oura'
 import '@/lib/health-providers/whoop'
 import '@/lib/health-providers/apple-health'
 
+// Compute data freshness based on last sync time
+function computeDataFreshness(lastSyncAt: Date | null): 'fresh' | 'stale' | 'critical' | 'never' {
+  if (!lastSyncAt) return 'never'
+  const hoursAgo = (Date.now() - new Date(lastSyncAt).getTime()) / (1000 * 60 * 60)
+  if (hoursAgo < 6) return 'fresh'
+  if (hoursAgo < 24) return 'stale'
+  return 'critical'
+}
+
+function computeTotalDataPoints(state: MetricSyncState | null): number {
+  if (!state) return 0
+  return Object.values(state).reduce((sum, m) => sum + (m.dataPoints ?? 0), 0)
+}
+
+function computeActiveMetrics(state: MetricSyncState | null): number {
+  if (!state) return 0
+  return Object.values(state).filter(m => m.status === 'ok').length
+}
+
+function computeErrorMetrics(state: MetricSyncState | null): string[] {
+  if (!state) return []
+  return Object.entries(state)
+    .filter(([, m]) => m.status === 'error' || m.status === 'permission_denied')
+    .map(([type]) => type)
+}
+
 // GET /api/health/integrations - List user's health integrations
 export async function GET() {
   try {
@@ -51,6 +77,12 @@ export async function GET() {
           lastSyncAt: integration.lastSyncAt,
           syncError: integration.syncError,
           metricSyncState,
+          createdAt: integration.createdAt,
+          updatedAt: integration.updatedAt,
+          dataFreshness: computeDataFreshness(integration.lastSyncAt),
+          totalDataPoints: computeTotalDataPoints(metricSyncState),
+          activeMetrics: computeActiveMetrics(metricSyncState),
+          errorMetrics: computeErrorMetrics(metricSyncState),
         } : null
       }
     })
