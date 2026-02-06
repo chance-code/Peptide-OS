@@ -42,6 +42,19 @@ export interface LabContext {
   stalenessMessage: string
 }
 
+export interface AgingVelocity {
+  headline: string
+  trend: 'decelerating' | 'steady' | 'accelerating'
+  confidence: 'high' | 'medium' | 'low'
+}
+
+export interface DailyInsight {
+  title: string
+  body: string
+  type: string
+  domain: string | null
+}
+
 export interface DailyStatus {
   date: string
   status: DailyStatusType
@@ -53,6 +66,8 @@ export interface DailyStatus {
   recommendation: string
   evaluation?: NextDayEvaluation
   labContext?: LabContext
+  agingVelocity?: AgingVelocity
+  dailyInsight?: DailyInsight
 }
 
 const KEY_METRICS: MetricType[] = [
@@ -152,6 +167,12 @@ export async function getDailyStatus(userId: string): Promise<DailyStatus> {
   const evaluation = buildEvaluation(metricsMap)
   const labContext = await getLabContext(userId, now)
 
+  // Compute aging velocity from 90-day score trend
+  const agingVelocity = computeAgingVelocity(metricsMap, now)
+
+  // Fetch top daily insight from discovery feed
+  const dailyInsight = await getTopDailyInsight(userId)
+
   return {
     date: today, status,
     title: cfg.title, subtitle: cfg.subtitle,
@@ -159,6 +180,8 @@ export async function getDailyStatus(userId: string): Promise<DailyStatus> {
     signals, recommendation: cfg.recommendation,
     evaluation: evaluation ?? undefined,
     labContext: labContext ?? undefined,
+    agingVelocity: agingVelocity ?? undefined,
+    dailyInsight: dailyInsight ?? undefined,
   }
 }
 
@@ -209,6 +232,103 @@ function buildEvaluation(
     todayOutcome: `${topChange.metric.replace(/_/g, ' ')} ${dir} by ${Math.abs(topChange.change_pct)}%`,
     improved,
     metrics: changes,
+  }
+}
+
+// ─── Aging Velocity ───────────────────────────────────────────────────
+
+function computeAgingVelocity(
+  metricsMap: Map<MetricType, { date: string; value: number }[]>,
+  now: Date,
+): AgingVelocity | null {
+  // Need at least 30 days of data across key metrics
+  const scoreMetrics: MetricType[] = ['sleep_score', 'hrv', 'rhr', 'deep_sleep']
+  let totalDays = 0
+  let positiveScoreDays = 0
+  let negativeScoreDays = 0
+
+  for (const mt of scoreMetrics) {
+    const values = metricsMap.get(mt)
+    if (!values || values.length < 14) continue
+
+    const dailyValues: DailyMetricValue[] = values.map(m => ({ date: m.date, value: m.value }))
+    const baseline = computeBaseline(dailyValues, 28, now)
+    if (!baseline) continue
+
+    const polarity = METRIC_POLARITY[mt] ?? 'higher_better'
+
+    // Count days above/below baseline in last 30 days
+    const recent = dailyValues.filter(d => {
+      const daysAgo = (now.getTime() - new Date(d.date).getTime()) / 864e5
+      return daysAgo <= 30
+    })
+
+    for (const day of recent) {
+      const diff = day.value - baseline.mean
+      const isAbove = diff > baseline.stdDev * 0.5
+      const isBelow = diff < -baseline.stdDev * 0.5
+
+      if (polarity === 'lower_better') {
+        if (isBelow) positiveScoreDays++
+        else if (isAbove) negativeScoreDays++
+      } else {
+        if (isAbove) positiveScoreDays++
+        else if (isBelow) negativeScoreDays++
+      }
+      totalDays++
+    }
+  }
+
+  // Need 30+ data points to show aging velocity
+  if (totalDays < 30) return null
+
+  const positiveRatio = positiveScoreDays / totalDays
+  const negativeRatio = negativeScoreDays / totalDays
+
+  let trend: 'decelerating' | 'steady' | 'accelerating'
+  let headline: string
+
+  if (positiveRatio > 0.5) {
+    trend = 'decelerating'
+    const velocity = rd(0.7 + positiveRatio * 0.3, 2) // 0.70–1.00x
+    headline = `Aging ${velocity}x`
+  } else if (negativeRatio > 0.5) {
+    trend = 'accelerating'
+    const velocity = rd(1.0 + negativeRatio * 0.3, 2) // 1.00–1.30x
+    headline = `Aging ${velocity}x`
+  } else {
+    trend = 'steady'
+    headline = 'Biological age: steady'
+  }
+
+  const confidence: 'high' | 'medium' | 'low' =
+    totalDays >= 90 ? 'high' : totalDays >= 60 ? 'medium' : 'low'
+
+  return { headline, trend, confidence }
+}
+
+// ─── Daily Insight ────────────────────────────────────────────────────
+
+async function getTopDailyInsight(userId: string): Promise<DailyInsight | null> {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const insight = await prisma.discoveryInsight.findFirst({
+    where: {
+      userId,
+      generatedAt: { gte: today },
+      dismissed: false,
+    },
+    orderBy: { priority: 'asc' },
+  })
+
+  if (!insight) return null
+
+  return {
+    title: insight.title,
+    body: insight.body,
+    type: insight.type,
+    domain: insight.domain,
   }
 }
 

@@ -31,6 +31,8 @@ model UserProfile {
   healthMetrics      HealthMetric[]
   labResults         LabResult[]
   labUploads         LabUpload[]
+  biologicalLiteracy UserBiologicalLiteracy?
+  discoveryInsights  DiscoveryInsight[]
 }
 
 // ============================================
@@ -436,6 +438,7 @@ model LabUpload {
 
   biomarkers    LabBiomarker[]
   review        LabEventReview?
+  preDrawContext PreDrawContext?
   user          UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, testDate])
@@ -499,4 +502,64 @@ model LabBiomarker {
   @@index([uploadId])
   @@index([biomarkerKey])
   @@unique([uploadId, biomarkerKey])
+}
+
+// ============================================
+// PRE-DRAW CONTEXT (contextual factors at time of blood draw)
+// ============================================
+model PreDrawContext {
+  id                 String    @id @default(cuid())
+  labUploadId        String    @unique
+  exercisedWithin24h Boolean   @default(false)
+  fastingHours       Int?
+  recentIllness      Boolean   @default(false)
+  illnessType        String?
+  drawTime           String?
+  newSupplements     String?   // JSON array
+  unusualStress      Boolean   @default(false)
+  notes              String?
+  createdAt          DateTime  @default(now())
+
+  labUpload          LabUpload @relation(fields: [labUploadId], references: [id], onDelete: Cascade)
+}
+
+// ============================================
+// BIOLOGICAL LITERACY (user engagement tier tracking)
+// ============================================
+model UserBiologicalLiteracy {
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  level           String    @default("explorer")  // explorer|student|practitioner|scientist
+  selfSelected    Boolean   @default(false)
+  detailTaps      Int       @default(0)
+  labViewCount    Int       @default(0)
+  insightViews    Int       @default(0)
+  lastLevelChange DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user            UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ============================================
+// DISCOVERY INSIGHTS (daily curated feed items)
+// ============================================
+model DiscoveryInsight {
+  id             String    @id @default(cuid())
+  userId         String
+  type           String    // pattern|cross_domain|milestone|predictive|surprise|retest|achievement|educational
+  title          String
+  body           String    // tier-adapted content
+  domain         String?
+  relatedMarkers String?   // JSON array of biomarker keys
+  priority       Int       @default(5)
+  seen           Boolean   @default(false)
+  dismissed      Boolean   @default(false)
+  generatedAt    DateTime  @default(now())
+  expiresAt      DateTime?
+
+  user           UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, generatedAt])
+  @@index([userId, seen])
 }
