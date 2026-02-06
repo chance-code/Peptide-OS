@@ -1,42 +1,25 @@
-<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
   <!-- Arc Protocol Logo - Dark Mode (Primary) -->
-  <!-- Background: Deep Navy -->
-  <rect width="1024" height="1024" rx="224" fill="#0f1729"/>
+  <!-- Background: Deep Charcoal -->
+  <rect width="1024" height="1024" rx="224" fill="#0B0B0D"/>
 
-  <defs>
-    <!-- Arc gradient: steel blue → teal → mint cyan -->
-    <linearGradient id="arcGrad" x1="0" y1="1" x2="1" y2="0">
-      <stop offset="0%" stop-color="#334d7a"/>
-      <stop offset="40%" stop-color="#4a9e9e"/>
-      <stop offset="70%" stop-color="#6ee7c0"/>
-      <stop offset="100%" stop-color="#a7f3d0"/>
-    </linearGradient>
-    <!-- Glow around the endpoint sphere -->
-    <radialGradient id="sphereGlow" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#a7f3d0" stop-opacity="0.9"/>
-      <stop offset="40%" stop-color="#6ee7c0" stop-opacity="0.4"/>
-      <stop offset="100%" stop-color="#6ee7c0" stop-opacity="0"/>
-    </radialGradient>
-  </defs>
-
-  <!--
-    The Arc: ~270° of a circle, gap at upper-right.
-    Center: 512, 512. Radius: 246.
-    Circumference = 2π × 246 ≈ 1545.8
-    270° = 270/360 × 1545.8 ≈ 1159.3
-    Gap = 90° = 90/360 × 1545.8 ≈ 386.4
-  -->
-  <circle
-    cx="512" cy="512" r="246"
-    fill="none"
-    stroke="url(#arcGrad)"
-    stroke-width="56"
-    stroke-linecap="round"
-    stroke-dasharray="1159 387"
-    stroke-dashoffset="-93"
+  <!-- Regular flat-top hexagon centered at (512,512), radius R=360 -->
+  <path
+    d="M872 512
+       L692 823.769
+       L332 823.769
+       L152 512
+       L332 200.231
+       L692 200.231
+       Z"
+    fill="#D6B07A"
   />
 
-  <!-- Glowing endpoint sphere at ~55° (upper right, 1 o'clock) -->
-  <circle cx="653" cy="371" r="80" fill="url(#sphereGlow)"/>
-  <circle cx="653" cy="371" r="30" fill="#a7f3d0"/>
+  <!-- Simplified waveform cutout (4 bars) -->
+  <g fill="#0B0B0D">
+    <rect x="373" y="432" width="44" height="160" rx="22"/>
+    <rect x="451" y="362" width="44" height="300" rx="22"/>
+    <rect x="529" y="392" width="44" height="240" rx="22"/>
+    <rect x="607" y="422" width="44" height="180" rx="22"/>
+  </g>
 </svg>

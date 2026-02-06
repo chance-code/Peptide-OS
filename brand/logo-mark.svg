@@ -1,17 +1,22 @@
-<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+<svg width="200" height="200" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
   <!-- Arc Protocol Logo - Monochrome Mark (no background) -->
-  <!-- Open arc - ~270° sweep, gap at upper-right -->
-  <!-- Circumference = 2π × 48 ≈ 301.6, 270° arc ≈ 226.2, gap ≈ 75.4 -->
-  <circle
-    cx="100" cy="100" r="48"
-    fill="none"
-    stroke="currentColor"
-    stroke-width="12"
-    stroke-linecap="round"
-    stroke-dasharray="226.2 75.4"
-    stroke-dashoffset="-18"
+  <!-- Regular flat-top hexagon centered at (512,512), radius R=360 -->
+  <path
+    d="M872 512
+       L692 823.769
+       L332 823.769
+       L152 512
+       L332 200.231
+       L692 200.231
+       Z"
+    fill="currentColor"
   />
 
-  <!-- Endpoint sphere -->
-  <circle cx="127.5" cy="72.5" r="6.5" fill="currentColor"/>
+  <!-- Waveform cutout (4 bars) - uses white to punch through -->
+  <g fill="white">
+    <rect x="373" y="432" width="44" height="160" rx="22"/>
+    <rect x="451" y="362" width="44" height="300" rx="22"/>
+    <rect x="529" y="392" width="44" height="240" rx="22"/>
+    <rect x="607" y="422" width="44" height="180" rx="22"/>
+  </g>
 </svg>

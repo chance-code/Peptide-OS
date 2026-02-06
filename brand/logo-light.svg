@@ -1,33 +1,24 @@
-<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
   <!-- Arc Protocol Logo - Light Mode -->
   <rect width="1024" height="1024" rx="224" fill="#F8FAFC"/>
 
-  <defs>
-    <linearGradient id="arcGradLight" x1="0" y1="1" x2="1" y2="0">
-      <stop offset="0%" stop-color="#1e3a5f"/>
-      <stop offset="40%" stop-color="#2d7a7a"/>
-      <stop offset="70%" stop-color="#3cb89c"/>
-      <stop offset="100%" stop-color="#4ade80"/>
-    </linearGradient>
-    <radialGradient id="sphereGlowLight" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#4ade80" stop-opacity="0.7"/>
-      <stop offset="40%" stop-color="#3cb89c" stop-opacity="0.3"/>
-      <stop offset="100%" stop-color="#3cb89c" stop-opacity="0"/>
-    </radialGradient>
-  </defs>
-
-  <!-- Open arc - ~270° sweep -->
-  <circle
-    cx="512" cy="512" r="246"
-    fill="none"
-    stroke="url(#arcGradLight)"
-    stroke-width="56"
-    stroke-linecap="round"
-    stroke-dasharray="1159 387"
-    stroke-dashoffset="-93"
+  <!-- Regular flat-top hexagon centered at (512,512), radius R=360 -->
+  <path
+    d="M872 512
+       L692 823.769
+       L332 823.769
+       L152 512
+       L332 200.231
+       L692 200.231
+       Z"
+    fill="#D6B07A"
   />
 
-  <!-- Glowing endpoint sphere -->
-  <circle cx="653" cy="371" r="80" fill="url(#sphereGlowLight)"/>
-  <circle cx="653" cy="371" r="30" fill="#4ade80"/>
+  <!-- Waveform cutout (4 bars) -->
+  <g fill="#F8FAFC">
+    <rect x="373" y="432" width="44" height="160" rx="22"/>
+    <rect x="451" y="362" width="44" height="300" rx="22"/>
+    <rect x="529" y="392" width="44" height="240" rx="22"/>
+    <rect x="607" y="422" width="44" height="180" rx="22"/>
+  </g>
 </svg>
