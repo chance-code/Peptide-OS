@@ -61,38 +61,8 @@ export async function POST(request: NextRequest) {
 
     const labName = labNameOverride || parseResult.labName
 
-    // Save to structured tables
+    // Save to legacy LabResult (always works)
     const recognizedMarkers = markers.filter(m => m.normalizedKey)
-    const upload = await prisma.labUpload.create({
-      data: {
-        userId,
-        testDate,
-        labName,
-        source: 'pdf_import',
-        notes: `Imported from PDF: ${file.name}`,
-        rawText: text,
-        confidence: parseResult.overallConfidence,
-        fileName: file.name,
-        biomarkers: {
-          create: recognizedMarkers.map(m => ({
-            biomarkerKey: m.normalizedKey!,
-            rawName: m.rawName,
-            value: m.value,
-            unit: m.unit,
-            originalValue: m.originalValue,
-            originalUnit: m.originalUnit,
-            rangeLow: m.rangeLow,
-            rangeHigh: m.rangeHigh,
-            flag: m.flag,
-            confidence: m.confidence,
-            category: m.category,
-          })),
-        },
-      },
-      include: { biomarkers: true },
-    })
-
-    // Also write legacy LabResult for backward compat
     await prisma.labResult.create({
       data: {
         userId,
@@ -113,6 +83,41 @@ export async function POST(request: NextRequest) {
       },
     })
 
+    // Structured write: LabUpload + LabBiomarker (non-blocking — table may not exist yet)
+    let upload: { id: string; biomarkers: { id: string }[] } | null = null
+    try {
+      upload = await prisma.labUpload.create({
+        data: {
+          userId,
+          testDate,
+          labName,
+          source: 'pdf_import',
+          notes: `Imported from PDF: ${file.name}`,
+          rawText: text,
+          confidence: parseResult.overallConfidence,
+          fileName: file.name,
+          biomarkers: {
+            create: recognizedMarkers.map(m => ({
+              biomarkerKey: m.normalizedKey!,
+              rawName: m.rawName,
+              value: m.value,
+              unit: m.unit,
+              originalValue: m.originalValue,
+              originalUnit: m.originalUnit,
+              rangeLow: m.rangeLow,
+              rangeHigh: m.rangeHigh,
+              flag: m.flag,
+              confidence: m.confidence,
+              category: m.category,
+            })),
+          },
+        },
+        include: { biomarkers: true },
+      })
+    } catch (uploadErr) {
+      console.warn('LabUpload write skipped (table may not exist):', uploadErr)
+    }
+
     // Run pattern analysis
     const biomarkerArray = recognizedMarkers.map(m => ({
       biomarkerKey: m.normalizedKey!,
@@ -132,14 +137,14 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      upload: {
+      upload: upload ? {
         id: upload.id,
-        testDate: upload.testDate,
-        labName: upload.labName,
-        fileName: upload.fileName,
+        testDate,
+        labName,
+        fileName: file.name,
         biomarkersCount: upload.biomarkers.length,
         overallConfidence: parseResult.overallConfidence,
-      },
+      } : null,
       summary: {
         totalParsed: markers.length,
         recognized: recognizedMarkers.length,

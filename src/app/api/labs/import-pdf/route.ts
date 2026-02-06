@@ -99,36 +99,40 @@ export async function POST(request: NextRequest) {
         },
       })
 
-      // Structured write: LabUpload + LabBiomarker
-      const recognizedMarkers = parseResult.markers.filter(m => m.normalizedKey)
-      savedUpload = await prisma.labUpload.create({
-        data: {
-          userId,
-          testDate: finalTestDate,
-          labName: finalLabName,
-          source: 'pdf_import',
-          notes: `Imported from PDF: ${file.name}`,
-          rawText: parseResult.rawText,
-          confidence: parseResult.overallConfidence,
-          fileName: file.name,
-          biomarkers: {
-            create: recognizedMarkers.map(m => ({
-              biomarkerKey: m.normalizedKey!,
-              rawName: m.rawName,
-              value: m.value,
-              unit: m.unit,
-              originalValue: m.originalValue,
-              originalUnit: m.originalUnit,
-              rangeLow: m.rangeLow,
-              rangeHigh: m.rangeHigh,
-              flag: m.flag,
-              confidence: m.confidence,
-              category: m.category,
-            })),
+      // Structured write: LabUpload + LabBiomarker (non-blocking — table may not exist yet)
+      try {
+        const recognizedMarkers = parseResult.markers.filter(m => m.normalizedKey)
+        savedUpload = await prisma.labUpload.create({
+          data: {
+            userId,
+            testDate: finalTestDate,
+            labName: finalLabName,
+            source: 'pdf_import',
+            notes: `Imported from PDF: ${file.name}`,
+            rawText: parseResult.rawText,
+            confidence: parseResult.overallConfidence,
+            fileName: file.name,
+            biomarkers: {
+              create: recognizedMarkers.map(m => ({
+                biomarkerKey: m.normalizedKey!,
+                rawName: m.rawName,
+                value: m.value,
+                unit: m.unit,
+                originalValue: m.originalValue,
+                originalUnit: m.originalUnit,
+                rangeLow: m.rangeLow,
+                rangeHigh: m.rangeHigh,
+                flag: m.flag,
+                confidence: m.confidence,
+                category: m.category,
+              })),
+            },
           },
-        },
-        include: { biomarkers: true },
-      })
+          include: { biomarkers: true },
+        })
+      } catch (uploadErr) {
+        console.warn('LabUpload write skipped (table may not exist):', uploadErr)
+      }
     }
 
     // Return parse results
