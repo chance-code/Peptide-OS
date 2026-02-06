@@ -21,6 +21,6 @@ export const config = {
      * - /manifest.json (PWA manifest)
      * - /icon-*.png (PWA icons)
      */
-    '/((?!login|api/auth|api/push|api/debug|api/labs/import-pdf|_next/static|_next/image|favicon.ico|sw.js|manifest.json|icon-).*)',
+    '/((?!login|api/auth|api/push|api/debug|api/labs/import-pdf|api/labs/test-pdf|_next/static|_next/image|favicon.ico|sw.js|manifest.json|icon-).*)',
   ],
 }

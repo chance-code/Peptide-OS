@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getAuthenticatedUserId } from '@/lib/api-auth'
-import { parseQuestPDF } from '@/lib/labs/lab-pdf-parser'
+import { parseQuestPDF, extractTextFromPDF } from '@/lib/labs/lab-pdf-parser'
 import { analyzeLabPatterns } from '@/lib/labs/lab-analyzer'
 
-// Force Node.js runtime for pdf-parse compatibility
+// Force Node.js runtime for pdfjs-dist compatibility
 export const runtime = 'nodejs'
 
 // ─── POST /api/health/labs/upload — Full PDF upload with analysis pipeline ──
@@ -34,14 +34,11 @@ export async function POST(request: NextRequest) {
 
     let text: string
     try {
-      const { PDFParse } = await import('pdf-parse')
-      const parser = new PDFParse({ data })
-      const textResult = await parser.getText()
-      text = textResult.text
-      await parser.destroy()
-    } catch {
+      text = await extractTextFromPDF(data)
+    } catch (pdfError) {
+      const errMsg = pdfError instanceof Error ? pdfError.message : String(pdfError)
       return NextResponse.json(
-        { error: 'Failed to parse PDF file. Please ensure it is a valid PDF.' },
+        { error: `Failed to parse PDF: ${errMsg}` },
         { status: 400 }
       )
     }
@@ -173,6 +170,7 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error('Error uploading lab PDF:', error)
-    return NextResponse.json({ error: 'Failed to process lab upload' }, { status: 500 })
+    const errMsg = error instanceof Error ? error.message : String(error)
+    return NextResponse.json({ error: `Failed to process lab upload: ${errMsg}` }, { status: 500 })
   }
 }

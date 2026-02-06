@@ -14,6 +14,19 @@ import {
   parseBelowDetectionLimit,
 } from '@/lib/labs/lab-validator'
 
+// ─── PDF Text Extraction ─────────────────────────────────────────────────────
+
+/**
+ * Extract text from a PDF buffer using unpdf (serverless-compatible pdfjs wrapper).
+ * Returns page texts joined with newlines to preserve line structure.
+ */
+export async function extractTextFromPDF(data: Uint8Array): Promise<string> {
+  const { extractText, getDocumentProxy } = await import('unpdf')
+  const pdf = await getDocumentProxy(data)
+  const { text } = await extractText(pdf, { mergePages: false })
+  return (text as string[]).join('\n')
+}
+
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 export interface ParsedBiomarker {
