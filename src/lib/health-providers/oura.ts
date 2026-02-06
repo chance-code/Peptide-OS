@@ -48,8 +48,11 @@ interface OuraHRV {
 interface OuraSleepSession {
   day: string
   total_sleep_duration: number // seconds
+  time_in_bed: number // seconds (includes awake time)
+  awake_time: number // seconds spent awake during sleep
   rem_sleep_duration: number
   deep_sleep_duration: number
+  light_sleep_duration: number
   average_heart_rate: number
   lowest_heart_rate: number
   average_hrv: number | null // HRV in milliseconds
@@ -88,7 +91,7 @@ const ouraProvider: HealthProvider = {
   name: 'oura',
   displayName: 'Oura Ring',
   description: 'Sync sleep scores, HRV, heart rate, and activity from your Oura Ring',
-  supportedMetrics: ['sleep_duration', 'sleep_score', 'hrv', 'rhr', 'steps', 'readiness_score', 'temperature_deviation', 'stress_high', 'recovery_high', 'resilience_level'],
+  supportedMetrics: ['sleep_duration', 'deep_sleep', 'rem_sleep', 'light_sleep', 'time_in_bed', 'sleep_score', 'hrv', 'rhr', 'steps', 'readiness_score', 'temperature_deviation', 'stress_high', 'recovery_high', 'resilience_level'],
   requiresOAuth: true,
 
   getAuthUrl(userId: string, redirectUri: string): string {
@@ -270,6 +273,43 @@ const ouraProvider: HealthProvider = {
               deep_duration: Math.round(session.deep_sleep_duration / 60)
             }
           })
+
+          // Sync individual sleep stages as separate metrics
+          if (session.deep_sleep_duration) {
+            metrics.push({
+              metricType: 'deep_sleep',
+              value: Math.round(session.deep_sleep_duration / 60),
+              unit: 'minutes',
+              recordedAt: new Date(session.day),
+            })
+          }
+          if (session.rem_sleep_duration) {
+            metrics.push({
+              metricType: 'rem_sleep',
+              value: Math.round(session.rem_sleep_duration / 60),
+              unit: 'minutes',
+              recordedAt: new Date(session.day),
+            })
+          }
+          if (session.light_sleep_duration) {
+            metrics.push({
+              metricType: 'light_sleep',
+              value: Math.round(session.light_sleep_duration / 60),
+              unit: 'minutes',
+              recordedAt: new Date(session.day),
+            })
+          }
+          // Sync time in bed: prefer time_in_bed field, fall back to total_sleep + awake_time
+          const timeInBedSeconds = session.time_in_bed
+            ?? (session.total_sleep_duration + (session.awake_time ?? 0))
+          if (timeInBedSeconds != null && timeInBedSeconds > 0) {
+            metrics.push({
+              metricType: 'time_in_bed',
+              value: Math.round(timeInBedSeconds / 60),
+              unit: 'minutes',
+              recordedAt: new Date(session.day),
+            })
+          }
 
           // Add resting heart rate from sleep session
           if (session.lowest_heart_rate) {

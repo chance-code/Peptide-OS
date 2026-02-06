@@ -13,6 +13,7 @@ export type MetricType =
   | 'waso'
   | 'sleep_latency'
   | 'deep_sleep'
+  | 'light_sleep'
   | 'hrv'
   | 'rhr'
   | 'weight'
