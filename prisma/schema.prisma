@@ -30,6 +30,7 @@ model UserProfile {
   healthIntegrations HealthIntegration[]
   healthMetrics      HealthMetric[]
   labResults         LabResult[]
+  labUploads         LabUpload[]
 }
 
 // ============================================
@@ -414,4 +415,55 @@ model LabResult {
   user      UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, testDate])
+}
+
+// ============================================
+// LAB UPLOADS (Structured — replaces JSON blob)
+// ============================================
+model LabUpload {
+  id            String   @id @default(cuid())
+  userId        String
+  testDate      DateTime            // Date blood was drawn
+  labName       String?             // "Function Health", "Quest Diagnostics"
+  source        String   @default("manual")  // "pdf_import" | "manual" | "api"
+  notes         String?
+  rawText       String?             // Preserved PDF text for re-parsing
+  confidence    Float?              // Overall parse confidence 0-1
+  fileName      String?             // Original PDF filename
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  biomarkers    LabBiomarker[]
+  user          UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, testDate])
+  @@index([userId])
+}
+
+// ============================================
+// LAB BIOMARKERS (Individual parsed markers)
+// ============================================
+model LabBiomarker {
+  id              String   @id @default(cuid())
+  uploadId        String
+  biomarkerKey    String              // Canonical key from registry: "total_testosterone"
+  rawName         String?             // Original name from PDF: "Testosterone, Total"
+  value           Float
+  unit            String              // Canonical storage unit
+  originalValue   Float?              // Pre-conversion value if unit converted
+  originalUnit    String?             // Pre-conversion unit
+  rangeLow        Float?              // Lab's reference range min
+  rangeHigh       Float?              // Lab's reference range max
+  flag            String              // "low" | "normal" | "optimal" | "high" | "critical_low" | "critical_high"
+  confidence      Float?              // Parse confidence for this marker (0-1)
+  category        String?             // From BiomarkerDefinition.category
+
+  createdAt       DateTime @default(now())
+
+  upload          LabUpload @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+
+  @@index([uploadId])
+  @@index([biomarkerKey])
+  @@unique([uploadId, biomarkerKey])
 }

@@ -5,8 +5,16 @@ import {
   normalizeBiomarkerName,
   getBiomarker,
   computeFlag,
+  BIOMARKER_REGISTRY,
   type BiomarkerFlag,
 } from '@/lib/lab-biomarker-contract'
+import {
+  validateBiomarkerValue,
+  computeAllDerived,
+  parseCategoricalValue,
+  parseBelowDetectionLimit,
+  parseAboveDetectionLimit,
+} from '@/lib/labs/lab-validator'
 
 // Force Node.js runtime for pdf-parse compatibility
 export const runtime = 'nodejs'
@@ -21,7 +29,12 @@ interface ParsedBiomarker {
   unit: string
   rangeLow?: number
   rangeHigh?: number
-  flag: BiomarkerFlag | 'normal' | 'high' | 'low'
+  flag: BiomarkerFlag
+  confidence: number
+  converted: boolean
+  originalValue?: number
+  originalUnit?: string
+  category?: string
 }
 
 interface ParseResult {
@@ -30,6 +43,7 @@ interface ParseResult {
   markers: ParsedBiomarker[]
   rawText: string
   parseWarnings: string[]
+  overallConfidence: number
 }
 
 // ─── Function Health PDF Parser ────────────────────────────────────────────
@@ -121,10 +135,31 @@ function parseFunctionHealthPDF(text: string): ParseResult {
     if (processedNames.has(cleanName.toLowerCase())) return
     processedNames.add(cleanName.toLowerCase())
 
-    const value = parseFloat(valueStr)
-    if (isNaN(value)) {
-      warnings.push(`Could not parse value for ${cleanName}: "${valueStr}"`)
-      return
+    // Handle categorical values (e.g., "Positive", "Negative", "Reactive")
+    let numericValue: number
+    let isCategorical = false
+    const belowLimit = parseBelowDetectionLimit(valueStr)
+    const aboveLimit = parseAboveDetectionLimit(valueStr)
+
+    if (belowLimit) {
+      numericValue = belowLimit.value
+    } else if (aboveLimit) {
+      numericValue = aboveLimit.value
+    } else {
+      const parsed = parseFloat(valueStr)
+      if (isNaN(parsed)) {
+        // Try categorical parse
+        const catValue = parseCategoricalValue(valueStr)
+        if (catValue !== null) {
+          numericValue = catValue
+          isCategorical = true
+        } else {
+          warnings.push(`Could not parse value for ${cleanName}: "${valueStr}"`)
+          return
+        }
+      } else {
+        numericValue = parsed
+      }
     }
 
     const rangeLow = rangeLowStr ? parseFloat(rangeLowStr) : undefined
@@ -133,32 +168,73 @@ function parseFunctionHealthPDF(text: string): ParseResult {
     // Try to normalize to our biomarker registry
     const normalizedKey = normalizeBiomarkerName(cleanName)
     let displayName = cleanName
-    let flag: BiomarkerFlag | 'normal' | 'high' | 'low' = 'normal'
+    let flag: BiomarkerFlag = 'normal'
+    let confidence = 0.7 // Base confidence for parsed values
+    let converted = false
+    let originalValue: number | undefined
+    let originalUnit: string | undefined
+    let category: string | undefined
 
     if (normalizedKey) {
       const biomarker = getBiomarker(normalizedKey)
       if (biomarker) {
         displayName = biomarker.displayName
-        flag = computeFlag(normalizedKey, value)
+        category = biomarker.category
+
+        if (isCategorical) {
+          // Categorical values: 1 = positive (flag as high), 0 = negative (normal)
+          flag = numericValue === 1 ? 'high' : 'normal'
+          confidence = 0.9
+        } else {
+          // Run full validation pipeline (unit conversion + bounds check + flag)
+          const validation = validateBiomarkerValue(normalizedKey, numericValue, unit)
+          numericValue = validation.value
+          flag = validation.flag
+          confidence = validation.confidence
+          converted = validation.converted
+          originalValue = validation.originalValue
+          originalUnit = validation.originalUnit
+
+          if (!validation.valid) {
+            warnings.push(validation.warning || `Value validation failed for ${cleanName}`)
+            confidence = 0.1
+          }
+
+          if (validation.critical) {
+            warnings.push(`Critical value: ${displayName} at ${numericValue} ${validation.unit}`)
+          }
+        }
+
+        // Boost confidence for recognized biomarkers
+        confidence = Math.min(confidence * 1.1, 1.0)
       }
     } else {
       // Fallback flag computation for unrecognized markers
-      if (rangeHigh !== undefined && value > rangeHigh) flag = 'high'
-      else if (rangeLow !== undefined && value < rangeLow) flag = 'low'
+      if (rangeHigh !== undefined && numericValue > rangeHigh) flag = 'high'
+      else if (rangeLow !== undefined && numericValue < rangeLow) flag = 'low'
       else flag = 'normal'
+      confidence = 0.4 // Lower confidence for unrecognized markers
 
       warnings.push(`Unrecognized biomarker: "${cleanName}" - stored but not normalized`)
     }
+
+    // Reduce confidence for detection-limit values
+    if (belowLimit || aboveLimit) confidence *= 0.8
 
     markers.push({
       rawName: cleanName,
       normalizedKey,
       displayName,
-      value,
+      value: numericValue,
       unit: unit.trim(),
       rangeLow,
       rangeHigh,
       flag,
+      confidence,
+      converted,
+      originalValue,
+      originalUnit,
+      category,
     })
   }
 
@@ -191,12 +267,18 @@ function parseFunctionHealthPDF(text: string): ParseResult {
     warnings.push('No biomarkers could be parsed from this PDF. Please check the format.')
   }
 
+  // Compute overall confidence as average of marker confidences
+  const overallConfidence = markers.length > 0
+    ? markers.reduce((sum, m) => sum + m.confidence, 0) / markers.length
+    : 0
+
   return {
     testDate,
     labName,
     markers,
     rawText: text,
     parseWarnings: warnings,
+    overallConfidence: Math.round(overallConfidence * 100) / 100,
   }
 }
 
@@ -268,9 +350,32 @@ export async function POST(request: NextRequest) {
       : (parseResult.testDate || new Date())
     const finalLabName = labNameOverride || parseResult.labName
 
-    // Convert to storage format
+    // Compute derived biomarkers (HOMA-IR, Non-HDL, etc.)
+    const valueMap: Record<string, number> = {}
+    for (const m of parseResult.markers) {
+      if (m.normalizedKey) valueMap[m.normalizedKey] = m.value
+    }
+    const derivedCalcs = computeAllDerived(valueMap)
+
+    // Add derived calculations as additional markers
+    for (const derived of derivedCalcs) {
+      const def = BIOMARKER_REGISTRY[derived.key]
+      parseResult.markers.push({
+        rawName: `[Derived] ${derived.displayName}`,
+        normalizedKey: derived.key,
+        displayName: derived.displayName,
+        value: derived.value,
+        unit: derived.unit,
+        flag: derived.flag,
+        confidence: 1.0, // Derived values have full confidence
+        converted: false,
+        category: def?.category,
+      })
+    }
+
+    // Convert to legacy storage format (backward compat with LabResult JSON blob)
     const markersForStorage = parseResult.markers.map((m) => ({
-      name: m.normalizedKey || m.rawName, // Use normalized key if available
+      name: m.normalizedKey || m.rawName,
       displayName: m.displayName,
       rawName: m.rawName,
       value: m.value,
@@ -278,11 +383,14 @@ export async function POST(request: NextRequest) {
       rangeLow: m.rangeLow,
       rangeHigh: m.rangeHigh,
       flag: m.flag,
+      confidence: m.confidence,
     }))
 
     // Optionally save to database
     let savedResult = null
+    let savedUpload = null
     if (saveResult && markersForStorage.length > 0) {
+      // Legacy write: LabResult (backward compat)
       savedResult = await prisma.labResult.create({
         data: {
           userId,
@@ -291,6 +399,37 @@ export async function POST(request: NextRequest) {
           notes: `Imported from PDF: ${file.name}`,
           markers: JSON.stringify(markersForStorage),
         },
+      })
+
+      // Structured write: LabUpload + LabBiomarker
+      const recognizedMarkers = parseResult.markers.filter(m => m.normalizedKey)
+      savedUpload = await prisma.labUpload.create({
+        data: {
+          userId,
+          testDate: finalTestDate,
+          labName: finalLabName,
+          source: 'pdf_import',
+          notes: `Imported from PDF: ${file.name}`,
+          rawText: parseResult.rawText,
+          confidence: parseResult.overallConfidence,
+          fileName: file.name,
+          biomarkers: {
+            create: recognizedMarkers.map(m => ({
+              biomarkerKey: m.normalizedKey!,
+              rawName: m.rawName,
+              value: m.value,
+              unit: m.unit,
+              originalValue: m.originalValue,
+              originalUnit: m.originalUnit,
+              rangeLow: m.rangeLow,
+              rangeHigh: m.rangeHigh,
+              flag: m.flag,
+              confidence: m.confidence,
+              category: m.category,
+            })),
+          },
+        },
+        include: { biomarkers: true },
       })
     }
 
@@ -302,12 +441,18 @@ export async function POST(request: NextRequest) {
         labName: finalLabName,
         markersCount: parseResult.markers.length,
         markers: parseResult.markers,
+        derived: derivedCalcs,
         warnings: parseResult.parseWarnings,
+        overallConfidence: parseResult.overallConfidence,
       },
       saved: savedResult ? {
         id: savedResult.id,
         testDate: savedResult.testDate,
         labName: savedResult.labName,
+      } : null,
+      upload: savedUpload ? {
+        id: savedUpload.id,
+        biomarkersCount: savedUpload.biomarkers.length,
       } : null,
     })
   } catch (error) {
