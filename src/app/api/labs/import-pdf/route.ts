@@ -7,7 +7,9 @@ import {
   computeFlag,
   type BiomarkerFlag,
 } from '@/lib/lab-biomarker-contract'
-import { PDFParse } from 'pdf-parse'
+
+// Force Node.js runtime for pdf-parse compatibility
+export const runtime = 'nodejs'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -234,9 +236,10 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await file.arrayBuffer()
     const data = new Uint8Array(arrayBuffer)
 
-    // Parse PDF to text
+    // Parse PDF to text using dynamic import
     let text: string
     try {
+      const { PDFParse } = await import('pdf-parse')
       const parser = new PDFParse({ data })
       const textResult = await parser.getText()
       text = textResult.text
