@@ -1604,6 +1604,158 @@ function computeDataQuality(
   return { overall, perMetric }
 }
 
+// ============================================================================
+// DAILY SCORE CALCULATION (for score-history)
+// ============================================================================
+
+export interface DailyScoreResult {
+  overall: number
+  sleep: number | null
+  recovery: number | null
+  activity: number | null
+  bodyComp: number | null
+  topPositive: { category: string; metric: string; contribution: string } | null
+  topNegative: { category: string; metric: string; contribution: string } | null
+}
+
+/**
+ * Calculate a health score for a single day's metrics.
+ * Uses the same scoring logic as calculateHealthScore() but operates on
+ * pre-fetched metric values rather than querying trends.
+ */
+export function calculateDailyScore(
+  metricsForDay: Map<MetricType, number>
+): DailyScoreResult {
+  const weights: Partial<Record<MetricType, { category: 'sleep' | 'recovery' | 'activity' | 'bodyComp'; weight: number }>> = {
+    // Sleep metrics
+    sleep_duration: { category: 'sleep', weight: 0.30 },
+    sleep_score: { category: 'sleep', weight: 0.35 },
+    sleep_efficiency: { category: 'sleep', weight: 0.15 },
+    time_in_bed: { category: 'sleep', weight: 0.10 },
+    bed_temperature: { category: 'sleep', weight: 0.10 },
+    // Recovery metrics
+    hrv: { category: 'recovery', weight: 0.4 },
+    rhr: { category: 'recovery', weight: 0.3 },
+    blood_oxygen: { category: 'recovery', weight: 0.15 },
+    respiratory_rate: { category: 'recovery', weight: 0.15 },
+    // Activity metrics
+    steps: { category: 'activity', weight: 0.3 },
+    active_calories: { category: 'activity', weight: 0.25 },
+    exercise_minutes: { category: 'activity', weight: 0.25 },
+    vo2_max: { category: 'activity', weight: 0.2 },
+    // Body composition
+    body_fat_percentage: { category: 'bodyComp', weight: 0.35 },
+    lean_body_mass: { category: 'bodyComp', weight: 0.30 },
+    muscle_mass: { category: 'bodyComp', weight: 0.25 },
+    weight: { category: 'bodyComp', weight: 0.10 }
+  }
+
+  const categoryScores: Record<'sleep' | 'recovery' | 'activity' | 'bodyComp', number[]> = {
+    sleep: [],
+    recovery: [],
+    activity: [],
+    bodyComp: []
+  }
+
+  const metricScores: Array<{ metric: MetricType; category: string; score: number; weight: number }> = []
+
+  for (const [metricType, value] of metricsForDay) {
+    const range = OPTIMAL_RANGES[metricType]
+    const w = weights[metricType]
+
+    if (!range || !w) continue
+
+    let score: number
+    const polarity = METRIC_POLARITY[metricType]
+
+    // For body comp metrics without fixed optimal ranges, use neutral score
+    if (range.optimal === 0 && w.category === 'bodyComp') {
+      score = 70 // Neutral for body comp without optimal
+    } else if (range.optimal === 0) {
+      continue // Skip non-body-comp metrics with no optimal range
+    } else if (polarity === 'lower_better') {
+      if (value <= range.optimal) score = 100
+      else if (value >= range.max) score = 50
+      else {
+        const denom = range.max - range.optimal
+        score = denom > 0 ? 100 - (safeDivide(value - range.optimal, denom) ?? 0) * 50 : 75
+      }
+    } else {
+      // higher_better or neutral
+      if (value >= range.optimal) score = 100
+      else if (value <= range.min) score = 50
+      else {
+        const denom = range.optimal - range.min
+        score = denom > 0 ? 50 + (safeDivide(value - range.min, denom) ?? 0) * 50 : 75
+      }
+    }
+
+    score = isNaN(score) ? 50 : Math.max(0, Math.min(100, Math.round(score)))
+
+    categoryScores[w.category].push(score)
+    metricScores.push({ metric: metricType, category: w.category, score, weight: w.weight })
+  }
+
+  const avgScore = (scores: number[]) =>
+    scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null
+
+  const sleep = avgScore(categoryScores.sleep)
+  const recovery = avgScore(categoryScores.recovery)
+  const activity = avgScore(categoryScores.activity)
+  const bodyComp = avgScore(categoryScores.bodyComp)
+  const hasBodyComp = categoryScores.bodyComp.length > 0
+
+  // Compute overall score
+  const hasAnyData = sleep !== null || recovery !== null || activity !== null
+  let overall = 50 // Default if no data
+
+  if (hasAnyData) {
+    const s = sleep ?? 50
+    const r = recovery ?? 50
+    const a = activity ?? 50
+    overall = hasBodyComp
+      ? Math.round(s * 0.35 + r * 0.30 + a * 0.20 + (bodyComp ?? 50) * 0.15)
+      : Math.round(s * 0.4 + r * 0.35 + a * 0.25)
+  }
+
+  // Find top positive and negative contributors
+  let topPositive: DailyScoreResult['topPositive'] = null
+  let topNegative: DailyScoreResult['topNegative'] = null
+
+  if (metricScores.length > 0) {
+    const withDelta = metricScores.map(m => ({
+      ...m,
+      delta: m.score - 50,
+      weightedDelta: (m.score - 50) * m.weight
+    }))
+
+    const sortedPositive = withDelta.filter(m => m.weightedDelta > 0).sort((a, b) => b.weightedDelta - a.weightedDelta)
+    const sortedNegative = withDelta.filter(m => m.weightedDelta < 0).sort((a, b) => a.weightedDelta - b.weightedDelta)
+
+    if (sortedPositive[0]) {
+      const t = sortedPositive[0]
+      const displayName = getMetricDisplayName(t.metric).toLowerCase()
+      topPositive = {
+        category: t.category,
+        metric: t.metric,
+        contribution: `${displayName} scored ${t.score}/100`
+      }
+    }
+
+    if (sortedNegative[0]) {
+      const t = sortedNegative[0]
+      const displayName = getMetricDisplayName(t.metric).toLowerCase()
+      topNegative = {
+        category: t.category,
+        metric: t.metric,
+        contribution: `${displayName} scored ${t.score}/100`
+      }
+    }
+  }
+
+  return { overall, sleep, recovery, activity, bodyComp, topPositive, topNegative }
+}
+
 export async function getUnifiedHealthSummary(userId: string, window: number = 7) {
   const [score, trends, insights, recovery, sleepArch, dayPatterns] = await Promise.all([
     calculateHealthScore(userId),
