@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { getAuthenticatedUserId } from '@/lib/api-auth'
 
 // GET /api/protocols/[id] - Get a single protocol with details
 export async function GET(
@@ -7,6 +8,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await getAuthenticatedUserId()
+    if (!auth.success) return auth.response
+
     const { id } = await params
     const protocol = await prisma.protocol.findUnique({
       where: { id },
@@ -27,6 +31,10 @@ export async function GET(
       return NextResponse.json({ error: 'Protocol not found' }, { status: 404 })
     }
 
+    if (protocol.userId !== auth.userId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     return NextResponse.json(protocol)
   } catch (error) {
     console.error('Error fetching protocol:', error)
@@ -40,6 +48,9 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await getAuthenticatedUserId()
+    if (!auth.success) return auth.response
+
     const { id } = await params
     const body = await request.json()
     const {
@@ -65,6 +76,10 @@ export async function PUT(
 
     if (!currentProtocol) {
       return NextResponse.json({ error: 'Protocol not found' }, { status: 404 })
+    }
+
+    if (currentProtocol.userId !== auth.userId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const updateData: Record<string, unknown> = {}
@@ -176,16 +191,23 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await getAuthenticatedUserId()
+    if (!auth.success) return auth.response
+
     const { id } = await params
 
-    // Check if protocol is completed - prevent deletion
+    // Check if protocol exists and verify ownership
     const protocol = await prisma.protocol.findUnique({
       where: { id },
-      select: { status: true },
+      select: { status: true, userId: true },
     })
 
     if (!protocol) {
       return NextResponse.json({ error: 'Protocol not found' }, { status: 404 })
+    }
+
+    if (protocol.userId !== auth.userId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     if (protocol.status === 'completed') {

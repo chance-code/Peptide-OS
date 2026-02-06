@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { getAuthenticatedUserId } from '@/lib/api-auth'
 
 // GET /api/users/[id] - Get a single user
 export async function GET(
@@ -7,7 +8,15 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await getAuthenticatedUserId()
+    if (!auth.success) return auth.response
+
     const { id } = await params
+
+    if (id !== auth.userId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     const user = await prisma.userProfile.findUnique({
       where: { id },
       include: {
@@ -37,7 +46,15 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await getAuthenticatedUserId()
+    if (!auth.success) return auth.response
+
     const { id } = await params
+
+    if (id !== auth.userId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     const body = await request.json()
     const { name, notes, isActive } = body
 
@@ -71,7 +88,14 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await getAuthenticatedUserId()
+    if (!auth.success) return auth.response
+
     const { id } = await params
+
+    if (id !== auth.userId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
 
     await prisma.userProfile.delete({
       where: { id },

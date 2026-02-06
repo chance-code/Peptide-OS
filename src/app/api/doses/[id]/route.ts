@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { getAuthenticatedUserId } from '@/lib/api-auth'
 
 // GET /api/doses/[id] - Get a single dose log
 export async function GET(
@@ -7,6 +8,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await getAuthenticatedUserId()
+    if (!auth.success) return auth.response
+
     const { id } = await params
     const doseLog = await prisma.doseLog.findUnique({
       where: { id },
@@ -19,6 +23,10 @@ export async function GET(
 
     if (!doseLog) {
       return NextResponse.json({ error: 'Dose log not found' }, { status: 404 })
+    }
+
+    if (doseLog.userId !== auth.userId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     return NextResponse.json(doseLog)
@@ -34,7 +42,25 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await getAuthenticatedUserId()
+    if (!auth.success) return auth.response
+
     const { id } = await params
+
+    // Verify ownership before updating
+    const existing = await prisma.doseLog.findUnique({
+      where: { id },
+      select: { userId: true },
+    })
+
+    if (!existing) {
+      return NextResponse.json({ error: 'Dose log not found' }, { status: 404 })
+    }
+
+    if (existing.userId !== auth.userId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
     const body = await request.json()
     const { status, actualDose, actualUnit, notes } = body
 
@@ -69,7 +95,23 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await getAuthenticatedUserId()
+    if (!auth.success) return auth.response
+
     const { id } = await params
+
+    const doseLog = await prisma.doseLog.findUnique({
+      where: { id },
+      select: { userId: true },
+    })
+
+    if (!doseLog) {
+      return NextResponse.json({ error: 'Dose log not found' }, { status: 404 })
+    }
+
+    if (doseLog.userId !== auth.userId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
 
     await prisma.doseLog.delete({
       where: { id },

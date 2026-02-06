@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { getAuthenticatedUserId } from '@/lib/api-auth'
 
-// GET /api/peptides/[id] - Get a single peptide
+// GET /api/peptides/[id] - Get a single peptide (public - peptides are shared definitions)
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -23,12 +24,15 @@ export async function GET(
   }
 }
 
-// PUT /api/peptides/[id] - Update a peptide
+// PUT /api/peptides/[id] - Update a peptide (requires authentication)
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await getAuthenticatedUserId()
+    if (!auth.success) return auth.response
+
     const { id } = await params
     const body = await request.json()
     const { name, category, description, storageNotes } = body
@@ -50,12 +54,15 @@ export async function PUT(
   }
 }
 
-// DELETE /api/peptides/[id] - Delete a peptide
+// DELETE /api/peptides/[id] - Delete a peptide (requires authentication)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await getAuthenticatedUserId()
+    if (!auth.success) return auth.response
+
     const { id } = await params
 
     await prisma.peptide.delete({

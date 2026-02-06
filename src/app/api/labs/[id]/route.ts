@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { getAuthenticatedUserId } from '@/lib/api-auth'
 
 interface Marker {
   name: string
@@ -30,11 +31,18 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await getAuthenticatedUserId()
+    if (!auth.success) return auth.response
+
     const { id } = await params
     const result = await prisma.labResult.findUnique({ where: { id } })
 
     if (!result) {
       return NextResponse.json({ error: 'Lab result not found' }, { status: 404 })
+    }
+
+    if (result.userId !== auth.userId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     return NextResponse.json({ ...result, markers: parseMarkers(result.markers) })
@@ -50,6 +58,9 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await getAuthenticatedUserId()
+    if (!auth.success) return auth.response
+
     const { id } = await params
     const body = await request.json()
     const { testDate, labName, markers, notes } = body
@@ -57,6 +68,10 @@ export async function PUT(
     const existing = await prisma.labResult.findUnique({ where: { id } })
     if (!existing) {
       return NextResponse.json({ error: 'Lab result not found' }, { status: 404 })
+    }
+
+    if (existing.userId !== auth.userId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     // Build update data — only include provided fields
@@ -101,7 +116,23 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await getAuthenticatedUserId()
+    if (!auth.success) return auth.response
+
     const { id } = await params
+
+    const result = await prisma.labResult.findUnique({
+      where: { id },
+      select: { userId: true },
+    })
+
+    if (!result) {
+      return NextResponse.json({ error: 'Lab result not found' }, { status: 404 })
+    }
+
+    if (result.userId !== auth.userId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
 
     await prisma.labResult.delete({ where: { id } })
 

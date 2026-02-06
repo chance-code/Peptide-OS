@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { getAuthenticatedUserId } from '@/lib/api-auth'
 
 // GET /api/inventory/[id] - Get a single inventory vial
 export async function GET(
@@ -7,6 +8,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await getAuthenticatedUserId()
+    if (!auth.success) return auth.response
+
     const { id } = await params
     const vial = await prisma.inventoryVial.findUnique({
       where: { id },
@@ -17,6 +21,10 @@ export async function GET(
 
     if (!vial) {
       return NextResponse.json({ error: 'Vial not found' }, { status: 404 })
+    }
+
+    if (vial.userId !== auth.userId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     return NextResponse.json(vial)
@@ -32,6 +40,9 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await getAuthenticatedUserId()
+    if (!auth.success) return auth.response
+
     const { id } = await params
     const body = await request.json()
     const {
@@ -55,6 +66,10 @@ export async function PUT(
 
     if (!currentVial) {
       return NextResponse.json({ error: 'Vial not found' }, { status: 404 })
+    }
+
+    if (currentVial.userId !== auth.userId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     // Calculate concentration if needed
@@ -119,7 +134,23 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await getAuthenticatedUserId()
+    if (!auth.success) return auth.response
+
     const { id } = await params
+
+    const vial = await prisma.inventoryVial.findUnique({
+      where: { id },
+      select: { userId: true },
+    })
+
+    if (!vial) {
+      return NextResponse.json({ error: 'Vial not found' }, { status: 404 })
+    }
+
+    if (vial.userId !== auth.userId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
 
     await prisma.inventoryVial.delete({
       where: { id },
