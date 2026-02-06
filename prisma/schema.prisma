@@ -33,6 +33,9 @@ model UserProfile {
   labUploads         LabUpload[]
   biologicalLiteracy UserBiologicalLiteracy?
   discoveryInsights  DiscoveryInsight[]
+  healthBrainSnapshots HealthBrainSnapshot[]
+  personalBaselines    PersonalBaseline[]
+  labPriorResets       LabPriorResetEvent[]
 }
 
 // ============================================
@@ -562,4 +565,78 @@ model DiscoveryInsight {
 
   @@index([userId, generatedAt])
   @@index([userId, seen])
+}
+
+// ============================================
+// HEALTH BRAIN SNAPSHOTS (Orchestrator output cache)
+// ============================================
+model HealthBrainSnapshot {
+  id                   String   @id @default(cuid())
+  userId               String
+  triggerEvent         String   @default("manual_refresh") // lab_upload|daily_wearable_sync|protocol_change|manual_refresh
+  evaluatedAt          DateTime @default(now())
+  pipelineMs           Int?
+
+  // Domain assessments (JSON strings)
+  domainsJson          String   @default("{}")
+  agingVelocityJson    String   @default("{}")
+  allostasisJson       String   @default("{}")
+  riskTrajectoriesJson String   @default("{}")
+  protocolEvidenceJson String   @default("[]")
+  predictionsJson      String   @default("[]")
+  narrativesJson       String   @default("[]")
+  actionItemsJson      String   @default("[]")
+
+  // Unified outputs
+  unifiedScore         Float?
+  dailyStatusJson      String   @default("{}")
+  confidenceJson       String   @default("{}")
+  dataCompleteness     Float    @default(0)
+
+  createdAt            DateTime @default(now())
+  user                 UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, evaluatedAt])
+}
+
+// ============================================
+// PERSONAL BASELINES (Bayesian biomarker baselines)
+// ============================================
+model PersonalBaseline {
+  id                   String    @id @default(cuid())
+  userId               String
+  biomarkerKey         String
+  personalMean         Float
+  personalSD           Float
+  drawCount            Int       @default(0)
+  populationPercentile Float?
+  trend                String    @default("stable") // improving|stable|declining
+  trendConfidence      Float     @default(0)
+  lastLabValue         Float?
+  lastLabDate          DateTime?
+  updatedAt            DateTime  @updatedAt
+  createdAt            DateTime  @default(now())
+  user                 UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, biomarkerKey])
+}
+
+// ============================================
+// LAB PRIOR RESET EVENTS (What changed when labs arrived)
+// ============================================
+model LabPriorResetEvent {
+  id                     String   @id @default(cuid())
+  userId                 String
+  labUploadId            String
+  baselinesUpdated       Int      @default(0)
+  hypothesesResolved     Int      @default(0)
+  domainsReweighted      Int      @default(0)
+  protocolsReassessed    Int      @default(0)
+  wearableSignalsQuieted Int      @default(0)
+  summaryNarrative       String?
+  createdAt              DateTime @default(now())
+  user                   UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([labUploadId])
 }

@@ -21,6 +21,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUserId } from '@/lib/api-auth'
 import { computePremiumEvidence, type PremiumProtocolEvidence } from '@/lib/health-evidence-engine'
 import { findProtocolMechanism } from '@/lib/protocol-mechanisms'
+import { getLatestSnapshot, isRecentSnapshot } from '@/lib/health-brain'
 
 export const dynamic = 'force-dynamic'
 
@@ -67,6 +68,15 @@ export async function GET(request: NextRequest) {
     // Generate summary for the response
     const summary = generateEvidenceSummary(enrichedEvidence)
 
+    // Enrich with Brain snapshot data if available
+    let brainProtocolEvidence: any[] | null = null
+    let brainConfidence: string | null = null
+    const snapshot = await getLatestSnapshot(userId)
+    if (snapshot && isRecentSnapshot(snapshot.evaluatedAt, 5 * 60 * 1000)) {
+      brainProtocolEvidence = snapshot.protocolEvidence ?? null
+      brainConfidence = snapshot.systemConfidence?.level ?? null
+    }
+
     return NextResponse.json(
       {
         evidence: enrichedEvidence,
@@ -78,6 +88,8 @@ export async function GET(request: NextRequest) {
           includesRobustness: includeRobustness,
           generatedAt: new Date().toISOString(),
         },
+        brainProtocolEvidence,
+        brainConfidence,
       },
       {
         headers: {

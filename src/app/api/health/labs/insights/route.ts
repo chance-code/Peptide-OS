@@ -4,6 +4,7 @@ import { getAuthenticatedUserId } from '@/lib/api-auth'
 import { BIOMARKER_REGISTRY, computeFlag, type BiomarkerFlag } from '@/lib/lab-biomarker-contract'
 import { analyzeLabPatterns, type LabPattern } from '@/lib/labs/lab-analyzer'
 import { generateBridgeInsights, type BridgeInsight } from '@/lib/labs/lab-wearable-bridge'
+import { getLatestSnapshot, isRecentSnapshot } from '@/lib/health-brain'
 
 // GET /api/health/labs/insights — Three-tier lab insights
 export async function GET(request: NextRequest) {
@@ -66,6 +67,17 @@ export async function GET(request: NextRequest) {
     // Prioritized actions
     const actions = generateActions(tier1, patterns, bridgeInsights)
 
+    // Enrich with Brain snapshot data if available
+    let brainDomains: any = null
+    let brainScore: number | null = null
+    let brainConfidence: string | null = null
+    const snapshot = await getLatestSnapshot(userId)
+    if (snapshot && isRecentSnapshot(snapshot.evaluatedAt, 5 * 60 * 1000)) {
+      brainDomains = snapshot.domains ?? null
+      brainScore = snapshot.unifiedScore ?? null
+      brainConfidence = snapshot.systemConfidence?.level ?? null
+    }
+
     return NextResponse.json({
       uploadId: sourceId,
       testDate: sourceTestDate,
@@ -110,6 +122,9 @@ export async function GET(request: NextRequest) {
       },
       narrative,
       actions,
+      brainDomains,
+      brainScore,
+      brainConfidence,
       disclaimer: 'This analysis is for informational purposes only and does not constitute medical advice. Always consult a qualified healthcare provider before making changes to your health regimen.',
     }, {
       headers: { 'Cache-Control': 'private, max-age=300' },

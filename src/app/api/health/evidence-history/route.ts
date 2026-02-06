@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyUserAccess } from '@/lib/api-auth'
 import { prisma } from '@/lib/prisma'
 import { computePremiumEvidence } from '@/lib/health-evidence-engine'
+import { getLatestSnapshot, isRecentSnapshot } from '@/lib/health-brain'
 
 // GET /api/health/evidence-history?userId=X&protocolId=X
 // Returns evidence verdict snapshots for a protocol
@@ -117,6 +118,19 @@ export async function GET(request: NextRequest) {
       })
     }
 
+    // Enrich with Brain snapshot data if available
+    let brainVerdict: string | null = null
+    let brainConfidence: string | null = null
+    const snapshot = await getLatestSnapshot(authResult.userId)
+    if (snapshot && isRecentSnapshot(snapshot.evaluatedAt, 5 * 60 * 1000)) {
+      const brainEvidence = snapshot.protocolEvidence as any[] | undefined
+      const match = brainEvidence?.find((e: any) => e.protocolId === protocolId)
+      if (match) {
+        brainVerdict = match.verdict ?? null
+      }
+      brainConfidence = snapshot.systemConfidence?.level ?? null
+    }
+
     return NextResponse.json({
       snapshots,
       protocolName: `${protocol.peptide.name} Protocol`,
@@ -124,6 +138,8 @@ export async function GET(request: NextRequest) {
       daysOnProtocol: protocolEvidence?.daysOnProtocol ?? null,
       currentVerdict: protocolEvidence?.verdict ?? null,
       currentVerdictExplanation: protocolEvidence?.verdictExplanation ?? null,
+      brainVerdict,
+      brainConfidence,
     }, {
       headers: {
         'Cache-Control': 'private, max-age=300',

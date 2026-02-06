@@ -3,6 +3,7 @@ import { verifyUserAccess } from '@/lib/api-auth'
 import { prisma } from '@/lib/prisma'
 import { calculateDailyScore, DailyScoreResult } from '@/lib/health-synthesis'
 import { MetricType } from '@/lib/health-providers'
+import { getLatestSnapshot, isRecentSnapshot } from '@/lib/health-brain'
 
 interface DailyScoreResponse {
   date: string
@@ -143,6 +144,15 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Enrich with Brain snapshot data if available
+    let brainScore: number | null = null
+    let brainConfidence: string | null = null
+    const snapshot = await getLatestSnapshot(authResult.userId)
+    if (snapshot && isRecentSnapshot(snapshot.evaluatedAt, 5 * 60 * 1000)) {
+      brainScore = snapshot.unifiedScore
+      brainConfidence = snapshot.systemConfidence?.level ?? null
+    }
+
     return NextResponse.json({
       scores,
       averageScore,
@@ -155,6 +165,8 @@ export async function GET(request: NextRequest) {
       categoryAverages,
       days,
       totalDaysWithData: scores.length,
+      brainScore,
+      brainConfidence,
     }, {
       headers: {
         'Cache-Control': 'private, max-age=0, must-revalidate',

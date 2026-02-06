@@ -4,6 +4,7 @@ import { getAuthenticatedUserId } from '@/lib/api-auth'
 import { parseQuestPDF, extractTextFromPDF } from '@/lib/labs/lab-pdf-parser'
 import { analyzeLabPatterns } from '@/lib/labs/lab-analyzer'
 import { runComputePipeline } from '@/lib/labs/lab-compute-pipeline'
+import { handleLabUpload } from '@/lib/health-brain'
 
 // Force Node.js runtime for pdfjs-dist compatibility
 export const runtime = 'nodejs'
@@ -110,6 +111,13 @@ export async function POST(request: NextRequest) {
       } catch (pipelineErr) {
         console.warn('Lab compute pipeline failed (non-blocking):', pipelineErr)
       }
+    }
+
+    // Trigger Brain prior-reset cascade (non-blocking)
+    if (upload) {
+      handleLabUpload(userId, upload.id).catch(err =>
+        console.error('Brain lab cascade failed (non-blocking):', err)
+      )
     }
 
     // Summary stats
