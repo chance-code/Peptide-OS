@@ -66,7 +66,7 @@ export interface LongitudinalResult {
  * Detect trajectory using simple linear regression on time-series data.
  * Returns slope normalized to units per month.
  */
-function computeTrajectory(
+export function computeTrajectory(
   points: Array<{ date: Date; value: number }>
 ): { trajectory: 'improving' | 'stable' | 'declining'; velocityPerMonth: number } {
   if (points.length < 2) return { trajectory: 'stable', velocityPerMonth: 0 }
@@ -108,7 +108,7 @@ function computeTrajectory(
  * Adjust trajectory label based on biomarker polarity.
  * For "lower_better" biomarkers, an increasing value = declining, not improving.
  */
-function adjustTrajectoryForPolarity(
+export function adjustTrajectoryForPolarity(
   trajectory: 'improving' | 'stable' | 'declining',
   polarity: string
 ): 'improving' | 'stable' | 'declining' {

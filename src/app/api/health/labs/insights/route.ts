@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getAuthenticatedUserId } from '@/lib/api-auth'
-import { BIOMARKER_REGISTRY, computeFlag, type BiomarkerFlag } from '@/lib/lab-biomarker-contract'
+import { BIOMARKER_REGISTRY, computeFlag, normalizeBiomarkerName, type BiomarkerFlag } from '@/lib/lab-biomarker-contract'
 import { analyzeLabPatterns, type LabPattern } from '@/lib/labs/lab-analyzer'
 import { generateBridgeInsights, type BridgeInsight } from '@/lib/labs/lab-wearable-bridge'
 
@@ -30,22 +30,96 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    if (!upload) {
-      return NextResponse.json({
-        error: 'No lab uploads found. Upload a lab PDF to get insights.',
-      }, { status: 404 })
+    // Fallback: if no LabUpload found, check legacy LabResult table
+    let legacyBiomarkers: Array<{
+      biomarkerKey: string
+      value: number
+      unit: string
+      flag: string
+    }> | null = null
+    let sourceId: string
+    let sourceTestDate: Date
+    let sourceLabName: string | null
+
+    if (upload) {
+      sourceId = upload.id
+      sourceTestDate = upload.testDate
+      sourceLabName = upload.labName
+      legacyBiomarkers = null // not needed, use upload.biomarkers directly
+    } else {
+      // No LabUpload found — try legacy LabResult
+      const legacyLab = await prisma.labResult.findFirst({
+        where: { userId },
+        orderBy: { testDate: 'desc' },
+      })
+
+      if (!legacyLab) {
+        return NextResponse.json({
+          error: 'No lab uploads found. Upload a lab PDF to get insights.',
+        }, { status: 404 })
+      }
+
+      sourceId = legacyLab.id
+      sourceTestDate = legacyLab.testDate
+      sourceLabName = legacyLab.labName
+
+      // Parse legacy markers JSON and convert to biomarker format
+      let rawMarkers: Array<{
+        name?: string
+        displayName?: string
+        rawName?: string
+        value?: number
+        unit?: string
+        rangeLow?: number
+        rangeHigh?: number
+        flag?: string
+      }> = []
+      try {
+        rawMarkers = JSON.parse(legacyLab.markers)
+      } catch {
+        rawMarkers = []
+      }
+
+      legacyBiomarkers = rawMarkers
+        .filter(m => m.value != null && m.unit)
+        .map(m => {
+          // The legacy `name` field is normalizedKey || rawName from the import.
+          // Try to resolve it to a canonical biomarker key.
+          const nameField = m.name || m.rawName || m.displayName || ''
+          const biomarkerKey = normalizeBiomarkerName(nameField) ?? nameField
+          const value = Number(m.value)
+          const unit = m.unit!
+          // Recompute flag using the registry for consistency; fall back to stored flag
+          const registryDef = BIOMARKER_REGISTRY[biomarkerKey]
+          const flag = registryDef ? computeFlag(biomarkerKey, value) : (m.flag || 'normal')
+
+          return { biomarkerKey, value, unit, flag }
+        })
+        .filter(bm => BIOMARKER_REGISTRY[bm.biomarkerKey]) // Only keep recognized biomarkers
     }
 
+    // Resolve the biomarker data source
+    const biomarkersForTier1 = upload
+      ? upload.biomarkers
+      : legacyBiomarkers!
+
     // Build biomarker array for analyzer/bridge functions
-    const biomarkerArray = upload.biomarkers.map(bm => ({
-      biomarkerKey: bm.biomarkerKey,
-      value: bm.value,
-      unit: bm.unit,
-      flag: computeFlag(bm.biomarkerKey, bm.value),
-    }))
+    const biomarkerArray = upload
+      ? upload.biomarkers.map(bm => ({
+          biomarkerKey: bm.biomarkerKey,
+          value: bm.value,
+          unit: bm.unit,
+          flag: computeFlag(bm.biomarkerKey, bm.value),
+        }))
+      : legacyBiomarkers!.map(bm => ({
+          biomarkerKey: bm.biomarkerKey,
+          value: bm.value,
+          unit: bm.unit,
+          flag: computeFlag(bm.biomarkerKey, bm.value),
+        }))
 
     // Tier 1: Individual biomarker status
-    const tier1 = generateTier1Insights(upload.biomarkers)
+    const tier1 = generateTier1Insights(biomarkersForTier1)
 
     // Tier 2: Cross-biomarker patterns
     const patterns = analyzeLabPatterns(biomarkerArray)
@@ -60,9 +134,9 @@ export async function GET(request: NextRequest) {
     const actions = generateActions(tier1, patterns, bridgeInsights)
 
     return NextResponse.json({
-      uploadId: upload.id,
-      testDate: upload.testDate,
-      labName: upload.labName,
+      uploadId: sourceId,
+      testDate: sourceTestDate,
+      labName: sourceLabName,
       tier1: {
         title: 'Biomarker Status',
         insights: tier1,

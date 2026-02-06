@@ -435,9 +435,42 @@ model LabUpload {
   updatedAt     DateTime @updatedAt
 
   biomarkers    LabBiomarker[]
+  review        LabEventReview?
   user          UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, testDate])
+  @@index([userId])
+}
+
+// ============================================
+// LAB EVENT REVIEW (Computed intelligence per upload)
+// ============================================
+model LabEventReview {
+  id              String   @id @default(cuid())
+  userId          String
+  labUploadId     String   @unique
+  labDate         DateTime
+
+  // Computed on upload (persisted as JSON strings)
+  domainSummaries String   @default("[]")
+  markerDeltas    String   @default("[]")
+  predictions     String   @default("[]")
+  protocolScores  String   @default("[]")
+  evidenceLedger  String   @default("[]")
+  trialCyclePhase String   @default("plan")
+
+  // Top-level verdict
+  verdictHeadline    String   @default("")
+  verdictTakeaways   String   @default("[]")
+  verdictFocus       String   @default("")
+  verdictConfidence  String   @default("low")
+
+  computedAt      DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  labUpload       LabUpload @relation(fields: [labUploadId], references: [id], onDelete: Cascade)
+
+  @@index([userId, labDate])
   @@index([userId])
 }
 

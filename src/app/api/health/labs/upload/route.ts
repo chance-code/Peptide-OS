@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma'
 import { getAuthenticatedUserId } from '@/lib/api-auth'
 import { parseQuestPDF, extractTextFromPDF } from '@/lib/labs/lab-pdf-parser'
 import { analyzeLabPatterns } from '@/lib/labs/lab-analyzer'
+import { runComputePipeline } from '@/lib/labs/lab-compute-pipeline'
 
 // Force Node.js runtime for pdfjs-dist compatibility
 export const runtime = 'nodejs'
@@ -127,6 +128,16 @@ export async function POST(request: NextRequest) {
     }))
     const patterns = analyzeLabPatterns(biomarkerArray)
 
+    // Run the lab intelligence compute pipeline (non-blocking — graceful fallback)
+    let reviewResult = null
+    if (upload) {
+      try {
+        reviewResult = await runComputePipeline(userId, upload.id)
+      } catch (pipelineErr) {
+        console.warn('Lab compute pipeline failed (non-blocking):', pipelineErr)
+      }
+    }
+
     // Summary stats
     const flagCounts = { optimal: 0, normal: 0, low: 0, high: 0, critical_low: 0, critical_high: 0 }
     for (const m of recognizedMarkers) {
@@ -144,6 +155,19 @@ export async function POST(request: NextRequest) {
         fileName: file.name,
         biomarkersCount: upload.biomarkers.length,
         overallConfidence: parseResult.overallConfidence,
+      } : null,
+      review: reviewResult ? {
+        id: reviewResult.labEventReviewId,
+        verdictHeadline: reviewResult.verdictHeadline,
+        verdictTakeaways: reviewResult.verdictTakeaways,
+        verdictFocus: reviewResult.verdictFocus,
+        verdictConfidence: reviewResult.verdictConfidence,
+        trialCyclePhase: reviewResult.trialCyclePhase,
+        isFirstLab: reviewResult.isFirstLab,
+        domainCount: reviewResult.domainSummaries.length,
+        predictionCount: reviewResult.predictions.length,
+        protocolScoreCount: reviewResult.protocolScores.length,
+        ledgerEntryCount: reviewResult.evidenceLedger.length,
       } : null,
       summary: {
         totalParsed: markers.length,
