@@ -348,13 +348,12 @@ export function computeTrigHDLRatio(
   if (triglycerides === undefined || hdl === undefined || hdl === 0) return null
 
   const value = triglycerides / hdl
-  const flag: BiomarkerFlag = value < 1.5 ? 'optimal' : value < 2.0 ? 'normal' : value < 3.5 ? 'high' : 'critical_high'
   return {
     key: 'trig_hdl_ratio',
     displayName: 'Triglyceride/HDL Ratio',
     value: Math.round(value * 100) / 100,
     unit: 'ratio',
-    flag,
+    flag: computeFlag('trig_hdl_ratio', value),
     formula: `${triglycerides} / ${hdl}`,
   }
 }
@@ -370,16 +369,35 @@ export function computeFreeT3RT3Ratio(
   if (freeT3 === undefined || reverseT3 === undefined || reverseT3 === 0) return null
 
   // Free T3 in pg/mL, Reverse T3 in ng/dL
-  // Need to convert Free T3 from pg/mL to the same relative scale
   const value = freeT3 / reverseT3
-  const flag: BiomarkerFlag = value >= 0.2 ? 'optimal' : value >= 0.15 ? 'normal' : 'low'
   return {
     key: 'free_t3_rt3_ratio',
     displayName: 'Free T3/Reverse T3 Ratio',
     value: Math.round(value * 1000) / 1000,
     unit: 'ratio',
-    flag,
+    flag: computeFlag('free_t3_rt3_ratio', value),
     formula: `${freeT3} / ${reverseT3}`,
+  }
+}
+
+/**
+ * Calculate ApoB/ApoA1 ratio — cardiovascular risk marker.
+ * Ratio < 0.6 is optimal. > 0.9 indicates elevated atherogenic particle balance.
+ */
+export function computeApoBToApoARatio(
+  apoB: number | undefined,
+  apoA1: number | undefined
+): DerivedCalculation | null {
+  if (apoB === undefined || apoA1 === undefined || apoA1 === 0) return null
+
+  const value = apoB / apoA1
+  return {
+    key: 'apob_apoa_ratio',
+    displayName: 'ApoB/ApoA1 Ratio',
+    value: Math.round(value * 1000) / 1000,
+    unit: 'ratio',
+    flag: computeFlag('apob_apoa_ratio', value),
+    formula: `${apoB} / ${apoA1}`,
   }
 }
 
@@ -402,6 +420,9 @@ export function computeAllDerived(
 
   const t3rt3 = computeFreeT3RT3Ratio(values['free_t3'], values['reverse_t3'])
   if (t3rt3) results.push(t3rt3)
+
+  const apobApoa = computeApoBToApoARatio(values['apolipoprotein_b'], values['apolipoprotein_a1'])
+  if (apobApoa) results.push(apobApoa)
 
   return results
 }

@@ -24,7 +24,9 @@ import {
   getBaselineConfidenceLabel,
   isPrimaryBaseline,
   type BaselineUpdateResult,
+  type PersonalBaselineRecord,
 } from './health-personal-baselines'
+import { scoreClinicalSignificance, type ClinicalWeight } from './labs/lab-clinical-significance'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -47,6 +49,12 @@ export interface DomainAssessment {
     markers: number
   } | null
   narrative: string
+  // Phase 2B additions
+  coherence: 'concordant' | 'discordant' | 'lab_only' | 'wearable_only' | null
+  personalBaselineComparison: 'above_personal_norm' | 'at_personal_norm' | 'below_personal_norm' | 'insufficient_history'
+  trajectoryConfidence: number
+  staleness: number  // hours since freshest data for this domain
+  recommendations: string[]
 }
 
 export interface AgingVelocityAssessment {
@@ -54,18 +62,49 @@ export interface AgingVelocityAssessment {
   trend: 'decelerating' | 'steady' | 'accelerating'
   confidence: 'high' | 'medium' | 'low'
   score90d: number | null
+  // Phase 2B additions
+  systemVelocities: Record<string, {
+    velocity: number | null
+    confidence: number
+    trend: 'decelerating' | 'steady' | 'accelerating'
+  }>
+  overallVelocity: number | null
+  daysGainedAnnually: number | null
+  concordanceScore: number
+  concordanceLabel: 'high' | 'moderate' | 'low'
 }
 
 export interface AllostasisAssessment {
   load: 'low' | 'moderate' | 'high'
   score: number
   drivers: string[]
+  // Phase 2B additions
+  components: Record<string, {
+    name: string
+    score: number
+    deviation: number
+    contribution: number
+  }>
+  trajectory: 'accumulating' | 'stable' | 'recovering'
+  dominantContributor: string
+  personalContext: string
+  recommendation: string
 }
 
 export interface RiskTrajectoryAssessment {
   level: 'low' | 'moderate' | 'elevated' | 'high'
   trend: 'improving' | 'stable' | 'worsening'
   confidence: 'high' | 'medium' | 'low'
+  // Phase 2B additions
+  compositeScore: number
+  keyDrivers: Array<{
+    biomarkerKey: string
+    displayName: string
+    personalTrend: string
+    contribution: number
+  }>
+  actionItems: string[]
+  nextLabRecommendation: string | null
 }
 
 export interface ProtocolEvidenceAssessment {
@@ -149,6 +188,11 @@ const DOMAIN_WEARABLE_METRICS: Record<string, MetricType[]> = {
   recovery: ['hrv', 'rhr', 'readiness_score'],
   activity: ['steps', 'exercise_minutes', 'vo2_max', 'active_calories'],
   bodyComp: ['body_fat_percentage', 'weight', 'muscle_mass', 'lean_body_mass'],
+  cardiovascular: ['rhr', 'hrv', 'vo2_max'],
+  metabolic: ['body_fat_percentage', 'weight'],
+  inflammatory: ['hrv', 'rhr', 'sleep_score'],
+  hormonal: ['deep_sleep', 'lean_body_mass', 'body_fat_percentage'],
+  neuro: ['sleep_score', 'deep_sleep', 'sleep_efficiency'],
 }
 
 const DOMAIN_LAB_MARKERS: Record<string, string[]> = {
@@ -156,15 +200,36 @@ const DOMAIN_LAB_MARKERS: Record<string, string[]> = {
   recovery: ['hs_crp', 'cortisol', 'dhea_s'],
   activity: ['hemoglobin', 'ferritin', 'iron'],
   bodyComp: ['total_testosterone', 'free_testosterone', 'tsh', 'free_t3'],
+  cardiovascular: ['apolipoprotein_b', 'ldl_cholesterol', 'lipoprotein_a', 'hs_crp', 'homocysteine'],
+  metabolic: ['fasting_insulin', 'fasting_glucose', 'hba1c', 'homa_ir', 'triglycerides'],
+  inflammatory: ['hs_crp', 'esr', 'homocysteine', 'ferritin'],
+  hormonal: ['total_testosterone', 'free_testosterone', 'estradiol', 'cortisol', 'dhea_s', 'tsh'],
+  neuro: ['vitamin_b12', 'folate', 'omega_3_index', 'homocysteine', 'vitamin_d'],
   bloodwork: [],  // all markers contribute
 }
 
 const CATEGORY_WEIGHTS: Record<string, number> = {
-  sleep: 0.30,
-  recovery: 0.30,
-  activity: 0.20,
-  bodyComp: 0.15,
+  sleep: 0.15,
+  recovery: 0.15,
+  activity: 0.12,
+  bodyComp: 0.08,
+  cardiovascular: 0.12,
+  metabolic: 0.12,
+  inflammatory: 0.08,
+  hormonal: 0.08,
+  neuro: 0.05,
   bloodwork: 0.05,
+}
+
+// Maps domains to aging velocity system names
+const DOMAIN_TO_VELOCITY_SYSTEM: Record<string, string> = {
+  cardiovascular: 'cardiovascular',
+  metabolic: 'metabolic',
+  inflammatory: 'inflammatory',
+  activity: 'fitness',
+  bodyComp: 'bodyComp',
+  hormonal: 'hormonal',
+  neuro: 'neuro',
 }
 
 // ─── Main Pipeline ──────────────────────────────────────────────────────────
@@ -175,6 +240,9 @@ const CATEGORY_WEIGHTS: Record<string, number> = {
 export async function evaluate(userId: string, trigger: BrainTrigger): Promise<BrainOutput> {
   const start = Date.now()
   let personalBaselinesUpdated = false
+
+  // Step 0: Fetch personal baselines once (used by multiple steps)
+  const personalBaselines = await getPersonalBaselines(userId)
 
   // Step 1: If lab_upload, run prior reset FIRST
   if (trigger === 'lab_upload') {
@@ -220,16 +288,26 @@ export async function evaluate(userId: string, trigger: BrainTrigger): Promise<B
   }
 
   // Step 7: Domain fusion — single truth per domain
-  const domains = fuseDomains(labScores, wearableAssessment, latestUpload)
+  const domains = fuseDomains(labScores, wearableAssessment, latestUpload, personalBaselines)
 
   // Step 8: Aging velocity
   const agingVelocity = await computeAgingVelocity(userId, domains)
 
-  // Step 9: Allostatic load
-  const allostasis = computeAllostasis(wearableAssessment, domains)
+  // Step 9: Allostatic load (with personal baselines + active protocol count)
+  const activeProtocolCount = await prisma.protocol.count({
+    where: { userId, endDate: null },
+  })
+  const allostasis = await computeAllostasis(wearableAssessment, domains, personalBaselines, activeProtocolCount, userId)
 
-  // Step 10: Risk trajectories
-  const riskTrajectories = computeRiskTrajectories(domains, labScores, patterns)
+  // Step 10: Risk trajectories (with personal baselines + clinical significance)
+  const clinicalWeights = labScores
+    ? scoreClinicalSignificance(
+        labScores.map(s => ({ biomarkerKey: s.biomarkerKey, value: s.value, flag: s.flag })),
+        personalBaselines,
+        patterns
+      )
+    : []
+  const riskTrajectories = computeRiskTrajectories(domains, labScores, patterns, personalBaselines, clinicalWeights)
 
   // Step 11: Narrative primitives
   const narrativePrimitives = generateNarrativePrimitives(
@@ -500,42 +578,56 @@ async function analyzeWearables(userId: string): Promise<WearableAssessment> {
 function fuseDomains(
   labScores: LabScoreEntry[] | null,
   wearable: WearableAssessment,
-  latestUpload: { testDate: Date } | null
+  latestUpload: { testDate: Date } | null,
+  personalBaselines: PersonalBaselineRecord[]
 ): Record<string, DomainAssessment> {
   const domains: Record<string, DomainAssessment> = {}
 
+  // Build baseline lookup
+  const baselineMap = new Map<string, PersonalBaselineRecord>()
+  for (const b of personalBaselines) baselineMap.set(b.biomarkerKey, b)
+
   // Lab recency factor (fresh < 14d = 1.0, decays to 0.3 at 180d)
-  let labRecency = 0
-  let labWeight = 0
+  let labRecencyDays = 0
+  let labRecencyWeight = 0
   if (latestUpload) {
     const daysSince = differenceInDays(new Date(), new Date(latestUpload.testDate))
-    labRecency = daysSince
-    if (daysSince <= 14) labWeight = 1.0
-    else if (daysSince <= 30) labWeight = 0.85
-    else if (daysSince <= 60) labWeight = 0.7
-    else if (daysSince <= 90) labWeight = 0.5
-    else if (daysSince <= 180) labWeight = 0.3
-    else labWeight = 0.15
+    labRecencyDays = daysSince
+    if (daysSince <= 14) labRecencyWeight = 1.0
+    else if (daysSince <= 30) labRecencyWeight = 0.85
+    else if (daysSince <= 60) labRecencyWeight = 0.7
+    else if (daysSince <= 90) labRecencyWeight = 0.5
+    else if (daysSince <= 180) labRecencyWeight = 0.3
+    else labRecencyWeight = 0.15
   }
 
   // Lab completeness factor (markers/30, clamped 0.3-1.0)
   const labMarkerCount = labScores?.length ?? 0
   const labCompleteness = Math.max(0.3, Math.min(1.0, labMarkerCount / 30))
-  const adjustedLabWeight = labWeight * labCompleteness
+  const adjustedLabWeight = labRecencyWeight * labCompleteness
 
-  for (const domainKey of ['sleep', 'recovery', 'activity', 'bodyComp', 'bloodwork']) {
+  const allDomainKeys = [
+    'sleep', 'recovery', 'activity', 'bodyComp',
+    'cardiovascular', 'metabolic', 'inflammatory', 'hormonal', 'neuro',
+    'bloodwork',
+  ]
+
+  for (const domainKey of allDomainKeys) {
     if (domainKey === 'bloodwork') {
-      // Bloodwork domain: lab primary
-      domains[domainKey] = buildBloodworkDomain(labScores, adjustedLabWeight, labRecency, labMarkerCount)
+      const bw = buildBloodworkDomain(labScores, adjustedLabWeight, labRecencyDays, labMarkerCount)
+      domains[domainKey] = bw
       continue
     }
 
-    // Wearable-primary domains
+    // Wearable component
     const wearableMetrics = DOMAIN_WEARABLE_METRICS[domainKey] ?? []
     const topSignals: DomainAssessment['topSignals'] = []
     let wearableScoreSum = 0
     let wearableScoreCount = 0
     let overallTrend: string = 'insufficient_data'
+    let trendCount = 0
+    let improvingCount = 0
+    let decliningCount = 0
 
     for (const metricType of wearableMetrics) {
       const data = wearable.metrics.get(metricType)
@@ -552,45 +644,104 @@ function fuseDomains(
         percentDiff: data.percentDiff,
       })
 
-      if (overallTrend === 'insufficient_data') overallTrend = data.trend
+      // Aggregate trend voting
+      trendCount++
+      if (data.trend === 'improving') improvingCount++
+      else if (data.trend === 'declining') decliningCount++
     }
 
-    // Lab contribution for this domain
+    // Consensus trend from wearable metrics
+    if (trendCount > 0) {
+      if (improvingCount > decliningCount && improvingCount >= trendCount * 0.5) overallTrend = 'improving'
+      else if (decliningCount > improvingCount && decliningCount >= trendCount * 0.5) overallTrend = 'declining'
+      else overallTrend = 'stable'
+    }
+
+    // Lab component for this domain
     let labContribution: DomainAssessment['labContribution'] = null
-    if (labScores && adjustedLabWeight > 0) {
-      const domainMarkers = DOMAIN_LAB_MARKERS[domainKey] ?? []
+    let labDomainScore: number | null = null
+    const domainMarkers = DOMAIN_LAB_MARKERS[domainKey] ?? []
+    if (labScores && adjustedLabWeight > 0 && domainMarkers.length > 0) {
       const relevantLabs = labScores.filter(s => domainMarkers.includes(s.biomarkerKey))
       if (relevantLabs.length > 0) {
         labContribution = {
           weight: adjustedLabWeight,
-          recency: labRecency,
+          recency: labRecencyDays,
           markers: relevantLabs.length,
         }
+        labDomainScore = relevantLabs.reduce((sum, s) => sum + s.zone.score, 0) / relevantLabs.length
       }
     }
 
-    // Blend wearable + lab scores
+    // Blend wearable + lab scores with dynamic weighting
+    const wearableScore = wearableScoreCount > 0 ? wearableScoreSum / wearableScoreCount : null
     let domainScore: number | null = null
-    if (wearableScoreCount > 0) {
-      const wearableScore = wearableScoreSum / wearableScoreCount
-      if (labContribution) {
-        // Weighted blend
-        domainScore = Math.round(
-          (wearableScore * 1.0 + getLabDomainScore(labScores!, domainKey) * adjustedLabWeight)
-          / (1.0 + adjustedLabWeight)
-        )
-      } else {
-        domainScore = Math.round(wearableScore)
+    if (wearableScore !== null && labDomainScore !== null) {
+      domainScore = Math.round(
+        (wearableScore * 1.0 + labDomainScore * adjustedLabWeight) / (1.0 + adjustedLabWeight)
+      )
+    } else if (wearableScore !== null) {
+      domainScore = Math.round(wearableScore)
+    } else if (labDomainScore !== null) {
+      domainScore = Math.round(labDomainScore)
+    }
+
+    // Coherence detection
+    let coherence: DomainAssessment['coherence'] = null
+    if (wearableScore !== null && labDomainScore !== null) {
+      const diff = Math.abs(wearableScore - labDomainScore)
+      coherence = diff > 15 ? 'discordant' : 'concordant'
+    } else if (wearableScore !== null) {
+      coherence = 'wearable_only'
+    } else if (labDomainScore !== null) {
+      coherence = 'lab_only'
+    }
+
+    // Personal baseline comparison
+    let personalBaselineComparison: DomainAssessment['personalBaselineComparison'] = 'insufficient_history'
+    if (domainScore !== null && domainMarkers.length > 0) {
+      const relevantBaselines = domainMarkers
+        .map(k => baselineMap.get(k))
+        .filter((b): b is PersonalBaselineRecord => !!b && b.isPrimary)
+      if (relevantBaselines.length > 0) {
+        const avgBaselineMean = relevantBaselines.reduce((s, b) => s + b.personalMean, 0) / relevantBaselines.length
+        // Compare current lab scores to personal baseline means using zone scoring
+        const avgCurrentLabScore = labDomainScore ?? domainScore
+        // If domain score is >5% above the personal baseline-derived score, it's above norm
+        const baselineScore = avgBaselineMean // Simplified: compare raw scores
+        if (avgCurrentLabScore > baselineScore * 1.05) personalBaselineComparison = 'above_personal_norm'
+        else if (avgCurrentLabScore < baselineScore * 0.95) personalBaselineComparison = 'below_personal_norm'
+        else personalBaselineComparison = 'at_personal_norm'
       }
     }
+
+    // Trajectory confidence
+    const trajectoryConfidence = trendCount >= 3 ? 0.8 : trendCount >= 1 ? 0.5 : 0
+
+    // Staleness: hours since freshest data for this domain
+    const wearableStaleness = wearable.staleness
+    const labStaleness = labRecencyDays * 24
+    const domainStaleness = Math.min(
+      wearableScoreCount > 0 ? wearableStaleness : 9999,
+      labContribution ? labStaleness : 9999
+    )
 
     // Determine confidence
     let confidence: 'high' | 'medium' | 'low' = 'low'
     if (wearableScoreCount >= 3 && wearable.staleness < 48) confidence = 'high'
-    else if (wearableScoreCount >= 1) confidence = 'medium'
+    else if (wearableScoreCount >= 1 || labContribution) confidence = 'medium'
 
     // Sort signals by absolute percentDiff
     topSignals.sort((a, b) => Math.abs(b.percentDiff) - Math.abs(a.percentDiff))
+
+    // Recommendations for declining signals
+    const recommendations: string[] = []
+    if (overallTrend === 'declining' && topSignals.length > 0) {
+      const recs = getRecommendations(topSignals[0].metric, 'declining', 'higher_better')
+      for (const rec of recs.slice(0, 1)) {
+        recommendations.push(rec.action)
+      }
+    }
 
     domains[domainKey] = {
       domain: domainKey,
@@ -600,6 +751,11 @@ function fuseDomains(
       topSignals: topSignals.slice(0, 3),
       labContribution,
       narrative: buildDomainNarrative(domainKey, domainScore, overallTrend, topSignals),
+      coherence,
+      personalBaselineComparison,
+      trajectoryConfidence,
+      staleness: domainStaleness === 9999 ? -1 : domainStaleness,
+      recommendations,
     }
   }
 
@@ -621,6 +777,11 @@ function buildBloodworkDomain(
       topSignals: [],
       labContribution: null,
       narrative: 'No bloodwork data available. Upload lab results to see your bloodwork assessment.',
+      coherence: null,
+      personalBaselineComparison: 'insufficient_history',
+      trajectoryConfidence: 0,
+      staleness: -1,
+      recommendations: [],
     }
   }
 
@@ -658,6 +819,13 @@ function buildBloodworkDomain(
       (concerns.length > 0
         ? `${concerns.length} marker${concerns.length > 1 ? 's' : ''} outside optimal range.`
         : 'All markers within optimal range.'),
+    coherence: 'lab_only',
+    personalBaselineComparison: 'insufficient_history' as const,
+    trajectoryConfidence: 0,
+    staleness: labRecency * 24,
+    recommendations: concerns.length > 0
+      ? [`Review ${concerns[0].biomarkerKey.replace(/_/g, ' ')} levels with your provider`]
+      : [],
   }
 }
 
@@ -688,148 +856,459 @@ function buildDomainNarrative(
   return `${scoreLabel} ${domain} — ${trendLabel}.`
 }
 
-/** Compute aging velocity from 90-day domain score trend */
+/** Compute aging velocity from 90-day domain score trend and per-system velocities */
 async function computeAgingVelocity(
   userId: string,
   domains: Record<string, DomainAssessment>
 ): Promise<AgingVelocityAssessment> {
-  // Fetch last 90 days of snapshots
+  // Compute per-system velocities from current domain scores
+  // Velocity = inverse normalization: score 80 → 0.80 years/year (slower aging)
+  const systemVelocities: AgingVelocityAssessment['systemVelocities'] = {}
+  const velocityValues: number[] = []
+
+  for (const [domainKey, systemName] of Object.entries(DOMAIN_TO_VELOCITY_SYSTEM)) {
+    const domain = domains[domainKey]
+    if (domain?.score !== null && domain.score !== undefined) {
+      // Score 0-100 → velocity: score 100 → 0.5x, score 50 → 1.0x, score 0 → 1.5x
+      const velocity = Math.round((1.5 - (domain.score / 100)) * 100) / 100
+      const domainTrend = domain.trend === 'improving' ? 'decelerating' as const
+        : domain.trend === 'declining' ? 'accelerating' as const
+        : 'steady' as const
+      systemVelocities[systemName] = {
+        velocity,
+        confidence: domain.confidence === 'high' ? 0.9 : domain.confidence === 'medium' ? 0.6 : 0.3,
+        trend: domainTrend,
+      }
+      velocityValues.push(velocity)
+    } else {
+      systemVelocities[systemName] = { velocity: null, confidence: 0, trend: 'steady' }
+    }
+  }
+
+  // Overall velocity = weighted average
+  let overallVelocity: number | null = null
+  let daysGainedAnnually: number | null = null
+  if (velocityValues.length > 0) {
+    overallVelocity = Math.round(
+      (velocityValues.reduce((a, b) => a + b, 0) / velocityValues.length) * 100
+    ) / 100
+    daysGainedAnnually = Math.round((1.0 - overallVelocity) * 365)
+  }
+
+  // Concordance: how much systems agree (low stddev = high concordance)
+  let concordanceScore = 0
+  let concordanceLabel: 'high' | 'moderate' | 'low' = 'low'
+  if (velocityValues.length >= 2) {
+    const mean = velocityValues.reduce((a, b) => a + b, 0) / velocityValues.length
+    const variance = velocityValues.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / velocityValues.length
+    const stdDev = Math.sqrt(variance)
+    concordanceScore = Math.round(Math.max(0, 1 - stdDev / 0.3) * 100) / 100 // 0.3 stddev = 0 concordance
+    if (concordanceScore >= 0.7) concordanceLabel = 'high'
+    else if (concordanceScore >= 0.4) concordanceLabel = 'moderate'
+  }
+
+  // Fetch last 90 days of snapshots for overall trend
   const snapshots = await prisma.healthBrainSnapshot.findMany({
     where: { userId, evaluatedAt: { gte: subDays(new Date(), 90) } },
     orderBy: { evaluatedAt: 'asc' },
     select: { unifiedScore: true, evaluatedAt: true },
   })
 
-  if (snapshots.length < 7) {
-    // Not enough history — use current domains as a single data point
-    const currentScores = Object.values(domains).map(d => d.score).filter((s): s is number => s !== null)
-    const avgScore = currentScores.length > 0
-      ? Math.round(currentScores.reduce((a, b) => a + b, 0) / currentScores.length)
-      : null
-
-    return {
-      headline: avgScore !== null ? `Health score: ${avgScore}` : 'Building your health picture',
-      trend: 'steady',
-      confidence: 'low',
-      score90d: avgScore,
-    }
-  }
-
-  // Compute trend: compare first half avg to second half avg
   const scores = snapshots.map(s => s.unifiedScore).filter((s): s is number => s !== null)
-  if (scores.length < 4) {
-    return { headline: 'Gathering more data', trend: 'steady', confidence: 'low', score90d: null }
-  }
-
-  const mid = Math.floor(scores.length / 2)
-  const firstHalf = scores.slice(0, mid)
-  const secondHalf = scores.slice(mid)
-  const firstAvg = firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length
-  const secondAvg = secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length
-  const changePct = ((secondAvg - firstAvg) / Math.abs(firstAvg)) * 100
 
   let trend: AgingVelocityAssessment['trend'] = 'steady'
   let headline: string
-  if (changePct > 3) {
-    trend = 'decelerating'
-    headline = `Aging ${(1 - changePct / 100).toFixed(2)}x — slowing down`
-  } else if (changePct < -3) {
-    trend = 'accelerating'
-    headline = `Aging ${(1 + Math.abs(changePct) / 100).toFixed(2)}x — needs attention`
+  let score90d: number | null = null
+  const confidence: AgingVelocityAssessment['confidence'] = snapshots.length >= 30 ? 'high'
+    : snapshots.length >= 14 ? 'medium' : 'low'
+
+  if (scores.length >= 4) {
+    const mid = Math.floor(scores.length / 2)
+    const firstAvg = scores.slice(0, mid).reduce((a, b) => a + b, 0) / mid
+    const secondAvg = scores.slice(mid).reduce((a, b) => a + b, 0) / (scores.length - mid)
+    const changePct = firstAvg !== 0 ? ((secondAvg - firstAvg) / Math.abs(firstAvg)) * 100 : 0
+    score90d = Math.round(secondAvg)
+
+    if (changePct > 3) trend = 'decelerating'
+    else if (changePct < -3) trend = 'accelerating'
   } else {
-    headline = `Biological age: steady`
+    const currentScores = Object.values(domains).map(d => d.score).filter((s): s is number => s !== null)
+    score90d = currentScores.length > 0
+      ? Math.round(currentScores.reduce((a, b) => a + b, 0) / currentScores.length)
+      : null
+  }
+
+  // Build headline
+  if (overallVelocity !== null && daysGainedAnnually !== null) {
+    if (daysGainedAnnually > 0) {
+      headline = `Aging at ${overallVelocity.toFixed(2)} years/year — gaining ${daysGainedAnnually} days annually`
+    } else if (daysGainedAnnually < 0) {
+      headline = `Aging at ${overallVelocity.toFixed(2)} years/year — needs attention`
+    } else {
+      headline = `Aging at 1.0 years/year — biological age tracking calendar age`
+    }
+  } else if (score90d !== null) {
+    headline = `Health score: ${score90d}`
+  } else {
+    headline = 'Building your health picture'
   }
 
   return {
-    headline,
-    trend,
-    confidence: snapshots.length >= 30 ? 'high' : snapshots.length >= 14 ? 'medium' : 'low',
-    score90d: Math.round(secondAvg),
+    headline, trend, confidence, score90d,
+    systemVelocities, overallVelocity, daysGainedAnnually,
+    concordanceScore, concordanceLabel,
   }
 }
 
-/** Compute allostatic load from stress indicators */
-function computeAllostasis(
+/** Compute allostatic load from 6 stress components with personal baseline deviations */
+async function computeAllostasis(
   wearable: WearableAssessment,
-  domains: Record<string, DomainAssessment>
-): AllostasisAssessment {
+  domains: Record<string, DomainAssessment>,
+  personalBaselines: PersonalBaselineRecord[],
+  activeProtocolCount: number,
+  userId: string
+): Promise<AllostasisAssessment> {
   const drivers: string[] = []
-  let stressScore = 0
+  const components: AllostasisAssessment['components'] = {}
 
-  // Check HRV (low = stressed)
-  const hrv = wearable.metrics.get('hrv')
-  if (hrv && hrv.percentDiff < -10) {
-    stressScore += 2
-    drivers.push('Low HRV')
+  // Build baseline lookup for personal deviation
+  const baselineMap = new Map<string, PersonalBaselineRecord>()
+  for (const b of personalBaselines) baselineMap.set(b.biomarkerKey, b)
+
+  // Helper: score a component 0-10 from wearable deviations
+  const scoreFromDeviation = (metricKey: string, invertPolarity: boolean = false): { score: number; deviation: number } => {
+    const data = wearable.metrics.get(metricKey)
+    if (!data) return { score: 0, deviation: 0 }
+    const pctDiff = data.percentDiff
+    // For "higher_better" metrics (HRV, sleep), negative deviation = stress
+    // For "lower_better" metrics (RHR), positive deviation = stress
+    const stressDirection = invertPolarity ? pctDiff : -pctDiff
+    const score = Math.max(0, Math.min(10, stressDirection / 5))
+    return { score: Math.round(score * 10) / 10, deviation: Math.round(pctDiff * 10) / 10 }
   }
 
-  // Check RHR (high = stressed)
-  const rhr = wearable.metrics.get('rhr')
-  if (rhr && rhr.percentDiff > 10) {
-    stressScore += 1.5
-    drivers.push('Elevated resting heart rate')
+  // 1. Autonomic: HRV (low = stress) + RHR (high = stress)
+  const hrvResult = scoreFromDeviation('hrv')
+  const rhrResult = scoreFromDeviation('rhr', true)
+  const autonomicScore = Math.round(((hrvResult.score + rhrResult.score) / 2) * 10) / 10
+  components.autonomic = {
+    name: 'Autonomic Stress',
+    score: autonomicScore,
+    deviation: hrvResult.deviation,
+    contribution: 0,
   }
+  if (autonomicScore >= 3) drivers.push('Autonomic stress (HRV/RHR deviation)')
 
-  // Check sleep
-  const sleepScore = wearable.metrics.get('sleep_score')
-  if (sleepScore && sleepScore.percentDiff < -10) {
-    stressScore += 1.5
-    drivers.push('Poor sleep')
+  // 2. Sleep: sleep_score + deep_sleep + sleep_efficiency
+  const sleepScoreResult = scoreFromDeviation('sleep_score')
+  const deepSleepResult = scoreFromDeviation('deep_sleep')
+  const sleepEffResult = scoreFromDeviation('sleep_efficiency')
+  const sleepValues = [sleepScoreResult.score, deepSleepResult.score, sleepEffResult.score].filter(v => v > 0)
+  const sleepCompScore = sleepValues.length > 0
+    ? Math.round((sleepValues.reduce((a, b) => a + b, 0) / sleepValues.length) * 10) / 10
+    : 0
+  components.sleep = {
+    name: 'Sleep Disruption',
+    score: sleepCompScore,
+    deviation: sleepScoreResult.deviation,
+    contribution: 0,
   }
+  if (sleepCompScore >= 3) drivers.push('Sleep disruption')
 
-  // Check recovery domain
-  const recovery = domains.recovery
-  if (recovery?.score !== null && recovery.score < 40) {
-    stressScore += 1
-    drivers.push('Low recovery score')
+  // 3. Body Composition: body_fat, weight trends
+  const bfResult = scoreFromDeviation('body_fat_percentage', true) // higher = worse
+  const weightResult = scoreFromDeviation('weight', true) // higher = worse
+  const bodyCompValues = [bfResult.score, weightResult.score].filter(v => v > 0)
+  const bodyCompScore = bodyCompValues.length > 0
+    ? Math.round((bodyCompValues.reduce((a, b) => a + b, 0) / bodyCompValues.length) * 10) / 10
+    : 0
+  components.bodyComp = {
+    name: 'Body Composition Stress',
+    score: bodyCompScore,
+    deviation: bfResult.deviation,
+    contribution: 0,
   }
+  if (bodyCompScore >= 3) drivers.push('Body composition shift')
 
+  // 4. Recovery: readiness_score
+  const readinessResult = scoreFromDeviation('readiness_score')
+  const recoveryDomain = domains.recovery
+  const recoveryScore = recoveryDomain?.score !== null && recoveryDomain?.score !== undefined
+    ? Math.round(Math.max(0, (50 - recoveryDomain.score) / 5) * 10) / 10
+    : readinessResult.score
+  components.recovery = {
+    name: 'Recovery Deficit',
+    score: Math.min(10, recoveryScore),
+    deviation: readinessResult.deviation,
+    contribution: 0,
+  }
+  if (recoveryScore >= 3) drivers.push('Low recovery')
+
+  // 5. Inflammatory: lab-based (hs-CRP, cortisol personal baselines)
+  let inflammatoryScore = 0
+  const hsCrpBaseline = baselineMap.get('hs_crp')
+  if (hsCrpBaseline && hsCrpBaseline.isPrimary) {
+    // Higher than personal mean = inflammatory stress
+    const deviation = hsCrpBaseline.lastLabValue
+      ? (hsCrpBaseline.lastLabValue - hsCrpBaseline.personalMean) / Math.max(0.1, hsCrpBaseline.personalSD)
+      : 0
+    inflammatoryScore = Math.max(0, Math.min(10, deviation * 2))
+  }
+  const cortisolBaseline = baselineMap.get('cortisol')
+  if (cortisolBaseline && cortisolBaseline.isPrimary && cortisolBaseline.lastLabValue) {
+    const deviation = (cortisolBaseline.lastLabValue - cortisolBaseline.personalMean) / Math.max(0.1, cortisolBaseline.personalSD)
+    inflammatoryScore = Math.max(inflammatoryScore, Math.max(0, Math.min(10, deviation * 2)))
+  }
+  components.inflammatory = {
+    name: 'Inflammatory Load',
+    score: Math.round(inflammatoryScore * 10) / 10,
+    deviation: 0,
+    contribution: 0,
+  }
+  if (inflammatoryScore >= 3) drivers.push('Inflammatory markers elevated vs personal baseline')
+
+  // 6. Protocol Burden: count active protocols × frequency weight
+  const protocolBurdenScore = Math.min(10, Math.round(activeProtocolCount * 1.5 * 10) / 10)
+  components.protocolBurden = {
+    name: 'Protocol Burden',
+    score: protocolBurdenScore,
+    deviation: activeProtocolCount,
+    contribution: 0,
+  }
+  if (protocolBurdenScore >= 5) drivers.push(`High protocol burden (${activeProtocolCount} active)`)
+
+  // Composite score: weighted average of 6 components
+  const componentWeights: Record<string, number> = {
+    autonomic: 0.25, sleep: 0.2, bodyComp: 0.1, recovery: 0.2, inflammatory: 0.15, protocolBurden: 0.1,
+  }
+  let compositeScore = 0
+  for (const [key, comp] of Object.entries(components)) {
+    const weight = componentWeights[key] ?? 0.1
+    comp.contribution = Math.round(comp.score * weight * 100) / 100
+    compositeScore += comp.contribution
+  }
+  compositeScore = Math.round(compositeScore * 10) / 10
+
+  // Load tier
   let load: AllostasisAssessment['load'] = 'low'
-  if (stressScore >= 4) load = 'high'
-  else if (stressScore >= 2) load = 'moderate'
+  if (compositeScore >= 4) load = 'high'
+  else if (compositeScore >= 2) load = 'moderate'
+
+  // Dominant contributor
+  const sortedComponents = Object.entries(components).sort((a, b) => b[1].score - a[1].score)
+  const dominantContributor = sortedComponents[0]?.[1].name ?? 'None'
+
+  // Trajectory: compare to previous snapshots
+  let trajectory: AllostasisAssessment['trajectory'] = 'stable'
+  try {
+    const prevSnapshots = await prisma.healthBrainSnapshot.findMany({
+      where: { userId, evaluatedAt: { gte: subDays(new Date(), 14) } },
+      orderBy: { evaluatedAt: 'desc' },
+      take: 3,
+      select: { allostasisJson: true },
+    })
+    if (prevSnapshots.length >= 2) {
+      const prevScores = prevSnapshots.map(s => {
+        try { return JSON.parse(s.allostasisJson)?.score ?? 0 } catch { return 0 }
+      })
+      const prevAvg = prevScores.reduce((a: number, b: number) => a + b, 0) / prevScores.length
+      if (compositeScore > prevAvg + 1) trajectory = 'accumulating'
+      else if (compositeScore < prevAvg - 1) trajectory = 'recovering'
+    }
+  } catch {
+    // Non-critical
+  }
+
+  // Personal context
+  const personalContext = `Your allostatic load of ${compositeScore.toFixed(1)} is ${
+    load === 'low' ? 'within a healthy range' : load === 'moderate' ? 'moderately elevated' : 'elevated and needs attention'
+  }.`
+
+  // Recommendation
+  let recommendation = ''
+  if (load === 'high') {
+    recommendation = `Focus on ${dominantContributor.toLowerCase()} — consider reducing training load and prioritizing sleep.`
+  } else if (load === 'moderate') {
+    recommendation = `Monitor ${dominantContributor.toLowerCase()} — small recovery gains will reduce overall load.`
+  } else {
+    recommendation = 'Your stress-recovery balance is healthy. Maintain current patterns.'
+  }
 
   return {
     load,
-    score: Math.min(10, Math.round(stressScore * 10) / 10),
+    score: compositeScore,
     drivers,
+    components,
+    trajectory,
+    dominantContributor,
+    personalContext,
+    recommendation,
   }
 }
 
-/** Compute risk trajectories from domain scores and lab patterns */
+/** Compute risk trajectories across 5 Attia domains + musculoskeletal */
 function computeRiskTrajectories(
   domains: Record<string, DomainAssessment>,
   labScores: LabScoreEntry[] | null,
-  patterns: LabPattern[]
+  patterns: LabPattern[],
+  personalBaselines: PersonalBaselineRecord[],
+  clinicalWeights: ClinicalWeight[]
 ): Record<string, RiskTrajectoryAssessment> {
   const risks: Record<string, RiskTrajectoryAssessment> = {}
 
-  // Cardiovascular risk
-  const cvPatterns = patterns.filter(p =>
-    p.patternKey.includes('cardiovascular') || p.patternKey.includes('insulin')
+  // Build lookups
+  const baselineMap = new Map<string, PersonalBaselineRecord>()
+  for (const b of personalBaselines) baselineMap.set(b.biomarkerKey, b)
+  const labMap = new Map<string, LabScoreEntry>()
+  if (labScores) for (const s of labScores) labMap.set(s.biomarkerKey, s)
+  const weightMap = new Map<string, ClinicalWeight>()
+  for (const w of clinicalWeights) weightMap.set(w.biomarkerKey, w)
+
+  // Helper: compute a risk domain from marker keys + wearable domain trends
+  const computeRiskDomain = (
+    domainName: string,
+    markerKeys: string[],
+    patternKeywords: string[],
+    wearableDomainKeys: string[]
+  ): RiskTrajectoryAssessment => {
+    const keyDrivers: RiskTrajectoryAssessment['keyDrivers'] = []
+    let compositeScore = 0
+    let driverCount = 0
+
+    // Score from lab markers
+    for (const key of markerKeys) {
+      const lab = labMap.get(key)
+      const baseline = baselineMap.get(key)
+      const weight = weightMap.get(key)
+      if (!lab) continue
+
+      // Zone score inverted: lower zone score = higher risk contribution
+      const riskContribution = Math.max(0, 100 - lab.zone.score)
+      compositeScore += riskContribution
+      driverCount++
+
+      const def = BIOMARKER_REGISTRY[key]
+      let personalTrend = 'no history'
+      if (baseline && baseline.isPrimary) {
+        if (baseline.trend === 'declining' && def?.polarity === 'higher_better') personalTrend = 'declining from baseline'
+        else if (baseline.trend === 'improving') personalTrend = 'improving'
+        else if (baseline.trend === 'declining' && def?.polarity === 'lower_better') personalTrend = 'improving (declining)'
+        else personalTrend = baseline.trend
+      }
+
+      keyDrivers.push({
+        biomarkerKey: key,
+        displayName: def?.displayName ?? key,
+        personalTrend,
+        contribution: Math.round(riskContribution),
+      })
+    }
+
+    // Score from detected patterns
+    const relevantPatterns = patterns.filter(p =>
+      p.detected && patternKeywords.some(kw => p.patternKey.includes(kw))
+    )
+    for (const p of relevantPatterns) {
+      const patternBoost = p.severity === 'urgent' ? 30 : p.severity === 'action' ? 20 : p.severity === 'attention' ? 10 : 5
+      compositeScore += patternBoost
+      driverCount++
+    }
+
+    // Score from wearable domain trends
+    for (const dk of wearableDomainKeys) {
+      const domain = domains[dk]
+      if (domain?.trend === 'declining') {
+        compositeScore += 15
+        driverCount++
+      }
+    }
+
+    // Normalize composite
+    const normalizedScore = driverCount > 0 ? Math.round(compositeScore / driverCount) : 0
+
+    // Level from composite
+    let level: RiskTrajectoryAssessment['level'] = 'low'
+    if (normalizedScore >= 60) level = 'high'
+    else if (normalizedScore >= 40) level = 'elevated'
+    else if (normalizedScore >= 20) level = 'moderate'
+
+    // Trend from domain trends + baseline trends
+    const decliningDrivers = keyDrivers.filter(d => d.personalTrend.includes('declining'))
+    const improvingDrivers = keyDrivers.filter(d => d.personalTrend.includes('improving'))
+    let trend: RiskTrajectoryAssessment['trend'] = 'stable'
+    if (decliningDrivers.length > improvingDrivers.length) trend = 'worsening'
+    else if (improvingDrivers.length > decliningDrivers.length) trend = 'improving'
+
+    // Confidence
+    const confidence: RiskTrajectoryAssessment['confidence'] =
+      driverCount >= 3 ? 'high' : driverCount >= 1 ? 'medium' : 'low'
+
+    // Action items from top drivers
+    const actionItems: string[] = []
+    const sortedDrivers = [...keyDrivers].sort((a, b) => b.contribution - a.contribution)
+    for (const driver of sortedDrivers.slice(0, 2)) {
+      if (driver.contribution >= 30) {
+        actionItems.push(`Prioritize optimizing ${driver.displayName}`)
+      }
+    }
+    for (const p of relevantPatterns.slice(0, 1)) {
+      if (p.recommendations.length > 0) actionItems.push(p.recommendations[0])
+    }
+
+    // Next lab recommendation: most stale + highest concern marker
+    let nextLabRecommendation: string | null = null
+    if (sortedDrivers.length > 0 && sortedDrivers[0].contribution >= 20) {
+      nextLabRecommendation = `Retest ${sortedDrivers[0].displayName} on your next panel`
+    }
+
+    return {
+      level, trend, confidence,
+      compositeScore: normalizedScore,
+      keyDrivers: sortedDrivers.slice(0, 5),
+      actionItems: actionItems.slice(0, 3),
+      nextLabRecommendation,
+    }
+  }
+
+  // 1. Cardiovascular (Attia #1 — atherosclerotic CVD)
+  risks.cardiovascular = computeRiskDomain(
+    'cardiovascular',
+    ['apolipoprotein_b', 'ldl_cholesterol', 'lipoprotein_a', 'hs_crp', 'homocysteine'],
+    ['cardiovascular', 'apob_ldl_discordance'],
+    ['cardiovascular', 'recovery']
   )
-  risks.cardiovascular = {
-    level: cvPatterns.length > 0
-      ? (cvPatterns.some(p => p.severity === 'urgent') ? 'high' : 'elevated')
-      : 'low',
-    trend: domains.recovery?.trend === 'declining' ? 'worsening' : 'stable',
-    confidence: labScores ? 'medium' : 'low',
-  }
 
-  // Metabolic risk
-  const metPatterns = patterns.filter(p => p.patternKey.includes('insulin') || p.patternKey.includes('metabolic'))
-  risks.metabolic = {
-    level: metPatterns.length > 0 ? 'elevated' : 'low',
-    trend: 'stable',
-    confidence: labScores ? 'medium' : 'low',
-  }
+  // 2. Metabolic (Attia #2 — type 2 diabetes / metabolic syndrome)
+  risks.metabolic = computeRiskDomain(
+    'metabolic',
+    ['fasting_insulin', 'fasting_glucose', 'hba1c', 'homa_ir', 'triglycerides', 'trig_hdl_ratio'],
+    ['insulin_resistance', 'metabolic'],
+    ['metabolic']
+  )
 
-  // Inflammation
-  const infPatterns = patterns.filter(p => p.patternKey.includes('inflammation'))
-  risks.inflammation = {
-    level: infPatterns.length > 0 ? 'elevated' : 'low',
-    trend: 'stable',
-    confidence: labScores ? 'medium' : 'low',
-  }
+  // 3. Cancer (Attia #3 — cancer risk via inflammation + immune + body comp)
+  risks.cancer = computeRiskDomain(
+    'cancer',
+    ['hs_crp', 'esr', 'fasting_insulin'],
+    ['inflammation'],
+    ['inflammatory', 'bodyComp']
+  )
+
+  // 4. Neurodegenerative (Attia #4 — Alzheimer's / cognitive decline)
+  risks.neurodegenerative = computeRiskDomain(
+    'neurodegenerative',
+    ['homocysteine', 'vitamin_b12', 'vitamin_d', 'omega_3_index', 'fasting_insulin'],
+    [],
+    ['neuro', 'sleep']
+  )
+
+  // 5. Musculoskeletal (functional longevity)
+  risks.musculoskeletal = computeRiskDomain(
+    'musculoskeletal',
+    ['vitamin_d', 'total_testosterone', 'free_testosterone'],
+    [],
+    ['activity', 'bodyComp']
+  )
 
   return risks
 }

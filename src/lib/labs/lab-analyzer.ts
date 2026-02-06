@@ -348,15 +348,6 @@ function detectCardiovascularRisk(map: BiomarkerMap): LabPattern {
     pattern.involvedBiomarkers.push(involved(map, 'apolipoprotein_b', 'primary_driver', label)!)
   }
 
-  // ApoB/LDL-C discordance check
-  if (apoB !== undefined && ldl !== undefined) {
-    const expectedApoB = ldl * 0.8  // rough concordance
-    if (apoB > expectedApoB * 1.2) {
-      pattern.involvedBiomarkers.push(involved(map, 'apolipoprotein_b', 'supporting',
-        `ApoB is discordantly high relative to LDL-C — particle number exceeds what cholesterol content suggests`)!)
-    }
-  }
-
   if (lpa !== undefined && lpa > 75) {
     longevityCount++
     clinicalCount++
@@ -410,6 +401,70 @@ function detectCardiovascularRisk(map: BiomarkerMap): LabPattern {
       'Review these advanced lipid markers with a cardiologist or lipidologist for personalized risk assessment',
       'If Lp(a) is elevated, your provider may recommend more aggressive management of modifiable risk factors',
       'If homocysteine is elevated, methylfolate and B12 supplementation can be discussed with your provider',
+    ]
+  }
+
+  return pattern
+}
+
+function detectApoBLDLDiscordance(map: BiomarkerMap): LabPattern {
+  const pattern: LabPattern = {
+    patternKey: 'apob_ldl_discordance',
+    patternName: 'ApoB/LDL-C Discordance',
+    description: 'ApoB particle count and LDL cholesterol content tell different stories',
+    severity: 'info',
+    involvedBiomarkers: [],
+    insight: '',
+    mechanismExplanation: '',
+    recommendations: [],
+    confidence: 0,
+    detected: false,
+  }
+
+  const apoB = getVal(map, 'apolipoprotein_b')
+  const ldl = getVal(map, 'ldl_cholesterol')
+
+  if (apoB === undefined || ldl === undefined) return pattern
+
+  // Rough concordance: ApoB (mg/dL) ≈ LDL-C (mg/dL) × 0.8
+  const expectedApoB = ldl * 0.8
+  const discordanceRatio = apoB / expectedApoB
+
+  // Case 1: LDL-C normal/low but ApoB is disproportionately high
+  if (discordanceRatio > 1.2 && apoB > 80) {
+    pattern.detected = true
+    pattern.severity = 'attention'
+    pattern.confidence = 0.8
+    pattern.involvedBiomarkers.push(
+      involved(map, 'apolipoprotein_b', 'primary_driver',
+        `ApoB of ${Math.round(apoB)} mg/dL is higher than expected for your LDL-C level`)!,
+      involved(map, 'ldl_cholesterol', 'supporting',
+        `LDL-C of ${Math.round(ldl)} mg/dL appears normal, but particle count tells a different story`)!,
+    )
+    pattern.insight = 'Your LDL-C looks normal, but ApoB tells a different story — you have a higher number of atherogenic particles than LDL-C alone suggests. This discordance means standard cholesterol testing may underestimate your cardiovascular risk. ApoB is considered the more accurate marker by current guidelines.'
+    pattern.mechanismExplanation = 'Each atherogenic lipoprotein particle carries one ApoB molecule. When ApoB is high relative to LDL-C, it means you have more numerous but cholesterol-depleted particles. These smaller, denser particles are more atherogenic per particle because they penetrate the arterial wall more easily.'
+    pattern.recommendations = [
+      'Discuss this ApoB/LDL-C discordance with your provider — ApoB may be a better treatment target than LDL-C in your case',
+      'Consider asking about an NMR lipoprofile for detailed particle size analysis',
+      'If metabolic markers like TG/HDL ratio are also suboptimal, this pattern may be part of a metabolic syndrome picture',
+    ]
+  }
+  // Case 2: LDL-C elevated but ApoB is normal/low
+  else if (discordanceRatio < 0.8 && ldl > 130 && apoB < 90) {
+    pattern.detected = true
+    pattern.severity = 'info'
+    pattern.confidence = 0.75
+    pattern.involvedBiomarkers.push(
+      involved(map, 'ldl_cholesterol', 'primary_driver',
+        `LDL-C of ${Math.round(ldl)} mg/dL appears elevated`)!,
+      involved(map, 'apolipoprotein_b', 'supporting',
+        `ApoB of ${Math.round(apoB)} mg/dL is normal — particles are likely large and buoyant`)!,
+    )
+    pattern.insight = 'Your LDL-C is elevated, but ApoB is in a good range — this suggests your LDL particles are large and buoyant rather than small and dense. Large LDL particles carry more cholesterol per particle but are generally considered less atherogenic. This is a more favorable pattern than LDL-C alone would suggest.'
+    pattern.mechanismExplanation = 'When ApoB is low relative to LDL-C, each particle carries more cholesterol (larger particles). Large buoyant LDL particles are less likely to penetrate the arterial wall compared to small dense LDL. This discordance suggests the LDL-C number may overestimate your actual particle-driven risk.'
+    pattern.recommendations = [
+      'Share this ApoB/LDL-C context with your provider — it may influence treatment decisions',
+      'Continue monitoring both markers to track this favorable particle pattern over time',
     ]
   }
 
@@ -1043,6 +1098,7 @@ export function analyzeLabPatterns(
     detectInsulinResistance(map),
     detectSubclinicalHypothyroidism(map),
     detectCardiovascularRisk(map),
+    detectApoBLDLDiscordance(map),
     detectInflammationCascade(map),
     detectNutrientDepletion(map),
     detectLiverStress(map),
@@ -1052,9 +1108,18 @@ export function analyzeLabPatterns(
     detectAutoimmunePre(map),
   ]
 
-  // Return only detected patterns, sorted by severity
+  // Metabolic/insulin patterns are prioritized first (primary metabolic marker),
+  // then sorted by severity
   const severityOrder: Record<PatternSeverity, number> = { urgent: 0, action: 1, attention: 2, info: 3 }
+  const metabolicKeys = new Set(['insulin_resistance_constellation', 'apob_ldl_discordance'])
   return allPatterns
     .filter(p => p.detected)
-    .sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity])
+    .sort((a, b) => {
+      // Metabolic priority patterns sort first at equal severity
+      const aMetabolic = metabolicKeys.has(a.patternKey) ? 0 : 1
+      const bMetabolic = metabolicKeys.has(b.patternKey) ? 0 : 1
+      const severityDiff = severityOrder[a.severity] - severityOrder[b.severity]
+      if (severityDiff !== 0) return severityDiff
+      return aMetabolic - bMetabolic
+    })
 }
