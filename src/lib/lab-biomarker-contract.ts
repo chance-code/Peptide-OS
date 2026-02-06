@@ -17,6 +17,8 @@ export type BiomarkerCategory =
   | 'liver'
   | 'kidney'
   | 'blood_counts'
+  | 'toxins'
+  | 'autoimmunity'
 
 export type HealthDomain =
   | 'sleep'
@@ -28,21 +30,34 @@ export type HealthDomain =
   | 'immune'
   | 'hormonal'
 
+export interface WearableCorrelation {
+  metric: string                       // Arc metric type key: "hrv", "rhr", "deep_sleep"
+  relationship: 'direct' | 'inverse' | 'modulating'
+  mechanism: string                    // Human-readable explanation
+}
+
 export interface BiomarkerDefinition {
   key: string                          // Canonical name: "total_testosterone"
   displayName: string                  // "Total Testosterone"
+  shortName?: string                   // For compact UI: "ApoB", "HbA1c", "hs-CRP"
   aliases: string[]                    // ["testosterone", "T", "Test Total"]
   category: BiomarkerCategory
   unit: string                         // "ng/dL"
-  polarity: 'higher_better' | 'lower_better' | 'optimal_range'
+  polarity: 'higher_better' | 'lower_better' | 'optimal_range' | 'categorical'
   optimalRange?: { min: number; optimal: number; max: number }
   referenceRange: { min: number; max: number }
+  absoluteBounds?: { min: number; max: number }  // Parsing sanity check — outside = error
+  criticalLow?: number                 // Below this = critical flag
+  criticalHigh?: number                // Above this = critical flag
+  unitAliases?: Record<string, number> // Conversion factors: { "mmol/L": 18.018 } means value * 18.018 → canonical
   healthDomains: HealthDomain[]        // ['hormonal', 'recovery']
   relatedMetrics?: string[]            // ['deep_sleep', 'hrv']
+  wearableCorrelations?: WearableCorrelation[]
+  sexSpecific?: boolean                // Different ranges for M/F
   format: (value: number) => string
 }
 
-export type BiomarkerFlag = 'low' | 'normal' | 'optimal' | 'high'
+export type BiomarkerFlag = 'low' | 'normal' | 'optimal' | 'high' | 'critical_low' | 'critical_high'
 
 // ─── Formatters ─────────────────────────────────────────────────────────────
 
@@ -106,6 +121,50 @@ function fmtMlMinCr(value: number): string {
   return `${Math.round(value)} mL/min/1.73m2`
 }
 
+function fmtUgDL(value: number): string {
+  return `${value.toFixed(0)} µg/dL`
+}
+
+function fmtUgL(value: number): string {
+  return `${value.toFixed(1)} µg/L`
+}
+
+function fmtGDL(value: number): string {
+  return `${value.toFixed(1)} g/dL`
+}
+
+function fmtMmHr(value: number): string {
+  return `${Math.round(value)} mm/hr`
+}
+
+function fmtIUML(value: number): string {
+  return `${value.toFixed(1)} IU/mL`
+}
+
+function fmtThousandUL(value: number): string {
+  return `${value.toFixed(1)} 10³/µL`
+}
+
+function fmtMillionUL(value: number): string {
+  return `${value.toFixed(2)} 10⁶/µL`
+}
+
+function fmtFL(value: number): string {
+  return `${value.toFixed(1)} fL`
+}
+
+function fmtNmolLAlt(value: number): string {
+  return `${Math.round(value)} nmol/L`
+}
+
+function fmtUgMLAlt(value: number): string {
+  return `${value.toFixed(1)} µg/mL`
+}
+
+function fmtNmolLDecimal(value: number): string {
+  return `${value.toFixed(1)} nmol/L`
+}
+
 // ─── Biomarker Registry ─────────────────────────────────────────────────────
 
 export const BIOMARKER_REGISTRY: Record<string, BiomarkerDefinition> = {
@@ -113,25 +172,36 @@ export const BIOMARKER_REGISTRY: Record<string, BiomarkerDefinition> = {
   total_testosterone: {
     key: 'total_testosterone',
     displayName: 'Total Testosterone',
+    shortName: 'Total T',
     aliases: ['testosterone', 'T', 'Test Total', 'Total T', 'Testosterone, Total', 'Serum Testosterone'],
     category: 'hormones_male',
     unit: 'ng/dL',
     polarity: 'optimal_range',
     optimalRange: { min: 600, optimal: 800, max: 1000 },
     referenceRange: { min: 264, max: 916 },
+    absoluteBounds: { min: 0, max: 3000 },
+    unitAliases: { 'nmol/L': 28.818 },
+    sexSpecific: true,
     healthDomains: ['hormonal', 'energy', 'body_composition', 'recovery', 'cognitive'],
     relatedMetrics: ['deep_sleep', 'hrv', 'lean_body_mass', 'body_fat_percentage'],
+    wearableCorrelations: [
+      { metric: 'deep_sleep', relationship: 'direct', mechanism: 'Testosterone supports restorative sleep architecture and growth hormone release during deep sleep' },
+      { metric: 'lean_body_mass', relationship: 'direct', mechanism: 'Testosterone directly drives muscle protein synthesis and lean mass accretion' },
+    ],
     format: fmtNgDL,
   },
   free_testosterone: {
     key: 'free_testosterone',
     displayName: 'Free Testosterone',
+    shortName: 'Free T',
     aliases: ['Free T', 'FT', 'Testosterone Free', 'Direct Free Testosterone'],
     category: 'hormones_male',
     unit: 'pg/mL',
     polarity: 'optimal_range',
     optimalRange: { min: 15, optimal: 20, max: 25 },
     referenceRange: { min: 5.0, max: 21.0 },
+    absoluteBounds: { min: 0, max: 100 },
+    sexSpecific: true,
     healthDomains: ['hormonal', 'energy', 'body_composition', 'recovery'],
     relatedMetrics: ['deep_sleep', 'hrv', 'lean_body_mass'],
     format: fmtPgML,
@@ -139,6 +209,7 @@ export const BIOMARKER_REGISTRY: Record<string, BiomarkerDefinition> = {
   estradiol: {
     key: 'estradiol',
     displayName: 'Estradiol',
+    shortName: 'E2',
     aliases: ['E2', 'Estradiol E2', 'Oestradiol', 'Sensitive Estradiol'],
     category: 'hormones_male',
     unit: 'pg/mL',
@@ -152,6 +223,7 @@ export const BIOMARKER_REGISTRY: Record<string, BiomarkerDefinition> = {
   shbg: {
     key: 'shbg',
     displayName: 'SHBG',
+    shortName: 'SHBG',
     aliases: ['Sex Hormone Binding Globulin', 'Sex Hormone-Binding Globulin'],
     category: 'hormones_male',
     unit: 'nmol/L',
@@ -167,6 +239,7 @@ export const BIOMARKER_REGISTRY: Record<string, BiomarkerDefinition> = {
   tsh: {
     key: 'tsh',
     displayName: 'TSH',
+    shortName: 'TSH',
     aliases: ['Thyroid Stimulating Hormone', 'Thyrotropin', 'TSH 3rd Generation'],
     category: 'hormones_thyroid',
     unit: 'mIU/L',
@@ -236,12 +309,17 @@ export const BIOMARKER_REGISTRY: Record<string, BiomarkerDefinition> = {
   fasting_glucose: {
     key: 'fasting_glucose',
     displayName: 'Fasting Glucose',
+    shortName: 'Glucose',
     aliases: ['Glucose', 'Blood Glucose', 'FBG', 'Fasting Blood Glucose', 'Glucose Fasting'],
     category: 'metabolic',
     unit: 'mg/dL',
     polarity: 'optimal_range',
     optimalRange: { min: 70, optimal: 85, max: 95 },
     referenceRange: { min: 65, max: 99 },
+    absoluteBounds: { min: 20, max: 600 },
+    criticalLow: 40,
+    criticalHigh: 400,
+    unitAliases: { 'mmol/L': 18.018 },
     healthDomains: ['energy', 'body_composition', 'cardiovascular'],
     relatedMetrics: ['body_fat_percentage', 'weight'],
     format: fmtMgDL,
@@ -249,12 +327,16 @@ export const BIOMARKER_REGISTRY: Record<string, BiomarkerDefinition> = {
   hba1c: {
     key: 'hba1c',
     displayName: 'HbA1c',
+    shortName: 'HbA1c',
     aliases: ['Hemoglobin A1c', 'A1C', 'Glycated Hemoglobin', 'Glycohemoglobin'],
     category: 'metabolic',
     unit: '%',
     polarity: 'lower_better',
     optimalRange: { min: 4.5, optimal: 5.0, max: 5.4 },
     referenceRange: { min: 4.0, max: 5.6 },
+    absoluteBounds: { min: 3, max: 20 },
+    criticalHigh: 10,
+    // mmol/mol → %: (mmol_mol / 10.929) + 2.15
     healthDomains: ['body_composition', 'cardiovascular', 'energy'],
     relatedMetrics: ['body_fat_percentage', 'weight'],
     format: fmtPercent,
@@ -262,14 +344,20 @@ export const BIOMARKER_REGISTRY: Record<string, BiomarkerDefinition> = {
   fasting_insulin: {
     key: 'fasting_insulin',
     displayName: 'Fasting Insulin',
+    shortName: 'Insulin',
     aliases: ['Insulin', 'Insulin Fasting', 'Serum Insulin'],
     category: 'metabolic',
     unit: 'uIU/mL',
     polarity: 'lower_better',
     optimalRange: { min: 2, optimal: 4, max: 6 },
     referenceRange: { min: 2.6, max: 24.9 },
+    absoluteBounds: { min: 0, max: 300 },
+    criticalHigh: 50,
     healthDomains: ['body_composition', 'energy', 'cardiovascular'],
     relatedMetrics: ['body_fat_percentage', 'weight'],
+    wearableCorrelations: [
+      { metric: 'hrv', relationship: 'inverse', mechanism: 'Hyperinsulinemia drives sympathetic dominance, suppressing parasympathetic tone and HRV' },
+    ],
     format: fmtUIU,
   },
 
@@ -482,15 +570,713 @@ export const BIOMARKER_REGISTRY: Record<string, BiomarkerDefinition> = {
   egfr: {
     key: 'egfr',
     displayName: 'eGFR',
+    shortName: 'eGFR',
     aliases: ['Estimated GFR', 'GFR', 'Glomerular Filtration Rate', 'eGFR (CKD-EPI)'],
     category: 'kidney',
     unit: 'mL/min/1.73m2',
     polarity: 'higher_better',
     optimalRange: { min: 90, optimal: 110, max: 130 },
     referenceRange: { min: 60, max: 200 },
+    absoluteBounds: { min: 0, max: 200 },
+    criticalLow: 30,
     healthDomains: ['cardiovascular'],
     relatedMetrics: [],
     format: fmtMlMinCr,
+  },
+
+  // ── Advanced Lipids ───────────────────────────────────────────────────────
+  apolipoprotein_b: {
+    key: 'apolipoprotein_b',
+    displayName: 'Apolipoprotein B',
+    shortName: 'ApoB',
+    aliases: ['ApoB', 'Apo B', 'Apolipoprotein B (c)', 'ApoB (c)'],
+    category: 'lipids',
+    unit: 'mg/dL',
+    polarity: 'lower_better',
+    optimalRange: { min: 40, optimal: 60, max: 80 },
+    referenceRange: { min: 0, max: 130 },
+    absoluteBounds: { min: 0, max: 500 },
+    criticalHigh: 200,
+    unitAliases: { 'g/L': 100 },
+    healthDomains: ['cardiovascular'],
+    relatedMetrics: ['rhr', 'vo2_max'],
+    wearableCorrelations: [
+      { metric: 'rhr', relationship: 'direct', mechanism: 'Elevated ApoB is associated with atherosclerosis, which can elevate resting heart rate over time' },
+      { metric: 'vo2_max', relationship: 'inverse', mechanism: 'High ApoB burden correlates with reduced cardiovascular fitness capacity' },
+    ],
+    format: fmtMgDL,
+  },
+  lipoprotein_a: {
+    key: 'lipoprotein_a',
+    displayName: 'Lipoprotein(a)',
+    shortName: 'Lp(a)',
+    aliases: ['Lp(a)', 'Lp a', 'Lipoprotein a', 'Lipoprotein (a)'],
+    category: 'lipids',
+    unit: 'nmol/L',
+    polarity: 'lower_better',
+    optimalRange: { min: 0, optimal: 30, max: 75 },
+    referenceRange: { min: 0, max: 75 },
+    absoluteBounds: { min: 0, max: 500 },
+    criticalHigh: 200,
+    healthDomains: ['cardiovascular'],
+    relatedMetrics: ['rhr', 'vo2_max'],
+    wearableCorrelations: [
+      { metric: 'vo2_max', relationship: 'inverse', mechanism: 'Elevated Lp(a) increases atherosclerotic burden limiting cardiovascular output' },
+    ],
+    format: fmtNmolLAlt,
+  },
+  ldl_particle_number: {
+    key: 'ldl_particle_number',
+    displayName: 'LDL Particle Number',
+    shortName: 'LDL-P',
+    aliases: ['LDL-P', 'LDL Particle', 'LDL Particle Count', 'LDL-P NMR'],
+    category: 'lipids',
+    unit: 'nmol/L',
+    polarity: 'lower_better',
+    optimalRange: { min: 400, optimal: 700, max: 1000 },
+    referenceRange: { min: 0, max: 1300 },
+    absoluteBounds: { min: 0, max: 3000 },
+    criticalHigh: 2000,
+    healthDomains: ['cardiovascular'],
+    relatedMetrics: ['rhr'],
+    format: fmtNmolLAlt,
+  },
+  ldl_small: {
+    key: 'ldl_small',
+    displayName: 'LDL Small',
+    shortName: 'sm-LDL',
+    aliases: ['Small LDL', 'LDL Small Dense', 'Small Dense LDL', 'sdLDL'],
+    category: 'lipids',
+    unit: 'nmol/L',
+    polarity: 'lower_better',
+    optimalRange: { min: 0, optimal: 200, max: 527 },
+    referenceRange: { min: 0, max: 527 },
+    absoluteBounds: { min: 0, max: 2000 },
+    healthDomains: ['cardiovascular'],
+    relatedMetrics: [],
+    format: fmtNmolLAlt,
+  },
+  non_hdl_cholesterol: {
+    key: 'non_hdl_cholesterol',
+    displayName: 'Non-HDL Cholesterol',
+    shortName: 'Non-HDL',
+    aliases: ['Non HDL', 'Non-HDL-C', 'Non HDL Cholesterol'],
+    category: 'lipids',
+    unit: 'mg/dL',
+    polarity: 'lower_better',
+    optimalRange: { min: 50, optimal: 90, max: 130 },
+    referenceRange: { min: 0, max: 159 },
+    absoluteBounds: { min: 0, max: 500 },
+    healthDomains: ['cardiovascular'],
+    relatedMetrics: ['rhr'],
+    format: fmtMgDL,
+  },
+  fibrinogen: {
+    key: 'fibrinogen',
+    displayName: 'Fibrinogen',
+    shortName: 'Fib',
+    aliases: ['Fibrinogen Activity', 'Fibrinogen Level'],
+    category: 'lipids',
+    unit: 'mg/dL',
+    polarity: 'optimal_range',
+    optimalRange: { min: 200, optimal: 300, max: 400 },
+    referenceRange: { min: 175, max: 425 },
+    absoluteBounds: { min: 50, max: 1000 },
+    healthDomains: ['cardiovascular', 'immune'],
+    relatedMetrics: [],
+    format: fmtMgDL,
+  },
+
+  // ── Metabolic (additions) ─────────────────────────────────────────────────
+  homa_ir: {
+    key: 'homa_ir',
+    displayName: 'HOMA-IR',
+    shortName: 'HOMA-IR',
+    aliases: ['Homeostatic Model Assessment', 'Insulin Resistance Index'],
+    category: 'metabolic',
+    unit: 'ratio',
+    polarity: 'lower_better',
+    optimalRange: { min: 0.3, optimal: 0.7, max: 1.0 },
+    referenceRange: { min: 0, max: 2.5 },
+    absoluteBounds: { min: 0, max: 50 },
+    criticalHigh: 5.0,
+    healthDomains: ['body_composition', 'cardiovascular', 'energy'],
+    relatedMetrics: ['body_fat_percentage', 'hrv', 'weight'],
+    wearableCorrelations: [
+      { metric: 'hrv', relationship: 'inverse', mechanism: 'Insulin resistance impairs autonomic flexibility, creating a biochemical ceiling for HRV' },
+      { metric: 'body_fat_percentage', relationship: 'direct', mechanism: 'Elevated HOMA-IR drives fat storage and inhibits lipolysis' },
+    ],
+    format: (v) => v.toFixed(2),
+  },
+  uric_acid: {
+    key: 'uric_acid',
+    displayName: 'Uric Acid',
+    shortName: 'UA',
+    aliases: ['Urate', 'Serum Uric Acid'],
+    category: 'metabolic',
+    unit: 'mg/dL',
+    polarity: 'optimal_range',
+    optimalRange: { min: 3.5, optimal: 5.0, max: 5.5 },
+    referenceRange: { min: 2.4, max: 8.2 },
+    absoluteBounds: { min: 0, max: 20 },
+    criticalHigh: 12,
+    healthDomains: ['cardiovascular', 'immune'],
+    relatedMetrics: [],
+    format: (v) => `${v.toFixed(1)} mg/dL`,
+  },
+  leptin: {
+    key: 'leptin',
+    displayName: 'Leptin',
+    shortName: 'Leptin',
+    aliases: ['Serum Leptin'],
+    category: 'metabolic',
+    unit: 'ng/mL',
+    polarity: 'lower_better',
+    optimalRange: { min: 1, optimal: 5, max: 10 },
+    referenceRange: { min: 0, max: 30 },
+    absoluteBounds: { min: 0, max: 200 },
+    sexSpecific: true,
+    healthDomains: ['body_composition', 'hormonal'],
+    relatedMetrics: ['body_fat_percentage', 'weight'],
+    format: fmtNgML,
+  },
+  adiponectin: {
+    key: 'adiponectin',
+    displayName: 'Adiponectin',
+    shortName: 'Adipo',
+    aliases: ['Serum Adiponectin'],
+    category: 'metabolic',
+    unit: 'ug/mL',
+    polarity: 'higher_better',
+    optimalRange: { min: 10, optimal: 15, max: 25 },
+    referenceRange: { min: 2, max: 30 },
+    absoluteBounds: { min: 0, max: 100 },
+    healthDomains: ['body_composition', 'cardiovascular'],
+    relatedMetrics: ['body_fat_percentage'],
+    format: fmtUgMLAlt,
+  },
+
+  // ── Thyroid (additions) ───────────────────────────────────────────────────
+  reverse_t3: {
+    key: 'reverse_t3',
+    displayName: 'Reverse T3',
+    shortName: 'rT3',
+    aliases: ['RT3', 'Reverse Triiodothyronine', 'rT3'],
+    category: 'hormones_thyroid',
+    unit: 'ng/dL',
+    polarity: 'lower_better',
+    optimalRange: { min: 8, optimal: 14, max: 20 },
+    referenceRange: { min: 9.2, max: 24.1 },
+    absoluteBounds: { min: 0, max: 100 },
+    healthDomains: ['energy', 'body_composition'],
+    relatedMetrics: ['rhr', 'body_fat_percentage'],
+    format: (v) => `${v.toFixed(1)} ng/dL`,
+  },
+  tpo_antibodies: {
+    key: 'tpo_antibodies',
+    displayName: 'TPO Antibodies',
+    shortName: 'TPO Ab',
+    aliases: ['Anti-TPO', 'Thyroid Peroxidase Antibodies', 'TPO Ab', 'Thyroid Peroxidase Ab'],
+    category: 'hormones_thyroid',
+    unit: 'IU/mL',
+    polarity: 'lower_better',
+    optimalRange: { min: 0, optimal: 0, max: 9 },
+    referenceRange: { min: 0, max: 34 },
+    absoluteBounds: { min: 0, max: 3000 },
+    criticalHigh: 500,
+    healthDomains: ['immune', 'energy'],
+    relatedMetrics: [],
+    format: fmtIUML,
+  },
+  thyroglobulin_antibodies: {
+    key: 'thyroglobulin_antibodies',
+    displayName: 'Thyroglobulin Antibodies',
+    shortName: 'TgAb',
+    aliases: ['Anti-Tg', 'Thyroglobulin Ab', 'TgAb', 'Anti-Thyroglobulin'],
+    category: 'hormones_thyroid',
+    unit: 'IU/mL',
+    polarity: 'lower_better',
+    optimalRange: { min: 0, optimal: 0, max: 1 },
+    referenceRange: { min: 0, max: 4 },
+    absoluteBounds: { min: 0, max: 5000 },
+    healthDomains: ['immune'],
+    relatedMetrics: [],
+    format: fmtIUML,
+  },
+
+  // ── Hormones - Male/Female (additions) ────────────────────────────────────
+  fsh: {
+    key: 'fsh',
+    displayName: 'FSH',
+    shortName: 'FSH',
+    aliases: ['Follicle Stimulating Hormone', 'Follicle-Stimulating Hormone'],
+    category: 'hormones_female',
+    unit: 'mIU/mL',
+    polarity: 'optimal_range',
+    optimalRange: { min: 3, optimal: 7, max: 12 },
+    referenceRange: { min: 1.5, max: 12.4 },
+    absoluteBounds: { min: 0, max: 200 },
+    sexSpecific: true,
+    healthDomains: ['hormonal'],
+    relatedMetrics: [],
+    format: (v) => `${v.toFixed(1)} mIU/mL`,
+  },
+  lh: {
+    key: 'lh',
+    displayName: 'LH',
+    shortName: 'LH',
+    aliases: ['Luteinizing Hormone'],
+    category: 'hormones_female',
+    unit: 'mIU/mL',
+    polarity: 'optimal_range',
+    optimalRange: { min: 2, optimal: 6, max: 12 },
+    referenceRange: { min: 1.7, max: 11.2 },
+    absoluteBounds: { min: 0, max: 200 },
+    sexSpecific: true,
+    healthDomains: ['hormonal'],
+    relatedMetrics: [],
+    format: (v) => `${v.toFixed(1)} mIU/mL`,
+  },
+  progesterone: {
+    key: 'progesterone',
+    displayName: 'Progesterone',
+    shortName: 'Prog',
+    aliases: ['Serum Progesterone', 'P4'],
+    category: 'hormones_female',
+    unit: 'ng/mL',
+    polarity: 'optimal_range',
+    optimalRange: { min: 0.1, optimal: 0.5, max: 1.5 },
+    referenceRange: { min: 0.1, max: 25 },
+    absoluteBounds: { min: 0, max: 50 },
+    sexSpecific: true,
+    healthDomains: ['hormonal', 'sleep'],
+    relatedMetrics: ['deep_sleep'],
+    format: fmtNgML,
+  },
+  amh: {
+    key: 'amh',
+    displayName: 'AMH',
+    shortName: 'AMH',
+    aliases: ['Anti-Mullerian Hormone', 'Anti-Müllerian Hormone', 'Mullerian Inhibiting Substance'],
+    category: 'hormones_female',
+    unit: 'ng/mL',
+    polarity: 'optimal_range',
+    optimalRange: { min: 1.0, optimal: 3.0, max: 6.0 },
+    referenceRange: { min: 0.3, max: 10 },
+    absoluteBounds: { min: 0, max: 25 },
+    sexSpecific: true,
+    healthDomains: ['hormonal'],
+    relatedMetrics: [],
+    format: fmtNgML,
+  },
+
+  // ── Liver (additions) ─────────────────────────────────────────────────────
+  ggt: {
+    key: 'ggt',
+    displayName: 'GGT',
+    shortName: 'GGT',
+    aliases: ['Gamma-Glutamyl Transferase', 'Gamma GT', 'GGTP', 'Gamma-Glutamyltransferase'],
+    category: 'liver',
+    unit: 'U/L',
+    polarity: 'lower_better',
+    optimalRange: { min: 5, optimal: 15, max: 25 },
+    referenceRange: { min: 0, max: 65 },
+    absoluteBounds: { min: 0, max: 2000 },
+    criticalHigh: 200,
+    sexSpecific: true,
+    healthDomains: ['body_composition', 'cardiovascular'],
+    relatedMetrics: ['body_fat_percentage'],
+    wearableCorrelations: [
+      { metric: 'body_fat_percentage', relationship: 'direct', mechanism: 'GGT elevation correlates with hepatic fat accumulation and oxidative stress' },
+    ],
+    format: fmtUL,
+  },
+  alkaline_phosphatase: {
+    key: 'alkaline_phosphatase',
+    displayName: 'Alkaline Phosphatase',
+    shortName: 'ALP',
+    aliases: ['ALP', 'Alk Phos', 'Alkaline Phos'],
+    category: 'liver',
+    unit: 'U/L',
+    polarity: 'optimal_range',
+    optimalRange: { min: 35, optimal: 65, max: 100 },
+    referenceRange: { min: 20, max: 130 },
+    absoluteBounds: { min: 0, max: 2000 },
+    healthDomains: ['body_composition'],
+    relatedMetrics: [],
+    format: fmtUL,
+  },
+  total_bilirubin: {
+    key: 'total_bilirubin',
+    displayName: 'Total Bilirubin',
+    shortName: 'T.Bili',
+    aliases: ['Bilirubin Total', 'Bilirubin', 'T. Bilirubin', 'TBIL'],
+    category: 'liver',
+    unit: 'mg/dL',
+    polarity: 'optimal_range',
+    optimalRange: { min: 0.2, optimal: 0.7, max: 1.2 },
+    referenceRange: { min: 0.1, max: 1.2 },
+    absoluteBounds: { min: 0, max: 30 },
+    criticalHigh: 5.0,
+    healthDomains: ['cardiovascular'],
+    relatedMetrics: [],
+    format: (v) => `${v.toFixed(1)} mg/dL`,
+  },
+  albumin: {
+    key: 'albumin',
+    displayName: 'Albumin',
+    shortName: 'Alb',
+    aliases: ['Serum Albumin'],
+    category: 'liver',
+    unit: 'g/dL',
+    polarity: 'higher_better',
+    optimalRange: { min: 4.2, optimal: 4.5, max: 5.0 },
+    referenceRange: { min: 3.5, max: 5.5 },
+    absoluteBounds: { min: 0, max: 8 },
+    criticalLow: 2.5,
+    healthDomains: ['immune', 'recovery'],
+    relatedMetrics: [],
+    format: fmtGDL,
+  },
+  total_protein: {
+    key: 'total_protein',
+    displayName: 'Total Protein',
+    shortName: 'TP',
+    aliases: ['Protein Total', 'Serum Protein', 'TP'],
+    category: 'liver',
+    unit: 'g/dL',
+    polarity: 'optimal_range',
+    optimalRange: { min: 6.5, optimal: 7.2, max: 8.0 },
+    referenceRange: { min: 6.0, max: 8.5 },
+    absoluteBounds: { min: 0, max: 15 },
+    healthDomains: ['immune'],
+    relatedMetrics: [],
+    format: fmtGDL,
+  },
+
+  // ── Kidney (additions) ────────────────────────────────────────────────────
+  bun: {
+    key: 'bun',
+    displayName: 'BUN',
+    shortName: 'BUN',
+    aliases: ['Blood Urea Nitrogen', 'Urea Nitrogen'],
+    category: 'kidney',
+    unit: 'mg/dL',
+    polarity: 'optimal_range',
+    optimalRange: { min: 7, optimal: 14, max: 20 },
+    referenceRange: { min: 6, max: 24 },
+    absoluteBounds: { min: 0, max: 200 },
+    criticalHigh: 100,
+    healthDomains: ['body_composition'],
+    relatedMetrics: [],
+    format: fmtMgDL,
+  },
+  cystatin_c: {
+    key: 'cystatin_c',
+    displayName: 'Cystatin C',
+    shortName: 'CysC',
+    aliases: ['Cystatin-C', 'Serum Cystatin C'],
+    category: 'kidney',
+    unit: 'mg/L',
+    polarity: 'optimal_range',
+    optimalRange: { min: 0.55, optimal: 0.70, max: 0.85 },
+    referenceRange: { min: 0.50, max: 1.00 },
+    absoluteBounds: { min: 0, max: 10 },
+    criticalHigh: 3.0,
+    healthDomains: ['cardiovascular'],
+    relatedMetrics: [],
+    format: fmtMgL,
+  },
+
+  // ── Nutrients & Vitamins (additions) ──────────────────────────────────────
+  methylmalonic_acid: {
+    key: 'methylmalonic_acid',
+    displayName: 'Methylmalonic Acid',
+    shortName: 'MMA',
+    aliases: ['MMA', 'Methylmalonate'],
+    category: 'vitamins',
+    unit: 'nmol/L',
+    polarity: 'lower_better',
+    optimalRange: { min: 50, optimal: 150, max: 270 },
+    referenceRange: { min: 0, max: 378 },
+    absoluteBounds: { min: 0, max: 5000 },
+    healthDomains: ['energy', 'cognitive'],
+    relatedMetrics: [],
+    format: (v) => `${Math.round(v)} nmol/L`,
+  },
+  tibc: {
+    key: 'tibc',
+    displayName: 'TIBC',
+    shortName: 'TIBC',
+    aliases: ['Total Iron Binding Capacity', 'Iron Binding Capacity'],
+    category: 'minerals',
+    unit: 'ug/dL',
+    polarity: 'optimal_range',
+    optimalRange: { min: 250, optimal: 310, max: 370 },
+    referenceRange: { min: 250, max: 450 },
+    absoluteBounds: { min: 50, max: 800 },
+    healthDomains: ['energy'],
+    relatedMetrics: ['rhr'],
+    format: fmtUgDL,
+  },
+  transferrin_saturation: {
+    key: 'transferrin_saturation',
+    displayName: 'Transferrin Saturation',
+    shortName: 'TSAT',
+    aliases: ['Iron Saturation', 'TSAT', 'Transferrin Sat', 'Iron Sat %'],
+    category: 'minerals',
+    unit: '%',
+    polarity: 'optimal_range',
+    optimalRange: { min: 25, optimal: 35, max: 45 },
+    referenceRange: { min: 15, max: 55 },
+    absoluteBounds: { min: 0, max: 100 },
+    criticalHigh: 70,
+    criticalLow: 10,
+    healthDomains: ['energy', 'recovery'],
+    relatedMetrics: ['rhr', 'vo2_max'],
+    format: fmtPercent,
+  },
+  rbc_magnesium: {
+    key: 'rbc_magnesium',
+    displayName: 'RBC Magnesium',
+    shortName: 'RBC Mg',
+    aliases: ['Magnesium RBC', 'Red Blood Cell Magnesium', 'Intracellular Magnesium'],
+    category: 'minerals',
+    unit: 'mg/dL',
+    polarity: 'optimal_range',
+    optimalRange: { min: 5.0, optimal: 5.8, max: 6.5 },
+    referenceRange: { min: 4.0, max: 6.8 },
+    absoluteBounds: { min: 1, max: 15 },
+    healthDomains: ['sleep', 'recovery', 'cardiovascular'],
+    relatedMetrics: ['deep_sleep', 'hrv'],
+    wearableCorrelations: [
+      { metric: 'deep_sleep', relationship: 'direct', mechanism: 'Magnesium facilitates GABA receptor function, directly supporting slow-wave sleep architecture' },
+      { metric: 'hrv', relationship: 'direct', mechanism: 'Magnesium supports parasympathetic tone and cardiac electrical stability' },
+    ],
+    format: (v) => `${v.toFixed(1)} mg/dL`,
+  },
+  omega_3_index: {
+    key: 'omega_3_index',
+    displayName: 'Omega-3 Index',
+    shortName: 'Ω-3',
+    aliases: ['Omega 3 Index', 'O3 Index', 'EPA + DHA Index'],
+    category: 'vitamins',
+    unit: '%',
+    polarity: 'higher_better',
+    optimalRange: { min: 8, optimal: 10, max: 12 },
+    referenceRange: { min: 2, max: 15 },
+    absoluteBounds: { min: 0, max: 20 },
+    healthDomains: ['cardiovascular', 'cognitive', 'immune'],
+    relatedMetrics: ['hrv', 'rhr'],
+    wearableCorrelations: [
+      { metric: 'hrv', relationship: 'direct', mechanism: 'Omega-3 fatty acids improve cell membrane fluidity and vagal tone, supporting HRV' },
+    ],
+    format: fmtPercent,
+  },
+  zinc: {
+    key: 'zinc',
+    displayName: 'Zinc',
+    shortName: 'Zn',
+    aliases: ['Serum Zinc', 'Zn', 'Plasma Zinc'],
+    category: 'minerals',
+    unit: 'ug/dL',
+    polarity: 'optimal_range',
+    optimalRange: { min: 80, optimal: 100, max: 120 },
+    referenceRange: { min: 56, max: 134 },
+    absoluteBounds: { min: 0, max: 300 },
+    healthDomains: ['immune', 'hormonal', 'recovery'],
+    relatedMetrics: ['recovery_score'],
+    format: fmtUgDL,
+  },
+
+  // ── Inflammation & Autoimmunity (additions) ───────────────────────────────
+  esr: {
+    key: 'esr',
+    displayName: 'ESR',
+    shortName: 'ESR',
+    aliases: ['Erythrocyte Sedimentation Rate', 'Sed Rate', 'Westergren ESR'],
+    category: 'inflammation',
+    unit: 'mm/hr',
+    polarity: 'lower_better',
+    optimalRange: { min: 0, optimal: 5, max: 10 },
+    referenceRange: { min: 0, max: 20 },
+    absoluteBounds: { min: 0, max: 200 },
+    criticalHigh: 100,
+    healthDomains: ['immune', 'recovery'],
+    relatedMetrics: ['hrv'],
+    format: fmtMmHr,
+  },
+  ana_screen: {
+    key: 'ana_screen',
+    displayName: 'ANA Screen',
+    shortName: 'ANA',
+    aliases: ['ANA', 'Antinuclear Antibodies', 'Antinuclear Antibody Screen', 'ANA Screen IFA'],
+    category: 'autoimmunity',
+    unit: 'pos/neg',
+    polarity: 'categorical',
+    referenceRange: { min: 0, max: 1 },
+    absoluteBounds: { min: 0, max: 1 },
+    healthDomains: ['immune'],
+    relatedMetrics: [],
+    format: (v) => v === 0 ? 'Negative' : 'Positive',
+  },
+  rheumatoid_factor: {
+    key: 'rheumatoid_factor',
+    displayName: 'Rheumatoid Factor',
+    shortName: 'RF',
+    aliases: ['RF', 'RA Factor', 'Rheumatoid Factor Quantitative'],
+    category: 'autoimmunity',
+    unit: 'IU/mL',
+    polarity: 'lower_better',
+    optimalRange: { min: 0, optimal: 0, max: 14 },
+    referenceRange: { min: 0, max: 14 },
+    absoluteBounds: { min: 0, max: 1000 },
+    criticalHigh: 100,
+    healthDomains: ['immune'],
+    relatedMetrics: [],
+    format: fmtIUML,
+  },
+
+  // ── Blood & CBC ───────────────────────────────────────────────────────────
+  wbc: {
+    key: 'wbc',
+    displayName: 'WBC',
+    shortName: 'WBC',
+    aliases: ['White Blood Cells', 'White Blood Cell Count', 'Leukocytes', 'WBC Count'],
+    category: 'blood_counts',
+    unit: '10^3/uL',
+    polarity: 'optimal_range',
+    optimalRange: { min: 4.0, optimal: 5.5, max: 7.0 },
+    referenceRange: { min: 3.4, max: 10.8 },
+    absoluteBounds: { min: 0, max: 100 },
+    criticalLow: 2.0,
+    criticalHigh: 30,
+    healthDomains: ['immune'],
+    relatedMetrics: [],
+    format: fmtThousandUL,
+  },
+  rbc: {
+    key: 'rbc',
+    displayName: 'RBC',
+    shortName: 'RBC',
+    aliases: ['Red Blood Cells', 'Red Blood Cell Count', 'Erythrocytes', 'RBC Count'],
+    category: 'blood_counts',
+    unit: '10^6/uL',
+    polarity: 'optimal_range',
+    optimalRange: { min: 4.5, optimal: 5.0, max: 5.5 },
+    referenceRange: { min: 4.14, max: 5.8 },
+    absoluteBounds: { min: 0, max: 10 },
+    criticalLow: 3.0,
+    sexSpecific: true,
+    healthDomains: ['energy', 'recovery'],
+    relatedMetrics: ['rhr', 'vo2_max'],
+    format: fmtMillionUL,
+  },
+  hemoglobin: {
+    key: 'hemoglobin',
+    displayName: 'Hemoglobin',
+    shortName: 'Hgb',
+    aliases: ['Hgb', 'Hb', 'Haemoglobin'],
+    category: 'blood_counts',
+    unit: 'g/dL',
+    polarity: 'optimal_range',
+    optimalRange: { min: 14.0, optimal: 15.5, max: 17.0 },
+    referenceRange: { min: 12.6, max: 17.7 },
+    absoluteBounds: { min: 3, max: 25 },
+    criticalLow: 7.0,
+    criticalHigh: 20,
+    sexSpecific: true,
+    healthDomains: ['energy', 'recovery', 'cardiovascular'],
+    relatedMetrics: ['rhr', 'vo2_max'],
+    wearableCorrelations: [
+      { metric: 'rhr', relationship: 'inverse', mechanism: 'Low hemoglobin forces compensatory heart rate increase to maintain oxygen delivery' },
+      { metric: 'vo2_max', relationship: 'direct', mechanism: 'Hemoglobin directly determines oxygen-carrying capacity, a primary limiter of VO2 max' },
+    ],
+    format: fmtGDL,
+  },
+  hematocrit: {
+    key: 'hematocrit',
+    displayName: 'Hematocrit',
+    shortName: 'Hct',
+    aliases: ['HCT', 'Packed Cell Volume', 'PCV'],
+    category: 'blood_counts',
+    unit: '%',
+    polarity: 'optimal_range',
+    optimalRange: { min: 40, optimal: 45, max: 50 },
+    referenceRange: { min: 37.5, max: 51.0 },
+    absoluteBounds: { min: 10, max: 70 },
+    criticalLow: 20,
+    criticalHigh: 60,
+    sexSpecific: true,
+    healthDomains: ['energy', 'recovery'],
+    relatedMetrics: ['rhr', 'vo2_max'],
+    format: fmtPercent,
+  },
+  mcv: {
+    key: 'mcv',
+    displayName: 'MCV',
+    shortName: 'MCV',
+    aliases: ['Mean Corpuscular Volume', 'Mean Cell Volume'],
+    category: 'blood_counts',
+    unit: 'fL',
+    polarity: 'optimal_range',
+    optimalRange: { min: 82, optimal: 90, max: 98 },
+    referenceRange: { min: 79, max: 97 },
+    absoluteBounds: { min: 40, max: 150 },
+    healthDomains: ['energy'],
+    relatedMetrics: [],
+    format: fmtFL,
+  },
+  platelets: {
+    key: 'platelets',
+    displayName: 'Platelets',
+    shortName: 'PLT',
+    aliases: ['Platelet Count', 'PLT', 'Thrombocytes'],
+    category: 'blood_counts',
+    unit: '10^3/uL',
+    polarity: 'optimal_range',
+    optimalRange: { min: 150, optimal: 250, max: 300 },
+    referenceRange: { min: 150, max: 379 },
+    absoluteBounds: { min: 10, max: 1000 },
+    criticalLow: 50,
+    criticalHigh: 600,
+    healthDomains: ['immune'],
+    relatedMetrics: [],
+    format: fmtThousandUL,
+  },
+
+  // ── Environmental Toxins ──────────────────────────────────────────────────
+  lead_blood: {
+    key: 'lead_blood',
+    displayName: 'Lead (Blood)',
+    shortName: 'Pb',
+    aliases: ['Lead', 'Blood Lead', 'Blood Lead Level', 'Pb'],
+    category: 'toxins',
+    unit: 'ug/dL',
+    polarity: 'lower_better',
+    optimalRange: { min: 0, optimal: 0, max: 1.0 },
+    referenceRange: { min: 0, max: 5.0 },
+    absoluteBounds: { min: 0, max: 100 },
+    criticalHigh: 10,
+    healthDomains: ['cognitive', 'cardiovascular'],
+    relatedMetrics: [],
+    format: (v) => `${v.toFixed(1)} µg/dL`,
+  },
+  mercury_blood: {
+    key: 'mercury_blood',
+    displayName: 'Mercury (Blood)',
+    shortName: 'Hg',
+    aliases: ['Mercury', 'Blood Mercury', 'Hg'],
+    category: 'toxins',
+    unit: 'ug/L',
+    polarity: 'lower_better',
+    optimalRange: { min: 0, optimal: 0, max: 5.0 },
+    referenceRange: { min: 0, max: 10 },
+    absoluteBounds: { min: 0, max: 200 },
+    criticalHigh: 20,
+    healthDomains: ['cognitive', 'immune'],
+    relatedMetrics: [],
+    format: fmtUgL,
   },
 }
 
@@ -584,9 +1370,13 @@ export function computeFlag(key: string, value: number): BiomarkerFlag {
   const def = BIOMARKER_REGISTRY[key]
   if (!def) return 'normal'
 
-  const { referenceRange, optimalRange } = def
+  const { referenceRange, optimalRange, criticalLow, criticalHigh } = def
 
-  // Check reference range bounds first
+  // Check critical ranges first
+  if (criticalLow !== undefined && value < criticalLow) return 'critical_low'
+  if (criticalHigh !== undefined && value > criticalHigh) return 'critical_high'
+
+  // Check reference range bounds
   if (value < referenceRange.min) return 'low'
   if (value > referenceRange.max) return 'high'
 
