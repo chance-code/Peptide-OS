@@ -37,26 +37,26 @@ interface DoseResponseCurve {
 const KNOWN_DOSE_RESPONSE: Record<string, DoseResponseCurve[]> = {
   // Supplements (matched to Peptide.name lowercase)
   'vitamin d': [
-    { biomarkerKey: 'vitamin_d', expectedDirection: 'increase', typicalEffectPercent: { min: 30, max: 80 }, minDaysForEffect: 60, minAdherencePercent: 70, basis: 'Vitamin D3 5000 IU/day typically raises 25-OH-D by 10-20 ng/mL over 90 days' },
+    { biomarkerKey: 'vitamin_d', expectedDirection: 'increase', typicalEffectPercent: { min: 30, max: 80 }, minDaysForEffect: 60, minAdherencePercent: 70, basis: 'Vitamin D3 supplementation typically raises 25-OH-D over 90 days — your provider can help determine appropriate dosing' },
   ],
   'vitamin d3': [
-    { biomarkerKey: 'vitamin_d', expectedDirection: 'increase', typicalEffectPercent: { min: 30, max: 80 }, minDaysForEffect: 60, minAdherencePercent: 70, basis: 'Vitamin D3 5000 IU/day typically raises 25-OH-D by 10-20 ng/mL over 90 days' },
+    { biomarkerKey: 'vitamin_d', expectedDirection: 'increase', typicalEffectPercent: { min: 30, max: 80 }, minDaysForEffect: 60, minAdherencePercent: 70, basis: 'Vitamin D3 supplementation typically raises 25-OH-D over 90 days — your provider can help determine appropriate dosing' },
   ],
   'fish oil': [
-    { biomarkerKey: 'triglycerides', expectedDirection: 'decrease', typicalEffectPercent: { min: 10, max: 30 }, minDaysForEffect: 60, minAdherencePercent: 80, basis: 'EPA/DHA 2-4g/day reduces triglycerides 15-30% over 8-12 weeks' },
-    { biomarkerKey: 'hs_crp', expectedDirection: 'decrease', typicalEffectPercent: { min: 10, max: 25 }, minDaysForEffect: 90, minAdherencePercent: 80, basis: 'High-dose omega-3 reduces hs-CRP by 10-25% over 3 months' },
+    { biomarkerKey: 'triglycerides', expectedDirection: 'decrease', typicalEffectPercent: { min: 10, max: 30 }, minDaysForEffect: 60, minAdherencePercent: 80, basis: 'EPA/DHA supplementation may reduce triglycerides 15-30% over 8-12 weeks — your provider can help determine appropriate dosing' },
+    { biomarkerKey: 'hs_crp', expectedDirection: 'decrease', typicalEffectPercent: { min: 10, max: 25 }, minDaysForEffect: 90, minAdherencePercent: 80, basis: 'Omega-3 supplementation may reduce hs-CRP over 3 months' },
     { biomarkerKey: 'omega_3_index', expectedDirection: 'increase', typicalEffectPercent: { min: 20, max: 60 }, minDaysForEffect: 90, minAdherencePercent: 80, basis: 'EPA/DHA supplementation increases omega-3 index over 3 months' },
   ],
   'omega-3': [
-    { biomarkerKey: 'triglycerides', expectedDirection: 'decrease', typicalEffectPercent: { min: 10, max: 30 }, minDaysForEffect: 60, minAdherencePercent: 80, basis: 'EPA/DHA 2-4g/day reduces triglycerides 15-30% over 8-12 weeks' },
-    { biomarkerKey: 'hs_crp', expectedDirection: 'decrease', typicalEffectPercent: { min: 10, max: 25 }, minDaysForEffect: 90, minAdherencePercent: 80, basis: 'High-dose omega-3 reduces hs-CRP by 10-25% over 3 months' },
+    { biomarkerKey: 'triglycerides', expectedDirection: 'decrease', typicalEffectPercent: { min: 10, max: 30 }, minDaysForEffect: 60, minAdherencePercent: 80, basis: 'EPA/DHA supplementation may reduce triglycerides 15-30% over 8-12 weeks — your provider can help determine appropriate dosing' },
+    { biomarkerKey: 'hs_crp', expectedDirection: 'decrease', typicalEffectPercent: { min: 10, max: 25 }, minDaysForEffect: 90, minAdherencePercent: 80, basis: 'Omega-3 supplementation may reduce hs-CRP over 3 months' },
   ],
   'magnesium': [
-    { biomarkerKey: 'magnesium', expectedDirection: 'increase', typicalEffectPercent: { min: 5, max: 15 }, minDaysForEffect: 60, minAdherencePercent: 70, basis: 'Magnesium glycinate 400mg/day improves serum Mg over 60 days' },
+    { biomarkerKey: 'magnesium', expectedDirection: 'increase', typicalEffectPercent: { min: 5, max: 15 }, minDaysForEffect: 60, minAdherencePercent: 70, basis: 'Magnesium supplementation may improve serum Mg over 60 days — your provider can help determine appropriate dosing' },
     { biomarkerKey: 'rbc_magnesium', expectedDirection: 'increase', typicalEffectPercent: { min: 5, max: 15 }, minDaysForEffect: 90, minAdherencePercent: 70, basis: 'RBC magnesium responds more slowly than serum — 90+ days' },
   ],
   'berberine': [
-    { biomarkerKey: 'hba1c', expectedDirection: 'decrease', typicalEffectPercent: { min: 5, max: 15 }, minDaysForEffect: 90, minAdherencePercent: 80, basis: 'Berberine 500mg 2x/day reduces HbA1c 0.5-1.0% over 3 months' },
+    { biomarkerKey: 'hba1c', expectedDirection: 'decrease', typicalEffectPercent: { min: 5, max: 15 }, minDaysForEffect: 90, minAdherencePercent: 80, basis: 'Berberine supplementation may reduce HbA1c over 3 months — your provider can help determine appropriate dosing' },
     { biomarkerKey: 'fasting_glucose', expectedDirection: 'decrease', typicalEffectPercent: { min: 5, max: 20 }, minDaysForEffect: 60, minAdherencePercent: 80, basis: 'Berberine improves fasting glucose via AMPK activation' },
     { biomarkerKey: 'ldl_cholesterol', expectedDirection: 'decrease', typicalEffectPercent: { min: 10, max: 25 }, minDaysForEffect: 90, minAdherencePercent: 80, basis: 'Berberine reduces LDL via upregulation of LDL receptors' },
   ],

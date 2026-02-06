@@ -1,15 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { verifyUserAccess } from '@/lib/api-auth'
-
-interface Marker {
-  name: string
-  value: number
-  unit: string
-  rangeLow?: number
-  rangeHigh?: number
-  flag: string
-}
+import { BIOMARKER_REGISTRY } from '@/lib/lab-biomarker-contract'
 
 interface TrendPoint {
   date: string
@@ -17,7 +9,7 @@ interface TrendPoint {
   flag: string
 }
 
-// GET /api/labs/trends - Get trends for specific markers over time
+// GET /api/labs/trends - Get trends for specific markers (reads from enriched LabUpload + LabBiomarker)
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
@@ -36,36 +28,38 @@ export async function GET(request: NextRequest) {
 
     const requestedMarkers = markersParam.split(',').map((m) => m.trim())
 
-    // Fetch all lab results for the user, ordered by test date ascending for charting
-    const results = await prisma.labResult.findMany({
+    // Fetch all uploads with biomarkers for this user
+    const uploads = await prisma.labUpload.findMany({
       where: { userId },
       orderBy: { testDate: 'asc' },
-      select: {
-        testDate: true,
-        markers: true,
+      include: {
+        biomarkers: true,
       },
     })
 
-    // Build trends: { "Total Testosterone": [{ date, value, flag }, ...] }
+    // Build trends keyed by display name (matching legacy format)
     const trends: Record<string, TrendPoint[]> = {}
     for (const name of requestedMarkers) {
       trends[name] = []
     }
 
-    for (const result of results) {
-      let parsed: Marker[]
-      try {
-        parsed = JSON.parse(result.markers)
-      } catch {
-        continue
-      }
+    // Build a lookup: display name -> biomarkerKey (and reverse)
+    const displayNameToKey = new Map<string, string>()
+    for (const [key, def] of Object.entries(BIOMARKER_REGISTRY)) {
+      displayNameToKey.set(def.displayName.toLowerCase(), key)
+    }
 
-      for (const marker of parsed) {
-        if (requestedMarkers.includes(marker.name)) {
-          trends[marker.name].push({
-            date: result.testDate.toISOString(),
-            value: marker.value,
-            flag: marker.flag,
+    for (const upload of uploads) {
+      for (const bm of upload.biomarkers) {
+        const def = BIOMARKER_REGISTRY[bm.biomarkerKey]
+        const displayName = def?.displayName || bm.rawName || bm.biomarkerKey
+
+        // Match by display name (iOS sends display names)
+        if (requestedMarkers.includes(displayName)) {
+          trends[displayName].push({
+            date: upload.testDate.toISOString(),
+            value: bm.value,
+            flag: bm.flag,
           })
         }
       }

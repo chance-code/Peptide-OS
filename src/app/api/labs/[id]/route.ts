@@ -1,31 +1,62 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getAuthenticatedUserId } from '@/lib/api-auth'
+import { BIOMARKER_REGISTRY, normalizeBiomarkerName } from '@/lib/lab-biomarker-contract'
 
-interface Marker {
+interface LegacyMarker {
   name: string
   value: number
   unit: string
-  rangeLow?: number
-  rangeHigh?: number
+  rangeLow?: number | null
+  rangeHigh?: number | null
   flag: string
 }
 
-function computeFlag(value: number, rangeLow?: number, rangeHigh?: number): 'normal' | 'high' | 'low' {
-  if (rangeHigh !== undefined && value > rangeHigh) return 'high'
-  if (rangeLow !== undefined && value < rangeLow) return 'low'
+function computeFlag(value: number, rangeLow?: number | null, rangeHigh?: number | null): 'normal' | 'high' | 'low' {
+  if (rangeHigh != null && value > rangeHigh) return 'high'
+  if (rangeLow != null && value < rangeLow) return 'low'
   return 'normal'
 }
 
-function parseMarkers(markersJson: string): Marker[] {
-  try {
-    return JSON.parse(markersJson)
-  } catch {
-    return []
+function uploadToLegacy(upload: {
+  id: string
+  userId: string
+  testDate: Date
+  labName: string | null
+  notes: string | null
+  createdAt: Date
+  biomarkers: Array<{
+    biomarkerKey: string
+    rawName: string | null
+    value: number
+    unit: string
+    rangeLow: number | null
+    rangeHigh: number | null
+    flag: string
+  }>
+}) {
+  return {
+    id: upload.id,
+    userId: upload.userId,
+    testDate: upload.testDate.toISOString(),
+    labName: upload.labName,
+    notes: upload.notes,
+    markers: upload.biomarkers.map((bm): LegacyMarker => {
+      const def = BIOMARKER_REGISTRY[bm.biomarkerKey]
+      return {
+        name: def?.displayName || bm.rawName || bm.biomarkerKey,
+        value: bm.value,
+        unit: bm.unit,
+        rangeLow: bm.rangeLow,
+        rangeHigh: bm.rangeHigh,
+        flag: bm.flag,
+      }
+    }),
+    createdAt: upload.createdAt.toISOString(),
   }
 }
 
-// GET /api/labs/[id] - Get a single lab result
+// GET /api/labs/[id] - Get a single lab result (reads from enriched LabUpload)
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -35,24 +66,27 @@ export async function GET(
     if (!auth.success) return auth.response
 
     const { id } = await params
-    const result = await prisma.labResult.findUnique({ where: { id } })
+    const upload = await prisma.labUpload.findUnique({
+      where: { id },
+      include: { biomarkers: true },
+    })
 
-    if (!result) {
+    if (!upload) {
       return NextResponse.json({ error: 'Lab result not found' }, { status: 404 })
     }
 
-    if (result.userId !== auth.userId) {
+    if (upload.userId !== auth.userId) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    return NextResponse.json({ ...result, markers: parseMarkers(result.markers) })
+    return NextResponse.json(uploadToLegacy(upload))
   } catch (error) {
     console.error('Error fetching lab result:', error)
     return NextResponse.json({ error: 'Failed to fetch lab result' }, { status: 500 })
   }
 }
 
-// PUT /api/labs/[id] - Update a lab result
+// PUT /api/labs/[id] - Update a lab result (updates enriched LabUpload + LabBiomarker)
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -65,7 +99,10 @@ export async function PUT(
     const body = await request.json()
     const { testDate, labName, markers, notes } = body
 
-    const existing = await prisma.labResult.findUnique({ where: { id } })
+    const existing = await prisma.labUpload.findUnique({
+      where: { id },
+      include: { biomarkers: true },
+    })
     if (!existing) {
       return NextResponse.json({ error: 'Lab result not found' }, { status: 404 })
     }
@@ -74,43 +111,60 @@ export async function PUT(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    // Build update data — only include provided fields
+    // Build update data
     const data: Record<string, unknown> = {}
+    if (testDate !== undefined) data.testDate = new Date(testDate)
+    if (labName !== undefined) data.labName = labName || null
+    if (notes !== undefined) data.notes = notes || null
 
-    if (testDate !== undefined) {
-      data.testDate = new Date(testDate)
-    }
-    if (labName !== undefined) {
-      data.labName = labName || null
-    }
-    if (notes !== undefined) {
-      data.notes = notes || null
-    }
+    // If markers are updated, replace all biomarkers
     if (markers !== undefined && Array.isArray(markers)) {
-      const processedMarkers = markers.map((m: Marker) => ({
-        name: m.name,
-        value: m.value,
-        unit: m.unit,
-        rangeLow: m.rangeLow,
-        rangeHigh: m.rangeHigh,
-        flag: computeFlag(m.value, m.rangeLow, m.rangeHigh),
-      }))
-      data.markers = JSON.stringify(processedMarkers)
+      // Delete existing biomarkers
+      await prisma.labBiomarker.deleteMany({ where: { uploadId: id } })
+
+      // Create new ones
+      const biomarkerData = markers.map((m: { name: string; value: number; unit: string; rangeLow?: number; rangeHigh?: number }) => {
+        const biomarkerKey = normalizeBiomarkerName(m.name) || m.name.toLowerCase().replace(/[^a-z0-9]+/g, '_')
+        const def = BIOMARKER_REGISTRY[biomarkerKey]
+        return {
+          uploadId: id,
+          biomarkerKey,
+          rawName: m.name,
+          value: m.value,
+          unit: m.unit || def?.unit || '',
+          rangeLow: m.rangeLow ?? null,
+          rangeHigh: m.rangeHigh ?? null,
+          flag: computeFlag(m.value, m.rangeLow, m.rangeHigh),
+          confidence: 1.0,
+          category: def?.category || null,
+        }
+      })
+
+      // Deduplicate
+      const seen = new Set<string>()
+      const unique = biomarkerData.filter((bm: { biomarkerKey: string }) => {
+        if (seen.has(bm.biomarkerKey)) return false
+        seen.add(bm.biomarkerKey)
+        return true
+      })
+
+      await prisma.labBiomarker.createMany({ data: unique })
     }
 
-    const updated = await prisma.labResult.update({
+    const updated = await prisma.labUpload.update({
       where: { id },
       data,
+      include: { biomarkers: true },
     })
 
-    return NextResponse.json({ ...updated, markers: parseMarkers(updated.markers) })
+    return NextResponse.json(uploadToLegacy(updated))
   } catch (error) {
     console.error('Error updating lab result:', error)
     return NextResponse.json({ error: 'Failed to update lab result' }, { status: 500 })
   }
 }
 
-// DELETE /api/labs/[id] - Delete a lab result
+// DELETE /api/labs/[id] - Delete a lab result (deletes enriched LabUpload, cascades to LabBiomarker + LabEventReview)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -121,30 +175,21 @@ export async function DELETE(
 
     const { id } = await params
 
-    const result = await prisma.labResult.findUnique({
+    const upload = await prisma.labUpload.findUnique({
       where: { id },
-      select: { userId: true, testDate: true },
+      select: { userId: true },
     })
 
-    if (!result) {
+    if (!upload) {
       return NextResponse.json({ error: 'Lab result not found' }, { status: 404 })
     }
 
-    if (result.userId !== auth.userId) {
+    if (upload.userId !== auth.userId) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    // Delete the LabResult
-    await prisma.labResult.delete({ where: { id } })
-
-    // Also delete any matching LabUpload records (created during PDF import)
-    try {
-      await prisma.labUpload.deleteMany({
-        where: { userId: auth.userId, testDate: result.testDate },
-      })
-    } catch {
-      // LabUpload table may not exist — ignore
-    }
+    // Delete LabUpload — LabBiomarker cascades, LabEventReview cascades
+    await prisma.labUpload.delete({ where: { id } })
 
     return NextResponse.json({ success: true })
   } catch (error) {

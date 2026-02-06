@@ -130,21 +130,21 @@ async function bridgeHRVMetabolic(
   userId: string,
   map: BiomarkerMap
 ): Promise<BridgeInsight | null> {
-  // Trigger: Elevated fasting insulin + HOMA-IR >1.5 + HRV in bottom range
+  // Trigger: Elevated fasting insulin + HOMA-IR >2.5 + HRV actually low
   const insulin = map['fasting_insulin']
   const glucose = map['fasting_glucose']
-  if (!insulin || !glucose || insulin.value <= 5) return null
+  if (!insulin || !glucose || insulin.value <= 10) return null
 
   const homaIR = (glucose.value * insulin.value) / 405
-  if (homaIR < 1.0) return null
+  if (homaIR < 2.5) return null
 
   const hrvData = await getRecentMetric(userId, 'hrv')
-  if (!hrvData) return null
+  if (!hrvData || hrvData.avg > 40) return null // Only flag if HRV is actually below average
 
   return {
     bridgeKey: 'hrv_metabolic_ceiling',
-    title: 'Your HRV ceiling is being set by your metabolic health',
-    narrative: `Your fasting insulin of ${insulin.value.toFixed(1)} µIU/mL and calculated HOMA-IR of ${homaIR.toFixed(2)} indicate insulin resistance. Your HRV has been averaging ${hrvData.avg} ms over the past 30 days${hrvData.trend === 'declining' ? ' and trending down' : ''}. Insulin resistance impairs autonomic flexibility — even with perfect sleep and training, HRV has a biochemical ceiling until metabolic markers improve.`,
+    title: 'Metabolic markers may be influencing your HRV',
+    narrative: `Your fasting insulin of ${insulin.value.toFixed(1)} µIU/mL and calculated HOMA-IR of ${homaIR.toFixed(2)} are elevated. Your HRV has been averaging ${hrvData.avg} ms over the past 30 days${hrvData.trend === 'declining' ? ' and trending down' : ''}. Research suggests that insulin resistance can influence autonomic nervous system function, which may be a factor in your HRV levels.`,
     labFindings: [
       { biomarkerKey: 'fasting_insulin', displayName: 'Fasting Insulin', ...insulin },
       { biomarkerKey: 'fasting_glucose', displayName: 'Fasting Glucose', ...glucose },
@@ -156,9 +156,9 @@ async function bridgeHRVMetabolic(
       unit: hrvData.unit,
       trend: hrvData.trend,
     }],
-    connection: 'Hyperinsulinemia drives sympathetic nervous system dominance, suppressing the parasympathetic tone that produces high HRV. Improving insulin sensitivity has been shown to increase HRV within 8-12 weeks.',
-    actionability: 'Focus on improving insulin sensitivity through time-restricted eating, resistance training, and sleep optimization. Retest insulin and HOMA-IR in 3 months and compare with HRV trends.',
-    confidence: homaIR > 2.0 ? 'high' : 'medium',
+    connection: 'Elevated insulin levels are associated with increased sympathetic nervous system activity, which can suppress the parasympathetic tone reflected in HRV. Improving insulin sensitivity may support HRV improvement.',
+    actionability: 'Discuss metabolic health with your provider. Regular exercise, balanced nutrition, and consistent sleep all support both insulin sensitivity and HRV.',
+    confidence: homaIR > 3.5 ? 'high' : 'medium',
     priority: 'high',
   }
 }
@@ -168,18 +168,18 @@ async function bridgeRecoveryInflammation(
   map: BiomarkerMap
 ): Promise<BridgeInsight | null> {
   const crp = map['hs_crp']
-  if (!crp || crp.value <= 1.0) return null
+  if (!crp || crp.value <= 3.0) return null // Only flag above reference range
 
   const recovery = await getRecentMetric(userId, 'recovery_score')
     ?? await getRecentMetric(userId, 'readiness_score')
-  if (!recovery) return null
+  if (!recovery || recovery.avg > 70) return null // Only flag if recovery is actually low
 
   const metricType = recovery.unit === 'score' ? 'recovery_score' : 'readiness_score'
 
   return {
     bridgeKey: 'recovery_inflammation',
-    title: 'Your recovery scores tell the same story as your inflammation markers',
-    narrative: `Your hs-CRP of ${crp.value.toFixed(2)} mg/L indicates systemic inflammation. Your ${METRIC_DISPLAY_NAMES[metricType] ?? metricType} has been averaging ${recovery.avg}${recovery.trend === 'declining' ? ' and trending down' : ''} over the past 30 days. The wearable is detecting what your blood confirms.`,
+    title: 'Elevated inflammation may be affecting your recovery',
+    narrative: `Your hs-CRP of ${crp.value.toFixed(2)} mg/L is above the reference range (0–3.0). Your ${METRIC_DISPLAY_NAMES[metricType] ?? metricType} has been averaging ${recovery.avg}${recovery.trend === 'declining' ? ' and trending down' : ''} over the past 30 days. Elevated inflammation can impact recovery capacity.`,
     labFindings: [
       { biomarkerKey: 'hs_crp', displayName: 'hs-CRP', ...crp },
     ],
@@ -190,9 +190,9 @@ async function bridgeRecoveryInflammation(
       unit: recovery.unit,
       trend: recovery.trend,
     }],
-    connection: 'Systemic inflammation (measured by hs-CRP) directly impairs parasympathetic recovery. Inflammatory cytokines activate the sympathetic nervous system, reduce HRV, and suppress the physiological recovery processes that wearables measure.',
-    actionability: 'Address the root causes of inflammation: optimize sleep, reduce processed food intake, consider omega-3 supplementation (2-4g EPA/DHA daily), and investigate gut health.',
-    confidence: crp.value > 3.0 ? 'high' : 'medium',
+    connection: 'Systemic inflammation (measured by hs-CRP) can impair autonomic recovery. Inflammatory cytokines influence the sympathetic nervous system and may suppress the recovery processes wearables measure.',
+    actionability: 'Discuss the hs-CRP elevation with your provider to identify the underlying cause. Sleep, nutrition, and regular exercise all support healthy inflammatory balance.',
+    confidence: crp.value > 5.0 ? 'high' : 'medium',
     priority: 'high',
   }
 }
@@ -203,10 +203,10 @@ async function bridgeSleepThyroid(
 ): Promise<BridgeInsight | null> {
   const tsh = map['tsh']
   const freeT3 = map['free_t3']
-  if (!tsh || tsh.value <= 2.0) return null
+  if (!tsh || tsh.value <= 4.0) return null // Only flag if TSH above reference range
 
   const deepSleep = await getRecentMetric(userId, 'deep_sleep')
-  if (!deepSleep) return null
+  if (!deepSleep || deepSleep.avg > 60) return null // Only flag if deep sleep is actually low
 
   const findings = [
     { biomarkerKey: 'tsh', displayName: 'TSH', ...tsh },
@@ -215,8 +215,8 @@ async function bridgeSleepThyroid(
 
   return {
     bridgeKey: 'sleep_thyroid',
-    title: 'Your sleep architecture may improve once thyroid is optimized',
-    narrative: `Your TSH of ${tsh.value.toFixed(2)} mIU/L${freeT3 ? ` and Free T3 of ${freeT3.value.toFixed(1)} pg/mL` : ''} suggest suboptimal thyroid function. Your deep sleep has been averaging ${deepSleep.avg} minutes over the past 30 days${deepSleep.trend === 'declining' ? ' and trending down' : ''}. T3 directly influences sleep architecture, particularly slow-wave (deep) sleep.`,
+    title: 'Thyroid function may be influencing your sleep quality',
+    narrative: `Your TSH of ${tsh.value.toFixed(2)} mIU/L is above the reference range${freeT3 ? ` and Free T3 of ${freeT3.value.toFixed(1)} pg/mL is ${freeT3.value < 2.3 ? 'low' : 'in range'}` : ''}. Your deep sleep has been averaging ${deepSleep.avg} minutes over the past 30 days${deepSleep.trend === 'declining' ? ' and trending down' : ''}. Thyroid hormones influence sleep architecture, particularly deep sleep.`,
     labFindings: findings,
     wearableFindings: [{
       metricType: 'deep_sleep',
@@ -225,8 +225,8 @@ async function bridgeSleepThyroid(
       unit: deepSleep.unit,
       trend: deepSleep.trend,
     }],
-    connection: 'Thyroid hormone T3 modulates neurotransmitter systems involved in sleep architecture. Low T3 reduces slow-wave sleep generation and can cause lighter, more fragmented sleep. This is a commonly underdiagnosed cause of poor deep sleep.',
-    actionability: 'Discuss thyroid optimization with your provider. If T4-to-T3 conversion is poor, selenium and zinc supplementation may help. Track deep sleep trends after any thyroid intervention.',
+    connection: 'Thyroid hormones influence neurotransmitter systems involved in sleep architecture. Reduced thyroid function has been associated with changes in slow-wave sleep patterns.',
+    actionability: 'Discuss thyroid function with your provider. If treatment is initiated, tracking deep sleep trends over time can help assess response.',
     confidence: 'medium',
     priority: 'medium',
   }
@@ -238,8 +238,8 @@ async function bridgeBodyCompHormonal(
 ): Promise<BridgeInsight | null> {
   const freeT = map['free_testosterone']
   const cortisol = map['cortisol']
-  const testLow = freeT && freeT.value < 10
-  const cortisolHigh = cortisol && cortisol.value > 18
+  const testLow = freeT && freeT.value < 5.0 // Below reference range
+  const cortisolHigh = cortisol && cortisol.value > 19.4 // Above reference range
 
   if (!testLow && !cortisolHigh) return null
 
@@ -255,8 +255,8 @@ async function bridgeBodyCompHormonal(
 
   return {
     bridgeKey: 'body_comp_hormonal',
-    title: 'Your body composition goals have a hormonal headwind',
-    narrative: `${testLow ? `Your free testosterone of ${freeT!.value.toFixed(1)} pg/mL is below optimal. ` : ''}${cortisolHigh ? `Your cortisol of ${cortisol!.value.toFixed(1)} µg/dL is elevated. ` : ''}Your ${METRIC_DISPLAY_NAMES[metricType]} has been ${wearable.trend === 'stable' ? 'stable' : wearable.trend === 'improving' ? 'improving' : 'trending unfavorably'} despite your training efforts. The hormonal environment directly determines whether training stimulus converts to lean mass.`,
+    title: 'Hormonal markers may be influencing body composition',
+    narrative: `${testLow ? `Your free testosterone of ${freeT!.value.toFixed(1)} pg/mL is below the reference range. ` : ''}${cortisolHigh ? `Your cortisol of ${cortisol!.value.toFixed(1)} µg/dL is above the reference range. ` : ''}Your ${METRIC_DISPLAY_NAMES[metricType]} has been ${wearable.trend === 'stable' ? 'stable' : wearable.trend === 'improving' ? 'improving' : 'trending unfavorably'} over the past 30 days. Hormonal balance influences body composition outcomes.`,
     labFindings: findings,
     wearableFindings: [{
       metricType,
@@ -265,8 +265,8 @@ async function bridgeBodyCompHormonal(
       unit: wearable.unit,
       trend: wearable.trend,
     }],
-    connection: 'Testosterone drives muscle protein synthesis and inhibits fat storage. Cortisol does the opposite — it promotes muscle breakdown and fat accumulation (especially visceral). When both are suboptimal, body composition changes become very difficult regardless of training and nutrition.',
-    actionability: 'Address the hormonal foundation first: optimize sleep (testosterone is produced during deep sleep), manage stress (to lower cortisol), and consider a hormonal evaluation with your provider.',
+    connection: 'Testosterone supports muscle protein synthesis while cortisol promotes catabolism. When these markers are outside reference ranges, body composition changes may be more difficult. Hormonal evaluation can help identify the cause.',
+    actionability: 'Discuss these hormonal results with your provider. Sleep, stress management, and exercise all influence hormone levels.',
     confidence: testLow && cortisolHigh ? 'high' : 'medium',
     priority: 'high',
   }
@@ -278,20 +278,20 @@ async function bridgeVO2Cardiovascular(
 ): Promise<BridgeInsight | null> {
   const apoB = map['apolipoprotein_b']
   const lpa = map['lipoprotein_a']
-  const hasRisk = (apoB && apoB.value > 90) || (lpa && lpa.value > 75)
+  const hasRisk = (apoB && apoB.value > 130) || (lpa && lpa.value > 75)
   if (!hasRisk) return null
 
   const vo2 = await getRecentMetric(userId, 'vo2_max')
   if (!vo2) return null
 
   const findings: BridgeInsight['labFindings'] = []
-  if (apoB && apoB.value > 90) findings.push({ biomarkerKey: 'apolipoprotein_b', displayName: 'ApoB', ...apoB })
+  if (apoB && apoB.value > 130) findings.push({ biomarkerKey: 'apolipoprotein_b', displayName: 'ApoB', ...apoB })
   if (lpa && lpa.value > 75) findings.push({ biomarkerKey: 'lipoprotein_a', displayName: 'Lp(a)', ...lpa })
 
   return {
     bridgeKey: 'vo2_cardiovascular',
     title: 'Your VO2 Max trajectory has a cardiovascular context',
-    narrative: `${apoB && apoB.value > 90 ? `Your ApoB of ${Math.round(apoB.value)} mg/dL indicates elevated atherogenic burden. ` : ''}${lpa && lpa.value > 75 ? `Your Lp(a) of ${Math.round(lpa.value)} nmol/L is a genetic risk factor. ` : ''}Your VO2 Max has been averaging ${vo2.avg} mL/kg/min${vo2.trend === 'declining' ? ' and is trending down' : ''}. Advanced lipid markers indicate vascular burden that can limit peak cardiovascular output. This creates urgency — both for performance and longevity.`,
+    narrative: `${apoB && apoB.value > 130 ? `Your ApoB of ${Math.round(apoB.value)} mg/dL is above the reference range. ` : ''}${lpa && lpa.value > 75 ? `Your Lp(a) of ${Math.round(lpa.value)} nmol/L is above the risk threshold. ` : ''}Your VO2 Max has been averaging ${vo2.avg} mL/kg/min${vo2.trend === 'declining' ? ' and is trending down' : ''}. These advanced lipid markers provide context for your cardiovascular health.`,
     labFindings: findings,
     wearableFindings: [{
       metricType: 'vo2_max',
@@ -300,8 +300,8 @@ async function bridgeVO2Cardiovascular(
       unit: vo2.unit,
       trend: vo2.trend,
     }],
-    connection: 'Atherosclerotic plaque reduces arterial compliance and impairs coronary blood flow, directly limiting cardiac output during peak exercise. This effect compounds with Lp(a), which promotes both plaque growth and thrombosis.',
-    actionability: 'Aggressive management of modifiable lipid markers (ApoB, LDL) is recommended when Lp(a) is elevated. Discuss with a cardiologist or lipidologist. Continue aerobic training — exercise itself is cardioprotective even in the presence of adverse lipids.',
+    connection: 'Elevated atherogenic particles can affect arterial health over time. Lp(a) is genetically determined and is an independent risk factor. These markers are best interpreted by a cardiologist or lipidologist.',
+    actionability: 'Discuss these advanced lipid markers with a cardiologist or lipidologist for personalized guidance. Continue regular exercise — it remains cardioprotective regardless of lipid levels.',
     confidence: 'medium',
     priority: 'high',
   }
@@ -313,24 +313,24 @@ async function bridgeRHRIron(
 ): Promise<BridgeInsight | null> {
   const hemoglobin = map['hemoglobin']
   const ferritin = map['ferritin']
-  const ironLow = (hemoglobin && hemoglobin.value < 14) || (ferritin && ferritin.value < 50)
+  const ironLow = (hemoglobin && hemoglobin.value < 12.6) || (ferritin && ferritin.value < 30)
   if (!ironLow) return null
 
   const rhrData = await getRecentMetric(userId, 'rhr')
     ?? await getRecentMetric(userId, 'resting_heart_rate')
-  if (!rhrData) return null
+  if (!rhrData || rhrData.avg < 65) return null // Only flag if RHR is actually elevated
 
   // For RHR, a higher trend = declining health (invert)
   const rhrTrend = rhrData.trend === 'improving' ? 'declining' : rhrData.trend === 'declining' ? 'improving' : 'stable'
 
   const findings: BridgeInsight['labFindings'] = []
-  if (hemoglobin) findings.push({ biomarkerKey: 'hemoglobin', displayName: 'Hemoglobin', ...hemoglobin })
-  if (ferritin && ferritin.value < 50) findings.push({ biomarkerKey: 'ferritin', displayName: 'Ferritin', ...ferritin })
+  if (hemoglobin && hemoglobin.value < 12.6) findings.push({ biomarkerKey: 'hemoglobin', displayName: 'Hemoglobin', ...hemoglobin })
+  if (ferritin && ferritin.value < 30) findings.push({ biomarkerKey: 'ferritin', displayName: 'Ferritin', ...ferritin })
 
   return {
     bridgeKey: 'rhr_iron',
-    title: 'Your resting heart rate elevation correlates with your iron status',
-    narrative: `${hemoglobin ? `Your hemoglobin of ${hemoglobin.value.toFixed(1)} g/dL` : `Your ferritin of ${ferritin!.value.toFixed(0)} ng/mL`} suggests reduced iron availability. Your resting heart rate has been averaging ${rhrData.avg} bpm${rhrTrend === 'declining' ? ' and has been trending up' : ''} over the past 30 days. The heart compensates for reduced oxygen-carrying capacity by beating faster.`,
+    title: 'Iron status may be influencing your resting heart rate',
+    narrative: `${hemoglobin && hemoglobin.value < 12.6 ? `Your hemoglobin of ${hemoglobin.value.toFixed(1)} g/dL is below the reference range` : `Your ferritin of ${ferritin!.value.toFixed(0)} ng/mL is below the reference range`}. Your resting heart rate has been averaging ${rhrData.avg} bpm${rhrTrend === 'declining' ? ' and has been trending up' : ''} over the past 30 days. Low iron can lead to compensatory increases in heart rate.`,
     labFindings: findings,
     wearableFindings: [{
       metricType: 'rhr',
@@ -339,9 +339,9 @@ async function bridgeRHRIron(
       unit: rhrData.unit,
       trend: rhrTrend as 'declining' | 'stable' | 'improving',
     }],
-    connection: 'Iron is essential for hemoglobin production. When hemoglobin is low, each heartbeat carries less oxygen. The cardiovascular system compensates by increasing heart rate. Correcting iron/ferritin often normalizes resting heart rate within 6-8 weeks.',
-    actionability: 'Start iron supplementation (iron bisglycinate with vitamin C) and retest in 8 weeks. Monitor your resting heart rate trend — it should decrease as iron status improves.',
-    confidence: hemoglobin && hemoglobin.value < 13 ? 'high' : 'medium',
+    connection: 'Iron is essential for hemoglobin production. When hemoglobin is low, the cardiovascular system may compensate by increasing heart rate to maintain oxygen delivery.',
+    actionability: 'Discuss iron supplementation with your provider. Monitoring your resting heart rate trend can help assess response to treatment.',
+    confidence: hemoglobin && hemoglobin.value < 10 ? 'high' : 'medium',
     priority: rhrTrend === 'declining' ? 'high' : 'medium',
   }
 }
@@ -356,16 +356,16 @@ async function bridgeActivityNutrient(
 
   let depletionCount = 0
   const findings: BridgeInsight['labFindings'] = []
-  if (vitD && vitD.value < 40) {
+  if (vitD && vitD.value < 30) {
     depletionCount++
     findings.push({ biomarkerKey: 'vitamin_d', displayName: 'Vitamin D', ...vitD })
   }
-  if (mg && (mg.value < 2.0 || (map['rbc_magnesium'] && mg.value < 5.0))) {
+  if (mg && (mg.value < 1.6 || (map['rbc_magnesium'] && mg.value < 4.0))) {
     depletionCount++
     const key = map['rbc_magnesium'] ? 'rbc_magnesium' : 'magnesium'
     findings.push({ biomarkerKey: key, displayName: BIOMARKER_REGISTRY[key]?.displayName ?? key, ...mg })
   }
-  if (b12 && b12.value < 500) {
+  if (b12 && b12.value < 232) {
     depletionCount++
     findings.push({ biomarkerKey: 'vitamin_b12', displayName: 'Vitamin B12', ...b12 })
   }
@@ -377,8 +377,8 @@ async function bridgeActivityNutrient(
 
   return {
     bridgeKey: 'activity_nutrient',
-    title: 'Your activity tolerance may be limited by your nutrient foundation',
-    narrative: `${findings.map(f => `${f.displayName}: ${f.value} ${f.unit}`).join(', ')} — multiple key nutrients are below optimal. Your exercise minutes have been averaging ${exercise.avg} min/day over the past 30 days${exercise.trend === 'declining' ? ' and trending down' : ''}. These nutrients are cofactors for energy production, muscle contraction, and recovery. Depletion creates a performance ceiling that no amount of willpower overcomes.`,
+    title: 'Nutrient deficiencies may be affecting your energy and activity',
+    narrative: `${findings.map(f => `${f.displayName}: ${f.value} ${f.unit}`).join(', ')} — multiple nutrients are below their reference ranges. Your exercise minutes have been averaging ${exercise.avg} min/day over the past 30 days${exercise.trend === 'declining' ? ' and trending down' : ''}. These nutrients are important cofactors for energy production and recovery.`,
     labFindings: findings,
     wearableFindings: [{
       metricType: 'exercise_minutes',
@@ -387,8 +387,8 @@ async function bridgeActivityNutrient(
       unit: exercise.unit,
       trend: exercise.trend,
     }],
-    connection: 'Vitamin D is required for calcium handling in muscle contraction and immune modulation post-exercise. Magnesium is a cofactor for ATP production (the energy currency of every cell). B12 is essential for red blood cell formation and neurological function. Together, these create the biochemical foundation for exercise capacity.',
-    actionability: 'Start targeted supplementation: Vitamin D3 with K2 (5000 IU/day if <30 ng/mL), magnesium glycinate (400mg before bed), and B12 (methylcobalamin 1000mcg sublingual). Retest in 3 months.',
+    connection: 'Vitamin D, magnesium, and B12 are cofactors for energy production, muscle function, and red blood cell formation. Deficiencies are common and generally straightforward to address with supplementation.',
+    actionability: 'Discuss targeted supplementation with your provider based on which nutrients are deficient. Retest in 3 months to confirm improvement.',
     confidence: depletionCount >= 3 ? 'high' : 'medium',
     priority: exercise.trend === 'declining' ? 'high' : 'medium',
   }

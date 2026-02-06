@@ -9,6 +9,7 @@ import { METRIC_POLARITY } from './health-baselines'
 import { safePercentChange, safeDivide } from './health-constants'
 import { getMetricDef } from './health-metric-contract'
 import type { MetricType } from './health-constants'
+import { BIOMARKER_REGISTRY } from '@/lib/lab-biomarker-contract'
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -29,6 +30,7 @@ export interface WeeklyReview {
     recovery: CategoryBreakdown | null
     activity: CategoryBreakdown | null
     bodyComp: CategoryBreakdown | null
+    bloodwork: BloodworkBreakdown | null
   }
 
   protocols: ProtocolWeeklyStatus[]
@@ -67,6 +69,17 @@ export interface MetricHighlight {
   narrative: string
 }
 
+export interface BloodworkBreakdown {
+  testDate: string
+  daysSinceTest: number
+  totalMarkers: number
+  optimalCount: number
+  criticalCount: number
+  attentionCount: number
+  topConcerns: { biomarkerKey: string; displayName: string; value: number; unit: string; flag: string }[]
+  narrative: string
+}
+
 // ─── Constants ───────────────────────────────────────────────────────
 
 const CATEGORY_METRICS: Record<string, string[]> = {
@@ -95,11 +108,13 @@ export async function generateWeeklyReview(
   ])
 
   // Compute category breakdowns
+  const bloodwork = await getBloodworkBreakdown(userId, endDate)
   const categories = {
     sleep: computeCategoryBreakdown('Sleep', 'sleep', thisWeekMetrics, lastWeekMetrics),
     recovery: computeCategoryBreakdown('Recovery', 'recovery', thisWeekMetrics, lastWeekMetrics),
     activity: computeCategoryBreakdown('Activity', 'activity', thisWeekMetrics, lastWeekMetrics),
     bodyComp: computeCategoryBreakdown('Body Composition', 'bodyComp', thisWeekMetrics, lastWeekMetrics),
+    bloodwork,
   }
 
   // Collect all metric changes for wins/concerns
@@ -116,7 +131,7 @@ export async function generateWeeklyReview(
       narrative: `${c.displayName} ${c.direction === 'improving' ? 'improved' : 'up'} ${Math.abs(c.change).toFixed(1)}% vs last week`,
     }))
 
-  const needsAttention = allChanges
+  const wearableAttention = allChanges
     .filter(c => c.direction === 'declining')
     .sort((a, b) => Math.abs(b.change) - Math.abs(a.change))
     .slice(0, 3)
@@ -126,6 +141,18 @@ export async function generateWeeklyReview(
       change: c.change,
       narrative: `${c.displayName} ${c.direction === 'declining' ? 'declined' : 'down'} ${Math.abs(c.change).toFixed(1)}% — monitor this week`,
     }))
+
+  // Include critical/flagged lab markers in needsAttention
+  const labAttention: MetricHighlight[] = (bloodwork?.topConcerns ?? [])
+    .slice(0, 2)
+    .map(c => ({
+      metric: c.biomarkerKey,
+      displayName: c.displayName,
+      change: 0,
+      narrative: `${c.displayName} is ${c.flag.replace('_', ' ')} at ${c.value} ${c.unit} — discuss with your provider`,
+    }))
+
+  const needsAttention = [...labAttention, ...wearableAttention].slice(0, 5)
 
   // Protocol adherence
   const protocols = await computeProtocolAdherence(userId, weekStart, weekEnd, thisWeekMetrics)
@@ -146,7 +173,7 @@ export async function generateWeeklyReview(
   const subheadline = generateSubheadline(improving, declining, stable, protocols)
 
   // Recommendations
-  const recommendations = generateRecommendations(categories, needsAttention, protocols)
+  const recommendations = generateRecommendations(categories, needsAttention, protocols, bloodwork)
 
   return {
     week: {
@@ -442,17 +469,25 @@ function generateRecommendations(
   categories: WeeklyReview['categories'],
   concerns: MetricHighlight[],
   protocols: ProtocolWeeklyStatus[],
+  bloodwork: BloodworkBreakdown | null,
 ): string[] {
   const recs: string[] = []
 
+  // Lab staleness recommendation (highest priority)
+  if (bloodwork && bloodwork.daysSinceTest >= 180) {
+    recs.push('Lab results are over 6 months old. Updated bloodwork would improve the accuracy of your health insights.')
+  } else if (bloodwork && bloodwork.criticalCount > 0) {
+    recs.push(`${bloodwork.criticalCount} lab marker${bloodwork.criticalCount > 1 ? 's are' : ' is'} flagged as critical. Discuss with your healthcare provider.`)
+  }
+
   // Sleep recommendation
   if (categories.sleep?.direction === 'declining') {
-    recs.push('Sleep declined this week. Prioritize 8+ hours and consistent bedtime.')
+    recs.push('Sleep declined this week. Prioritizing sleep duration and a consistent bedtime may help.')
   }
 
   // Recovery recommendation
   if (categories.recovery?.direction === 'declining') {
-    recs.push('Recovery metrics dipped. Consider reducing training intensity for 2-3 days.')
+    recs.push('Recovery metrics dipped. Lighter training for 2-3 days may help your body recover.')
   }
 
   // Activity recommendation
@@ -472,5 +507,75 @@ function generateRecommendations(
     recs.push(`Watch ${concerns[0].displayName} closely — it's been trending down.`)
   }
 
+  // Lab retest recommendation (lower priority)
+  if (bloodwork && bloodwork.daysSinceTest >= 90 && bloodwork.daysSinceTest < 180 && recs.length < 4) {
+    recs.push('Lab results are getting stale. Consider scheduling follow-up bloodwork.')
+  }
+
   return recs.slice(0, 5)
+}
+
+// ─── Bloodwork Breakdown ────────────────────────────────────────────
+
+async function getBloodworkBreakdown(
+  userId: string,
+  now: Date,
+): Promise<BloodworkBreakdown | null> {
+  const latestUpload = await prisma.labUpload.findFirst({
+    where: { userId },
+    orderBy: { testDate: 'desc' },
+    include: { biomarkers: true },
+  })
+
+  if (!latestUpload) return null
+
+  const daysSinceTest = differenceInDays(now, latestUpload.testDate)
+  const biomarkers = latestUpload.biomarkers
+
+  let optimalCount = 0
+  let criticalCount = 0
+  let attentionCount = 0
+
+  for (const bm of biomarkers) {
+    if (bm.flag === 'optimal') optimalCount++
+    else if (bm.flag === 'critical_low' || bm.flag === 'critical_high') criticalCount++
+    else if (bm.flag === 'high' || bm.flag === 'low') attentionCount++
+  }
+
+  const flaggedMarkers = biomarkers
+    .filter(bm => !['optimal', 'normal'].includes(bm.flag))
+    .sort((a, b) => {
+      const priority = (f: string) => f.startsWith('critical') ? 0 : (f === 'high' || f === 'low') ? 1 : 2
+      return priority(a.flag) - priority(b.flag)
+    })
+
+  const topConcerns = flaggedMarkers.slice(0, 5).map(bm => {
+    const def = BIOMARKER_REGISTRY[bm.biomarkerKey]
+    return {
+      biomarkerKey: bm.biomarkerKey,
+      displayName: def?.displayName ?? bm.rawName ?? bm.biomarkerKey,
+      value: bm.value,
+      unit: bm.unit,
+      flag: bm.flag,
+    }
+  })
+
+  // Build narrative
+  let narrative = `Bloodwork: ${biomarkers.length} markers tested`
+  if (optimalCount > 0) narrative += `, ${optimalCount} optimal`
+  if (criticalCount > 0) narrative += `, ${criticalCount} critical`
+  if (attentionCount > 0) narrative += `, ${attentionCount} need attention`
+  narrative += '.'
+  if (daysSinceTest >= 90) narrative += ` Results are ${daysSinceTest} days old.`
+
+  return {
+    testDate: format(latestUpload.testDate, 'yyyy-MM-dd'),
+    daysSinceTest,
+    totalMarkers: biomarkers.length,
+    optimalCount,
+    criticalCount,
+    attentionCount,
+    topConcerns,
+    narrative,
+  }
 }

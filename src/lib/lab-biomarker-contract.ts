@@ -54,10 +54,41 @@ export interface BiomarkerDefinition {
   relatedMetrics?: string[]            // ['deep_sleep', 'hrv']
   wearableCorrelations?: WearableCorrelation[]
   sexSpecific?: boolean                // Different ranges for M/F
+  biologicalVariation?: {
+    withinSubjectCV: number            // Within-subject coefficient of variation (%)
+    betweenSubjectCV: number           // Between-subject coefficient of variation (%)
+    analyticalCV?: number              // Analytical imprecision (%)
+  }
   format: (value: number) => string
 }
 
 export type BiomarkerFlag = 'low' | 'normal' | 'optimal' | 'high' | 'critical_low' | 'critical_high'
+
+// ─── Zone Scoring Types ─────────────────────────────────────────────────────
+
+export type BiomarkerZone =
+  | 'critical_low'
+  | 'low'
+  | 'below_optimal'
+  | 'optimal_low'
+  | 'optimal_peak'
+  | 'optimal_high'
+  | 'above_optimal'
+  | 'high'
+  | 'critical_high'
+
+export type ClinicalSignificance = 'urgent' | 'significant' | 'notable' | 'routine'
+
+export interface ZoneResult {
+  zone: BiomarkerZone
+  score: number                        // 0-100 continuous score
+  confidence: number                   // 0-1, reduced for high-CV markers
+  transitionProximity: number          // 0-1, how close to nearest boundary
+  legacyFlag: BiomarkerFlag            // Maps back to 6-value flag
+  clinicalSignificance: ClinicalSignificance
+  biologicalVariationNote: string | null   // e.g. "Within normal biological variation — retest to confirm"
+  retestRecommendation: boolean
+}
 
 // ─── Formatters ─────────────────────────────────────────────────────────────
 
@@ -188,6 +219,7 @@ export const BIOMARKER_REGISTRY: Record<string, BiomarkerDefinition> = {
       { metric: 'deep_sleep', relationship: 'direct', mechanism: 'Testosterone supports restorative sleep architecture and growth hormone release during deep sleep' },
       { metric: 'lean_body_mass', relationship: 'direct', mechanism: 'Testosterone directly drives muscle protein synthesis and lean mass accretion' },
     ],
+    biologicalVariation: { withinSubjectCV: 9.3, betweenSubjectCV: 22.8, analyticalCV: 4.0 },
     format: fmtNgDL,
   },
   free_testosterone: {
@@ -248,6 +280,7 @@ export const BIOMARKER_REGISTRY: Record<string, BiomarkerDefinition> = {
     referenceRange: { min: 0.45, max: 4.5 },
     healthDomains: ['energy', 'body_composition', 'cognitive'],
     relatedMetrics: ['rhr', 'body_fat_percentage', 'weight'],
+    biologicalVariation: { withinSubjectCV: 19.3, betweenSubjectCV: 27.2, analyticalCV: 5.0 },
     format: fmtMIUML,
   },
   free_t3: {
@@ -261,6 +294,7 @@ export const BIOMARKER_REGISTRY: Record<string, BiomarkerDefinition> = {
     referenceRange: { min: 2.0, max: 4.4 },
     healthDomains: ['energy', 'body_composition', 'cognitive'],
     relatedMetrics: ['rhr', 'active_calories', 'body_fat_percentage'],
+    biologicalVariation: { withinSubjectCV: 7.9, betweenSubjectCV: 12.6, analyticalCV: 3.5 },
     format: fmtPgDL,
   },
   free_t4: {
@@ -274,6 +308,7 @@ export const BIOMARKER_REGISTRY: Record<string, BiomarkerDefinition> = {
     referenceRange: { min: 0.82, max: 1.77 },
     healthDomains: ['energy', 'body_composition', 'cognitive'],
     relatedMetrics: ['rhr', 'body_fat_percentage'],
+    biologicalVariation: { withinSubjectCV: 7.2, betweenSubjectCV: 12.0, analyticalCV: 4.0 },
     format: (v) => `${v.toFixed(2)} ng/dL`,
   },
 
@@ -322,6 +357,7 @@ export const BIOMARKER_REGISTRY: Record<string, BiomarkerDefinition> = {
     unitAliases: { 'mmol/L': 18.018 },
     healthDomains: ['energy', 'body_composition', 'cardiovascular'],
     relatedMetrics: ['body_fat_percentage', 'weight'],
+    biologicalVariation: { withinSubjectCV: 5.7, betweenSubjectCV: 6.9, analyticalCV: 2.2 },
     format: fmtMgDL,
   },
   hba1c: {
@@ -339,6 +375,7 @@ export const BIOMARKER_REGISTRY: Record<string, BiomarkerDefinition> = {
     // mmol/mol → %: (mmol_mol / 10.929) + 2.15
     healthDomains: ['body_composition', 'cardiovascular', 'energy'],
     relatedMetrics: ['body_fat_percentage', 'weight'],
+    biologicalVariation: { withinSubjectCV: 1.9, betweenSubjectCV: 4.0, analyticalCV: 1.5 },
     format: fmtPercent,
   },
   fasting_insulin: {
@@ -358,6 +395,7 @@ export const BIOMARKER_REGISTRY: Record<string, BiomarkerDefinition> = {
     wearableCorrelations: [
       { metric: 'hrv', relationship: 'inverse', mechanism: 'Hyperinsulinemia drives sympathetic dominance, suppressing parasympathetic tone and HRV' },
     ],
+    biologicalVariation: { withinSubjectCV: 25.0, betweenSubjectCV: 58.3, analyticalCV: 5.0 },
     format: fmtUIU,
   },
 
@@ -376,6 +414,7 @@ export const BIOMARKER_REGISTRY: Record<string, BiomarkerDefinition> = {
     unitAliases: { 'mmol/L': 38.67 },
     healthDomains: ['cardiovascular', 'hormonal'],
     relatedMetrics: ['rhr', 'body_fat_percentage'],
+    biologicalVariation: { withinSubjectCV: 5.4, betweenSubjectCV: 15.3, analyticalCV: 1.5 },
     format: fmtMgDL,
   },
   ldl_cholesterol: {
@@ -392,6 +431,7 @@ export const BIOMARKER_REGISTRY: Record<string, BiomarkerDefinition> = {
     unitAliases: { 'mmol/L': 38.67 },
     healthDomains: ['cardiovascular'],
     relatedMetrics: ['rhr', 'body_fat_percentage'],
+    biologicalVariation: { withinSubjectCV: 8.3, betweenSubjectCV: 21.6, analyticalCV: 3.0 },
     format: fmtMgDL,
   },
   hdl_cholesterol: {
@@ -408,6 +448,7 @@ export const BIOMARKER_REGISTRY: Record<string, BiomarkerDefinition> = {
     unitAliases: { 'mmol/L': 38.67 },
     healthDomains: ['cardiovascular'],
     relatedMetrics: ['rhr', 'vo2_max'],
+    biologicalVariation: { withinSubjectCV: 7.1, betweenSubjectCV: 20.8, analyticalCV: 2.5 },
     format: fmtMgDL,
   },
   triglycerides: {
@@ -425,6 +466,7 @@ export const BIOMARKER_REGISTRY: Record<string, BiomarkerDefinition> = {
     unitAliases: { 'mmol/L': 88.57 },
     healthDomains: ['cardiovascular', 'body_composition'],
     relatedMetrics: ['body_fat_percentage', 'weight'],
+    biologicalVariation: { withinSubjectCV: 20.9, betweenSubjectCV: 37.2, analyticalCV: 3.0 },
     format: fmtMgDL,
   },
 
@@ -446,6 +488,7 @@ export const BIOMARKER_REGISTRY: Record<string, BiomarkerDefinition> = {
     wearableCorrelations: [
       { metric: 'sleep_score', relationship: 'direct', mechanism: 'Vitamin D receptors in the brainstem regulate sleep-wake cycles and melatonin production' },
     ],
+    biologicalVariation: { withinSubjectCV: 10.2, betweenSubjectCV: 40.0, analyticalCV: 5.0 },
     format: fmtNgML,
   },
   vitamin_b12: {
@@ -487,6 +530,7 @@ export const BIOMARKER_REGISTRY: Record<string, BiomarkerDefinition> = {
     referenceRange: { min: 30, max: 400 },
     healthDomains: ['energy', 'immune', 'recovery'],
     relatedMetrics: ['rhr', 'hrv'],
+    biologicalVariation: { withinSubjectCV: 14.2, betweenSubjectCV: 15.0, analyticalCV: 3.5 },
     format: fmtNgML,
   },
   iron: {
@@ -536,6 +580,7 @@ export const BIOMARKER_REGISTRY: Record<string, BiomarkerDefinition> = {
       { metric: 'hrv', relationship: 'inverse', mechanism: 'Systemic inflammation directly impairs parasympathetic recovery and autonomic flexibility' },
       { metric: 'recovery_score', relationship: 'inverse', mechanism: 'Elevated CRP signals inflammatory burden that suppresses physiological recovery capacity' },
     ],
+    biologicalVariation: { withinSubjectCV: 42.2, betweenSubjectCV: 76.3, analyticalCV: 3.5 },
     format: fmtMgL,
   },
   homocysteine: {
@@ -549,6 +594,7 @@ export const BIOMARKER_REGISTRY: Record<string, BiomarkerDefinition> = {
     referenceRange: { min: 0, max: 15 },
     healthDomains: ['cardiovascular', 'cognitive'],
     relatedMetrics: ['rhr'],
+    biologicalVariation: { withinSubjectCV: 8.6, betweenSubjectCV: 26.0, analyticalCV: 2.5 },
     format: fmtUmolL,
   },
 
@@ -564,6 +610,7 @@ export const BIOMARKER_REGISTRY: Record<string, BiomarkerDefinition> = {
     referenceRange: { min: 0, max: 44 },
     healthDomains: ['body_composition'],
     relatedMetrics: ['body_fat_percentage'],
+    biologicalVariation: { withinSubjectCV: 19.4, betweenSubjectCV: 41.6, analyticalCV: 3.0 },
     format: fmtUL,
   },
   ast: {
@@ -577,6 +624,7 @@ export const BIOMARKER_REGISTRY: Record<string, BiomarkerDefinition> = {
     referenceRange: { min: 0, max: 40 },
     healthDomains: ['body_composition', 'recovery'],
     relatedMetrics: ['body_fat_percentage'],
+    biologicalVariation: { withinSubjectCV: 12.3, betweenSubjectCV: 23.1, analyticalCV: 3.0 },
     format: fmtUL,
   },
 
@@ -592,6 +640,7 @@ export const BIOMARKER_REGISTRY: Record<string, BiomarkerDefinition> = {
     referenceRange: { min: 0.76, max: 1.27 },
     healthDomains: ['body_composition'],
     relatedMetrics: ['lean_body_mass'],
+    biologicalVariation: { withinSubjectCV: 4.3, betweenSubjectCV: 12.9, analyticalCV: 2.0 },
     format: (v) => `${v.toFixed(2)} mg/dL`,
   },
   egfr: {
@@ -631,6 +680,7 @@ export const BIOMARKER_REGISTRY: Record<string, BiomarkerDefinition> = {
       { metric: 'rhr', relationship: 'direct', mechanism: 'Elevated ApoB is associated with atherosclerosis, which can elevate resting heart rate over time' },
       { metric: 'vo2_max', relationship: 'inverse', mechanism: 'High ApoB burden correlates with reduced cardiovascular fitness capacity' },
     ],
+    biologicalVariation: { withinSubjectCV: 6.2, betweenSubjectCV: 22.6, analyticalCV: 3.0 },
     format: fmtMgDL,
   },
   lipoprotein_a: {
@@ -1219,6 +1269,7 @@ export const BIOMARKER_REGISTRY: Record<string, BiomarkerDefinition> = {
       { metric: 'rhr', relationship: 'inverse', mechanism: 'Low hemoglobin forces compensatory heart rate increase to maintain oxygen delivery' },
       { metric: 'vo2_max', relationship: 'direct', mechanism: 'Hemoglobin directly determines oxygen-carrying capacity, a primary limiter of VO2 max' },
     ],
+    biologicalVariation: { withinSubjectCV: 2.8, betweenSubjectCV: 6.9, analyticalCV: 1.5 },
     format: fmtGDL,
   },
   hematocrit: {
@@ -1423,6 +1474,216 @@ export function computeFlag(key: string, value: number): BiomarkerFlag {
   return 'normal'
 }
 
+// ─── Zone Scoring Engine ────────────────────────────────────────────────────
+
+/** Standard logistic sigmoid: 0→1 as x goes from -∞ to +∞ */
+function sigmoid(x: number): number {
+  return 1 / (1 + Math.exp(-x))
+}
+
+/**
+ * Smooth 0→1 transition centered at `position` with tunable steepness.
+ * position: 0-1 normalized position within a range segment
+ * steepness: higher = sharper transition (default 6)
+ */
+function sigmoidTransition(position: number, steepness: number = 6): number {
+  // Map position [0,1] to sigmoid input [-steepness, +steepness]
+  return sigmoid((position - 0.5) * 2 * steepness)
+}
+
+/**
+ * Derive boundary steepness from biological variation.
+ * High-CV markers (hs-CRP ~42%) get gentle transitions (k≈3).
+ * Low-CV markers (HbA1c ~2%) get sharp transitions (k≈10).
+ */
+function computeBoundarySteepness(withinSubjectCV: number): number {
+  // Inverse relationship: steepness = clamp(12 - cv * 0.2, 3, 10)
+  return Math.max(3, Math.min(10, 12 - withinSubjectCV * 0.2))
+}
+
+/** Map 9-zone to 6-value legacy flag */
+export function zoneToLegacyFlag(zone: BiomarkerZone): BiomarkerFlag {
+  switch (zone) {
+    case 'critical_low': return 'critical_low'
+    case 'critical_high': return 'critical_high'
+    case 'low': return 'low'
+    case 'high': return 'high'
+    case 'below_optimal': return 'normal'
+    case 'above_optimal': return 'normal'
+    case 'optimal_low': return 'optimal'
+    case 'optimal_peak': return 'optimal'
+    case 'optimal_high': return 'optimal'
+  }
+}
+
+/** Map zone to clinical significance */
+function zoneToClinicalSignificance(zone: BiomarkerZone): ClinicalSignificance {
+  switch (zone) {
+    case 'critical_low':
+    case 'critical_high':
+      return 'urgent'
+    case 'low':
+    case 'high':
+      return 'significant'
+    case 'below_optimal':
+    case 'above_optimal':
+      return 'notable'
+    case 'optimal_low':
+    case 'optimal_peak':
+    case 'optimal_high':
+      return 'routine'
+  }
+}
+
+/**
+ * Compute a 9-zone classification with continuous 0-100 score using
+ * sigmoid transitions at boundaries. Replaces cliff-edge flag logic
+ * with smooth, biologically-calibrated scoring.
+ *
+ * Score regions:
+ *   85-100: Within optimal range (quadratic dropoff from peak)
+ *   40-85:  Between optimal and reference boundary (sigmoid transition)
+ *   10-40:  Outside reference range (sigmoid toward critical)
+ *   0-10:   Critical range
+ */
+export function computeZone(key: string, value: number): ZoneResult {
+  const def = BIOMARKER_REGISTRY[key]
+
+  // Fallback for unknown biomarkers
+  if (!def) {
+    return {
+      zone: 'optimal_peak', score: 50, confidence: 0,
+      transitionProximity: 0, legacyFlag: 'normal',
+      clinicalSignificance: 'routine',
+      biologicalVariationNote: null, retestRecommendation: false,
+    }
+  }
+
+  const { referenceRange, optimalRange, criticalLow, criticalHigh, biologicalVariation } = def
+  const cv = biologicalVariation?.withinSubjectCV ?? 5
+  const analyticalCV = biologicalVariation?.analyticalCV ?? 2
+  const steepness = computeBoundarySteepness(cv)
+
+  // Confidence: lower for high-CV markers (sigmoid from 0.95 at cv=2 to 0.5 at cv=40)
+  const confidence = Math.max(0.4, Math.min(0.98, 1 - sigmoid((cv - 15) * 0.1) * 0.5))
+
+  let score: number
+  let zone: BiomarkerZone
+
+  // Use optimal range if defined, otherwise treat mid-reference as pseudo-optimal
+  const optMin = optimalRange?.min ?? (referenceRange.min + (referenceRange.max - referenceRange.min) * 0.35)
+  const optMax = optimalRange?.max ?? (referenceRange.min + (referenceRange.max - referenceRange.min) * 0.65)
+  const optPeak = optimalRange?.optimal ?? (optMin + optMax) / 2
+
+  // ─── Critical low ───
+  if (criticalLow !== undefined && value < criticalLow) {
+    // Score 0-10: deeper into critical = lower score
+    const critFloor = criticalLow - (referenceRange.max - referenceRange.min) * 0.3
+    const depth = Math.max(0, Math.min(1, (criticalLow - value) / Math.max(1, criticalLow - critFloor)))
+    score = Math.round(10 * (1 - depth))
+    zone = 'critical_low'
+  }
+  // ─── Critical high ───
+  else if (criticalHigh !== undefined && value > criticalHigh) {
+    const critCeiling = criticalHigh + (referenceRange.max - referenceRange.min) * 0.3
+    const depth = Math.max(0, Math.min(1, (value - criticalHigh) / Math.max(1, critCeiling - criticalHigh)))
+    score = Math.round(10 * (1 - depth))
+    zone = 'critical_high'
+  }
+  // ─── Below reference range (low) ───
+  else if (value < referenceRange.min) {
+    // Score 10-40: sigmoid from reference min toward critical low
+    const lowerBound = criticalLow ?? (referenceRange.min - (referenceRange.max - referenceRange.min) * 0.3)
+    const span = Math.max(1, referenceRange.min - lowerBound)
+    const position = Math.max(0, Math.min(1, (value - lowerBound) / span))
+    const t = sigmoidTransition(position, steepness)
+    score = Math.round(10 + t * 30)
+    zone = 'low'
+  }
+  // ─── Above reference range (high) ───
+  else if (value > referenceRange.max) {
+    const upperBound = criticalHigh ?? (referenceRange.max + (referenceRange.max - referenceRange.min) * 0.3)
+    const span = Math.max(1, upperBound - referenceRange.max)
+    const position = Math.max(0, Math.min(1, (upperBound - value) / span))
+    const t = sigmoidTransition(position, steepness)
+    score = Math.round(10 + t * 30)
+    zone = 'high'
+  }
+  // ─── Below optimal but within reference (below_optimal) ───
+  else if (value < optMin) {
+    const span = Math.max(1, optMin - referenceRange.min)
+    const position = (value - referenceRange.min) / span
+    const t = sigmoidTransition(position, steepness)
+    score = Math.round(40 + t * 45)
+    zone = 'below_optimal'
+  }
+  // ─── Above optimal but within reference (above_optimal) ───
+  else if (value > optMax) {
+    const span = Math.max(1, referenceRange.max - optMax)
+    const position = (referenceRange.max - value) / span
+    const t = sigmoidTransition(position, steepness)
+    score = Math.round(40 + t * 45)
+    zone = 'above_optimal'
+  }
+  // ─── Within optimal range ───
+  else {
+    // Quadratic dropoff from peak: 100 at peak, 85 at edges
+    const halfSpan = Math.max(1, (optMax - optMin) / 2)
+    const distFromPeak = Math.abs(value - optPeak)
+    const normalizedDist = Math.min(1, distFromPeak / halfSpan)
+    score = Math.round(100 - normalizedDist * normalizedDist * 15)
+
+    // Sub-classify within optimal
+    if (normalizedDist < 0.2) {
+      zone = 'optimal_peak'
+    } else if (value < optPeak) {
+      zone = 'optimal_low'
+    } else {
+      zone = 'optimal_high'
+    }
+  }
+
+  // Clamp score
+  score = Math.max(0, Math.min(100, score))
+
+  // ─── Transition proximity ───
+  // How close is value to the nearest zone boundary? (0 = far, 1 = right on boundary)
+  const boundaries = [referenceRange.min, referenceRange.max, optMin, optMax]
+  if (criticalLow !== undefined) boundaries.push(criticalLow)
+  if (criticalHigh !== undefined) boundaries.push(criticalHigh)
+  const fullRange = Math.max(1, referenceRange.max - referenceRange.min)
+  const minDistToBoundary = Math.min(...boundaries.map(b => Math.abs(value - b)))
+  const transitionProximity = Math.max(0, Math.min(1, 1 - minDistToBoundary / (fullRange * 0.15)))
+
+  // ─── Biological variation note ───
+  // RCV = 2.77 * sqrt(CV_analytical² + CV_within²)
+  const rcv = 2.77 * Math.sqrt(analyticalCV * analyticalCV + cv * cv)
+  let biologicalVariationNote: string | null = null
+  let retestRecommendation = false
+
+  // If value is within 1 RCV of any boundary and CV > 15%, add note
+  if (cv > 15) {
+    const rcvAbsolute = (rcv / 100) * Math.abs(value || 1)
+    const nearBoundary = boundaries.some(b => Math.abs(value - b) < rcvAbsolute)
+    if (nearBoundary) {
+      biologicalVariationNote = 'Within normal biological variation — retest to confirm'
+    }
+  }
+
+  // Retest recommendation: close to boundary and meaningful CV
+  if (transitionProximity > 0.8 && cv > 10) {
+    retestRecommendation = true
+  }
+
+  const legacyFlag = zoneToLegacyFlag(zone)
+  const clinicalSignificance = zoneToClinicalSignificance(zone)
+
+  return {
+    zone, score, confidence, transitionProximity, legacyFlag,
+    clinicalSignificance, biologicalVariationNote, retestRecommendation,
+  }
+}
+
 /**
  * Format a biomarker value using its defined formatter.
  */
@@ -1459,32 +1720,13 @@ export function getAllCategories(): BiomarkerCategory[] {
 
 /**
  * Calculate percentage within optimal range (0-100).
- * Returns null if no optimal range defined or value is out of reference range.
+ * Uses sigmoid-based zone scoring for smooth, biologically-calibrated results.
+ * Returns null only if no optimal range defined for this biomarker.
  */
 export function computeOptimalScore(key: string, value: number): number | null {
   const def = BIOMARKER_REGISTRY[key]
   if (!def || !def.optimalRange) return null
-
-  const { optimalRange, referenceRange } = def
-
-  // Out of reference range
-  if (value < referenceRange.min || value > referenceRange.max) return null
-
-  // At optimal value
-  if (value === optimalRange.optimal) return 100
-
-  // Calculate distance from optimal as percentage
-  if (value < optimalRange.optimal) {
-    // Below optimal
-    const range = optimalRange.optimal - referenceRange.min
-    const distance = optimalRange.optimal - value
-    return Math.max(0, Math.round(100 * (1 - distance / range)))
-  } else {
-    // Above optimal
-    const range = referenceRange.max - optimalRange.optimal
-    const distance = value - optimalRange.optimal
-    return Math.max(0, Math.round(100 * (1 - distance / range)))
-  }
+  return computeZone(key, value).score
 }
 
 /**

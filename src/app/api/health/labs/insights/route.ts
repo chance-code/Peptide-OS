@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getAuthenticatedUserId } from '@/lib/api-auth'
-import { BIOMARKER_REGISTRY, computeFlag, normalizeBiomarkerName, type BiomarkerFlag } from '@/lib/lab-biomarker-contract'
+import { BIOMARKER_REGISTRY, computeFlag, type BiomarkerFlag } from '@/lib/lab-biomarker-contract'
 import { analyzeLabPatterns, type LabPattern } from '@/lib/labs/lab-analyzer'
 import { generateBridgeInsights, type BridgeInsight } from '@/lib/labs/lab-wearable-bridge'
 
@@ -30,93 +30,26 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Fallback: if no LabUpload found, check legacy LabResult table
-    let legacyBiomarkers: Array<{
-      biomarkerKey: string
-      value: number
-      unit: string
-      flag: string
-    }> | null = null
-    let sourceId: string
-    let sourceTestDate: Date
-    let sourceLabName: string | null
-
-    if (upload) {
-      sourceId = upload.id
-      sourceTestDate = upload.testDate
-      sourceLabName = upload.labName
-      legacyBiomarkers = null // not needed, use upload.biomarkers directly
-    } else {
-      // No LabUpload found — try legacy LabResult
-      const legacyLab = await prisma.labResult.findFirst({
-        where: { userId },
-        orderBy: { testDate: 'desc' },
-      })
-
-      if (!legacyLab) {
-        return NextResponse.json({
-          error: 'No lab uploads found. Upload a lab PDF to get insights.',
-        }, { status: 404 })
-      }
-
-      sourceId = legacyLab.id
-      sourceTestDate = legacyLab.testDate
-      sourceLabName = legacyLab.labName
-
-      // Parse legacy markers JSON and convert to biomarker format
-      let rawMarkers: Array<{
-        name?: string
-        displayName?: string
-        rawName?: string
-        value?: number
-        unit?: string
-        rangeLow?: number
-        rangeHigh?: number
-        flag?: string
-      }> = []
-      try {
-        rawMarkers = JSON.parse(legacyLab.markers)
-      } catch {
-        rawMarkers = []
-      }
-
-      legacyBiomarkers = rawMarkers
-        .filter(m => m.value != null && m.unit)
-        .map(m => {
-          // The legacy `name` field is normalizedKey || rawName from the import.
-          // Try to resolve it to a canonical biomarker key.
-          const nameField = m.name || m.rawName || m.displayName || ''
-          const biomarkerKey = normalizeBiomarkerName(nameField) ?? nameField
-          const value = Number(m.value)
-          const unit = m.unit!
-          // Recompute flag using the registry for consistency; fall back to stored flag
-          const registryDef = BIOMARKER_REGISTRY[biomarkerKey]
-          const flag = registryDef ? computeFlag(biomarkerKey, value) : (m.flag || 'normal')
-
-          return { biomarkerKey, value, unit, flag }
-        })
-        .filter(bm => BIOMARKER_REGISTRY[bm.biomarkerKey]) // Only keep recognized biomarkers
+    if (!upload) {
+      return NextResponse.json({
+        error: 'No lab uploads found. Upload a lab PDF to get insights.',
+      }, { status: 404 })
     }
 
-    // Resolve the biomarker data source
-    const biomarkersForTier1 = upload
-      ? upload.biomarkers
-      : legacyBiomarkers!
+    const sourceId = upload.id
+    const sourceTestDate = upload.testDate
+    const sourceLabName = upload.labName
+
+    // Use enriched biomarkers directly
+    const biomarkersForTier1 = upload.biomarkers
 
     // Build biomarker array for analyzer/bridge functions
-    const biomarkerArray = upload
-      ? upload.biomarkers.map(bm => ({
-          biomarkerKey: bm.biomarkerKey,
-          value: bm.value,
-          unit: bm.unit,
-          flag: computeFlag(bm.biomarkerKey, bm.value),
-        }))
-      : legacyBiomarkers!.map(bm => ({
-          biomarkerKey: bm.biomarkerKey,
-          value: bm.value,
-          unit: bm.unit,
-          flag: computeFlag(bm.biomarkerKey, bm.value),
-        }))
+    const biomarkerArray = upload.biomarkers.map(bm => ({
+      biomarkerKey: bm.biomarkerKey,
+      value: bm.value,
+      unit: bm.unit,
+      flag: computeFlag(bm.biomarkerKey, bm.value),
+    }))
 
     // Tier 1: Individual biomarker status
     const tier1 = generateTier1Insights(biomarkersForTier1)
@@ -225,7 +158,7 @@ function generateTier1Insights(biomarkers: Array<{
         break
       case 'normal':
         status = 'Within Range'
-        message = `${def.displayName} at ${def.format(bm.value)} is within reference range but not yet optimal.`
+        message = `${def.displayName} at ${def.format(bm.value)} is within the reference range.`
         priority = 'info'
         break
       case 'low':
@@ -277,33 +210,36 @@ function generateOverallNarrative(
   const parts: string[] = []
 
   const optimal = tier1.filter(i => i.flag === 'optimal').length
+  const normal = tier1.filter(i => i.flag === 'normal').length
+  const inRange = optimal + normal
   const action = tier1.filter(i => i.priority === 'action').length
   const attention = tier1.filter(i => i.priority === 'attention').length
   const total = tier1.length
 
-  if (action > 0) {
-    parts.push(`${action} biomarker${action > 1 ? 's' : ''} at critical levels requiring attention.`)
+  // Lead with the positive
+  if (inRange === total) {
+    parts.push(`All ${total} markers are within their reference ranges — ${optimal} in the optimal range.`)
+  } else if (inRange >= total * 0.8) {
+    parts.push(`${inRange} of ${total} markers are within reference ranges (${optimal} optimal). Overall, a solid picture.`)
+  } else if (inRange >= total * 0.5) {
+    parts.push(`${inRange} of ${total} markers are within reference ranges.`)
+  } else {
+    parts.push(`${inRange} of ${total} markers are within reference ranges.`)
   }
 
-  if (optimal > total * 0.5) {
-    parts.push(`Strong overall picture with ${optimal} of ${total} markers in optimal range.`)
-  } else if (attention > total * 0.3) {
-    parts.push(`Several markers need attention — ${attention} of ${total} outside reference range.`)
-  } else {
-    parts.push(`${optimal} of ${total} markers in optimal range.`)
+  // Then note any concerns
+  if (action > 0) {
+    parts.push(`${action} marker${action > 1 ? 's' : ''} outside the reference range may warrant discussion with your provider.`)
+  } else if (attention > 0) {
+    parts.push(`${attention} marker${attention > 1 ? 's are' : ' is'} outside the reference range.`)
   }
 
   if (patterns.length > 0) {
-    const highSev = patterns.filter(p => p.severity === 'action' || p.severity === 'urgent')
-    if (highSev.length > 0) {
-      parts.push(`${highSev.length} significant pattern${highSev.length > 1 ? 's' : ''} detected: ${highSev.map(p => p.patternName).join(', ')}.`)
-    } else {
-      parts.push(`${patterns.length} pattern${patterns.length > 1 ? 's' : ''} identified for awareness.`)
-    }
+    parts.push(`${patterns.length} cross-biomarker pattern${patterns.length > 1 ? 's' : ''} identified for context.`)
   }
 
   if (bridges.length > 0) {
-    parts.push(`${bridges.length} connection${bridges.length > 1 ? 's' : ''} found between your bloodwork and daily metrics.`)
+    parts.push(`${bridges.length} connection${bridges.length > 1 ? 's' : ''} found between your bloodwork and wearable data.`)
   }
 
   return parts.join(' ')

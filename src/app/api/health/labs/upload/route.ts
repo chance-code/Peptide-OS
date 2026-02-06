@@ -62,62 +62,36 @@ export async function POST(request: NextRequest) {
 
     const labName = labNameOverride || parseResult.labName
 
-    // Save to legacy LabResult (always works)
+    // Write to enriched LabUpload + LabBiomarker (single source of truth)
     const recognizedMarkers = markers.filter(m => m.normalizedKey)
-    await prisma.labResult.create({
+    const upload = await prisma.labUpload.create({
       data: {
         userId,
         testDate,
         labName,
+        source: 'pdf_import',
         notes: `Imported from PDF: ${file.name}`,
-        markers: JSON.stringify(markers.map(m => ({
-          name: m.normalizedKey || m.rawName,
-          displayName: m.displayName,
-          rawName: m.rawName,
-          value: m.value,
-          unit: m.unit,
-          rangeLow: m.rangeLow,
-          rangeHigh: m.rangeHigh,
-          flag: m.flag,
-          confidence: m.confidence,
-        }))),
-      },
-    })
-
-    // Structured write: LabUpload + LabBiomarker (non-blocking — table may not exist yet)
-    let upload: { id: string; biomarkers: { id: string }[] } | null = null
-    try {
-      upload = await prisma.labUpload.create({
-        data: {
-          userId,
-          testDate,
-          labName,
-          source: 'pdf_import',
-          notes: `Imported from PDF: ${file.name}`,
-          rawText: text,
-          confidence: parseResult.overallConfidence,
-          fileName: file.name,
-          biomarkers: {
-            create: recognizedMarkers.map(m => ({
-              biomarkerKey: m.normalizedKey!,
-              rawName: m.rawName,
-              value: m.value,
-              unit: m.unit,
-              originalValue: m.originalValue,
-              originalUnit: m.originalUnit,
-              rangeLow: m.rangeLow,
-              rangeHigh: m.rangeHigh,
-              flag: m.flag,
-              confidence: m.confidence,
-              category: m.category,
-            })),
-          },
+        rawText: text,
+        confidence: parseResult.overallConfidence,
+        fileName: file.name,
+        biomarkers: {
+          create: recognizedMarkers.map(m => ({
+            biomarkerKey: m.normalizedKey!,
+            rawName: m.rawName,
+            value: m.value,
+            unit: m.unit,
+            originalValue: m.originalValue,
+            originalUnit: m.originalUnit,
+            rangeLow: m.rangeLow,
+            rangeHigh: m.rangeHigh,
+            flag: m.flag,
+            confidence: m.confidence,
+            category: m.category,
+          })),
         },
-        include: { biomarkers: true },
-      })
-    } catch (uploadErr) {
-      console.warn('LabUpload write skipped (table may not exist):', uploadErr)
-    }
+      },
+      include: { biomarkers: true },
+    })
 
     // Run pattern analysis
     const biomarkerArray = recognizedMarkers.map(m => ({

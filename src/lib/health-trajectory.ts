@@ -434,10 +434,10 @@ export function computeEnhancedBodyComp(
         severity,
         indicators: { basalCaloriesTrend: basalTrend, weightTrend: wTrend },
         recommendation: severity === 'severe'
-          ? 'Consider a diet break or reverse diet. Metabolic rate has significantly decreased.'
+          ? 'A diet break or reverse diet may help — your metabolic rate has decreased significantly. Discussing this with your provider is worth prioritizing.'
           : severity === 'moderate'
-          ? 'Your metabolism may be adapting. Consider increasing calories slightly or adding refeed days.'
-          : 'Mild metabolic slowdown detected. Monitor closely and ensure adequate protein intake.',
+          ? 'Your metabolism may be adapting. A slight calorie increase or refeed days may help — your provider can help determine the right approach.'
+          : 'Mild metabolic slowdown detected. This is worth monitoring, and adequate protein intake may help maintain metabolic rate.',
       }
     } else {
       metabolicAdaptation.indicators = { basalCaloriesTrend: basalTrend, weightTrend: wTrend }

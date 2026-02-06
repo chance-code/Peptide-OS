@@ -22,14 +22,14 @@ const METRIC_RECOMMENDATIONS: Record<string, {
 }> = {
   'hrv': {
     declining: [
-      { action: 'Reduce training intensity for 2-3 days', reason: 'Low HRV often indicates accumulated stress or incomplete recovery', priority: 'high', timeframe: '2-3 days' },
-      { action: 'Prioritize 8+ hours of sleep', reason: 'Sleep is the primary driver of HRV recovery', priority: 'high' },
-      { action: 'Check for illness or unusual stress', reason: 'HRV drops often precede getting sick', priority: 'medium' },
-      { action: 'Avoid alcohol and late caffeine', reason: 'Both significantly suppress overnight HRV', priority: 'medium' }
+      { action: 'Lighter training for 2-3 days may help recovery', reason: 'Low HRV often indicates accumulated stress or incomplete recovery', priority: 'high', timeframe: '2-3 days' },
+      { action: 'Prioritizing sleep duration may support HRV recovery', reason: 'Sleep is the primary driver of HRV recovery', priority: 'high' },
+      { action: 'This is worth monitoring — illness or unusual stress can drive HRV drops', reason: 'HRV drops often precede getting sick', priority: 'medium' },
+      { action: 'Reducing alcohol and late caffeine may help', reason: 'Both significantly suppress overnight HRV', priority: 'medium' }
     ],
     improving: [
       { action: 'Maintain current recovery practices', reason: 'Your body is adapting well', priority: 'low' },
-      { action: 'Consider slightly increasing training load', reason: 'Higher HRV indicates capacity for more stress', priority: 'medium' }
+      { action: 'A slightly higher training load may be appropriate given your HRV trend', reason: 'Higher HRV indicates capacity for more stress', priority: 'medium' }
     ],
     stable: [
       { action: 'Continue current routine', reason: 'Consistency is key for HRV', priority: 'low' }
@@ -37,10 +37,10 @@ const METRIC_RECOMMENDATIONS: Record<string, {
   },
   'deep_sleep': {
     declining: [
-      { action: 'Take magnesium glycinate before bed', reason: 'Magnesium supports deep sleep architecture', priority: 'high' },
-      { action: 'Keep bedroom temperature at 65-68°F', reason: 'Cooler temperatures promote deep sleep', priority: 'high' },
-      { action: 'Avoid screens 1 hour before bed', reason: 'Blue light suppresses melatonin and deep sleep', priority: 'medium' },
-      { action: 'Finish eating 3+ hours before bed', reason: 'Digestion interferes with deep sleep', priority: 'medium' }
+      { action: 'Magnesium supplementation may support deep sleep — discuss with your provider', reason: 'Magnesium supports deep sleep architecture', priority: 'high' },
+      { action: 'A cooler bedroom (65-68°F) may promote deeper sleep', reason: 'Cooler temperatures promote deep sleep', priority: 'high' },
+      { action: 'Reducing screen time before bed may help', reason: 'Blue light suppresses melatonin and deep sleep', priority: 'medium' },
+      { action: 'Finishing meals earlier in the evening may improve deep sleep', reason: 'Digestion interferes with deep sleep', priority: 'medium' }
     ],
     improving: [
       { action: 'Keep doing what you\'re doing', reason: 'Your sleep hygiene is working', priority: 'low' }
@@ -49,9 +49,9 @@ const METRIC_RECOMMENDATIONS: Record<string, {
   },
   'rhr': {
     declining: [
-      { action: 'Take a rest day', reason: 'Elevated RHR indicates accumulated fatigue', priority: 'high' },
-      { action: 'Hydrate well (aim for clear urine)', reason: 'Dehydration elevates resting heart rate', priority: 'medium' },
-      { action: 'Check for overtraining signs', reason: 'Chronic RHR elevation suggests overreaching', priority: 'medium' }
+      { action: 'A rest day may help — elevated RHR often reflects accumulated fatigue', reason: 'Elevated RHR indicates accumulated fatigue', priority: 'high' },
+      { action: 'Increasing hydration may help lower RHR', reason: 'Dehydration elevates resting heart rate', priority: 'medium' },
+      { action: 'This is worth monitoring — chronic RHR elevation can suggest overreaching', reason: 'Chronic RHR elevation suggests overreaching', priority: 'medium' }
     ],
     improving: [
       { action: 'Continue current training approach', reason: 'Lower RHR indicates improved cardiovascular fitness', priority: 'low' }
@@ -61,49 +61,49 @@ const METRIC_RECOMMENDATIONS: Record<string, {
   'body_fat_percentage': {
     declining: [
       { action: 'Maintain current nutrition approach', reason: 'Fat loss is occurring—stay consistent', priority: 'low' },
-      { action: 'Ensure adequate protein (1g/lb bodyweight)', reason: 'Protein preserves muscle during fat loss', priority: 'medium' }
+      { action: 'Adequate protein intake may help preserve muscle during fat loss', reason: 'Protein preserves muscle during fat loss', priority: 'medium' }
     ],
     improving: [
-      { action: 'Track calorie intake for 1 week', reason: 'Awareness often reveals hidden calories', priority: 'high' },
-      { action: 'Increase daily movement (steps)', reason: 'NEAT is a major factor in body composition', priority: 'medium' },
-      { action: 'Review carb timing around workouts', reason: 'Strategic carb placement optimizes body composition', priority: 'low' }
+      { action: 'Tracking calorie intake for a week may help identify patterns', reason: 'Awareness often reveals hidden calories', priority: 'high' },
+      { action: 'Increasing daily movement (steps) may support body composition goals', reason: 'NEAT is a major factor in body composition', priority: 'medium' },
+      { action: 'Reviewing carb timing around workouts may be worth exploring', reason: 'Strategic carb placement optimizes body composition', priority: 'low' }
     ],
     stable: []
   },
   'sleep_efficiency': {
     declining: [
-      { action: 'Only use bed for sleep', reason: 'Strengthens sleep-bed association', priority: 'high' },
-      { action: 'Get up if awake >20 min', reason: 'Lying awake weakens sleep drive', priority: 'medium' },
-      { action: 'Wake at the same time daily', reason: 'Anchors circadian rhythm', priority: 'high' }
+      { action: 'Reserving the bed for sleep may strengthen the sleep-bed association', reason: 'Strengthens sleep-bed association', priority: 'high' },
+      { action: 'Getting up if awake for extended periods may help maintain sleep drive', reason: 'Lying awake weakens sleep drive', priority: 'medium' },
+      { action: 'A consistent wake time may help anchor your circadian rhythm', reason: 'Anchors circadian rhythm', priority: 'high' }
     ],
     improving: [],
     stable: []
   },
   'steps': {
     declining: [
-      { action: 'Take a 10-minute walk after each meal', reason: '3 short walks add 3,000+ steps easily', priority: 'high' },
-      { action: 'Set hourly movement reminders', reason: 'Breaks up sedentary time', priority: 'medium' }
+      { action: 'Short walks after meals may help increase daily steps', reason: '3 short walks add 3,000+ steps easily', priority: 'high' },
+      { action: 'Hourly movement breaks may help reduce sedentary time', reason: 'Breaks up sedentary time', priority: 'medium' }
     ],
     improving: [
-      { action: 'Great job! Consider adding variety', reason: 'Mix in different types of movement', priority: 'low' }
+      { action: 'Great momentum! Adding variety may help keep things engaging', reason: 'Mix in different types of movement', priority: 'low' }
     ],
     stable: []
   },
   'weight': {
     declining: [
-      { action: 'Ensure adequate protein intake', reason: 'Prevents muscle loss during weight loss', priority: 'high' },
-      { action: 'Don\'t cut calories too aggressively', reason: 'Sustainable loss is 0.5-1% bodyweight/week', priority: 'medium' }
+      { action: 'Adequate protein intake may help prevent muscle loss during weight change', reason: 'Prevents muscle loss during weight loss', priority: 'high' },
+      { action: 'A moderate calorie approach may support sustainable progress', reason: 'Sustainable loss is 0.5-1% bodyweight/week', priority: 'medium' }
     ],
     improving: [
-      { action: 'Review recent dietary changes', reason: 'Identify what shifted', priority: 'medium' },
-      { action: 'Check sodium and hydration', reason: 'Water weight can mask fat changes', priority: 'low' }
+      { action: 'Reviewing recent dietary changes may help identify what shifted', reason: 'Identify what shifted', priority: 'medium' },
+      { action: 'Sodium and hydration levels may be worth checking', reason: 'Water weight can mask fat changes', priority: 'low' }
     ],
     stable: []
   },
   'sleep_duration': {
     declining: [
       { action: 'Set a consistent bedtime alarm', reason: 'Signals your brain to wind down', priority: 'high' },
-      { action: 'Avoid caffeine after 2pm', reason: 'Caffeine has a 6-hour half-life', priority: 'medium' },
+      { action: 'Limiting afternoon caffeine may improve sleep onset', reason: 'Caffeine has a 6-hour half-life', priority: 'medium' },
       { action: 'Create a 30-min wind-down routine', reason: 'Helps transition from alertness to sleep', priority: 'medium' }
     ],
     improving: [
@@ -113,18 +113,18 @@ const METRIC_RECOMMENDATIONS: Record<string, {
   },
   'rem_sleep': {
     declining: [
-      { action: 'Avoid alcohol before bed', reason: 'Alcohol severely suppresses REM sleep', priority: 'high' },
-      { action: 'Reduce late-night stress', reason: 'Stress hormones interfere with REM', priority: 'medium' },
-      { action: 'Ensure adequate total sleep time', reason: 'REM occurs mainly in later sleep cycles', priority: 'medium' }
+      { action: 'Reducing alcohol before bed may help REM sleep', reason: 'Alcohol severely suppresses REM sleep', priority: 'high' },
+      { action: 'Managing late-night stress may support REM sleep', reason: 'Stress hormones interfere with REM', priority: 'medium' },
+      { action: 'Longer total sleep time allows more time in REM-heavy later cycles', reason: 'REM occurs mainly in later sleep cycles', priority: 'medium' }
     ],
     improving: [],
     stable: []
   },
   'vo2_max': {
     declining: [
-      { action: 'Add 2-3 cardio sessions per week', reason: 'VO2 max responds to aerobic training', priority: 'high' },
-      { action: 'Include interval training', reason: 'HIIT is more time-efficient for VO2 gains', priority: 'medium' },
-      { action: 'Check for overtraining', reason: 'Fatigue can temporarily suppress VO2 readings', priority: 'low' }
+      { action: 'Adding cardio sessions may help improve VO2 max', reason: 'VO2 max responds to aerobic training', priority: 'high' },
+      { action: 'Interval training may be an efficient approach for VO2 gains', reason: 'HIIT is more time-efficient for VO2 gains', priority: 'medium' },
+      { action: 'This is worth monitoring — fatigue can temporarily suppress VO2 readings', reason: 'Fatigue can temporarily suppress VO2 readings', priority: 'low' }
     ],
     improving: [
       { action: 'Continue current cardio routine', reason: 'Your aerobic fitness is improving', priority: 'low' }
@@ -133,28 +133,28 @@ const METRIC_RECOMMENDATIONS: Record<string, {
   },
   'exercise_minutes': {
     declining: [
-      { action: 'Schedule workouts like meetings', reason: 'Blocked time is harder to skip', priority: 'high' },
-      { action: 'Try shorter, more frequent sessions', reason: 'Even 15-20 min counts', priority: 'medium' },
-      { action: 'Find an accountability partner', reason: 'Social commitment increases adherence', priority: 'low' }
+      { action: 'Scheduling workouts like meetings may help with consistency', reason: 'Blocked time is harder to skip', priority: 'high' },
+      { action: 'Shorter, more frequent sessions may help maintain momentum', reason: 'Even 15-20 min counts', priority: 'medium' },
+      { action: 'An accountability partner may increase adherence', reason: 'Social commitment increases adherence', priority: 'low' }
     ],
     improving: [
-      { action: 'Great momentum! Ensure adequate recovery', reason: 'Avoid overtraining as volume increases', priority: 'medium' }
+      { action: 'Great momentum! Adequate recovery will help sustain progress', reason: 'Avoid overtraining as volume increases', priority: 'medium' }
     ],
     stable: []
   },
   'active_calories': {
     declining: [
-      { action: 'Increase daily step count', reason: 'Walking burns significant calories over time', priority: 'high' },
-      { action: 'Add resistance training', reason: 'Muscle burns more calories at rest', priority: 'medium' }
+      { action: 'Increasing daily step count may support calorie expenditure', reason: 'Walking burns significant calories over time', priority: 'high' },
+      { action: 'Resistance training may help increase resting metabolic rate', reason: 'Muscle burns more calories at rest', priority: 'medium' }
     ],
     improving: [],
     stable: []
   },
   'lean_body_mass': {
     declining: [
-      { action: 'Increase protein to 1g per lb bodyweight', reason: 'Protein is essential for muscle preservation', priority: 'high' },
-      { action: 'Add or increase resistance training', reason: 'Muscle responds to progressive overload', priority: 'high' },
-      { action: 'Ensure you\'re not in too large a calorie deficit', reason: 'Extreme deficits cause muscle loss', priority: 'medium' }
+      { action: 'Adequate protein intake may help preserve lean mass', reason: 'Protein is essential for muscle preservation', priority: 'high' },
+      { action: 'Resistance training may help counteract lean mass decline', reason: 'Muscle responds to progressive overload', priority: 'high' },
+      { action: 'A moderate calorie deficit may better preserve muscle than an aggressive one', reason: 'Extreme deficits cause muscle loss', priority: 'medium' }
     ],
     improving: [
       { action: 'Maintain protein intake and training', reason: 'You\'re building lean mass effectively', priority: 'low' }
@@ -163,9 +163,9 @@ const METRIC_RECOMMENDATIONS: Record<string, {
   },
   'muscle_mass': {
     declining: [
-      { action: 'Increase protein to 1g per lb bodyweight', reason: 'Protein is essential for muscle preservation', priority: 'high' },
-      { action: 'Add or increase resistance training', reason: 'Muscle responds to progressive overload', priority: 'high' },
-      { action: 'Ensure you\'re not in too large a calorie deficit', reason: 'Extreme deficits cause muscle loss', priority: 'medium' }
+      { action: 'Adequate protein intake may help preserve muscle mass', reason: 'Protein is essential for muscle preservation', priority: 'high' },
+      { action: 'Resistance training may help counteract muscle mass decline', reason: 'Muscle responds to progressive overload', priority: 'high' },
+      { action: 'A moderate calorie deficit may better preserve muscle than an aggressive one', reason: 'Extreme deficits cause muscle loss', priority: 'medium' }
     ],
     improving: [
       { action: 'Maintain protein intake and training', reason: 'You\'re building muscle effectively', priority: 'low' }
@@ -780,7 +780,7 @@ function generateCorrelationClaims(
 
           headline: `Alcohol reduces your deep sleep by ${Math.abs(pctDiff).toFixed(0)}%`,
           evidence: `On alcohol nights: ${Math.round(alcoholAvg)}min avg deep sleep vs ${Math.round(normalAvg)}min on normal nights`,
-          actionable: 'Consider limiting alcohol to protect sleep quality',
+          actionable: 'Limiting alcohol intake may help protect sleep quality',
 
           metricType: 'deep_sleep',
 
@@ -860,7 +860,7 @@ function generateCorrelationClaims(
           priority: 'medium',
           headline: `Good sleep nights → ${pctDiff > 0 ? Math.round(pctDiff) + '% more' : Math.abs(Math.round(pctDiff)) + '% fewer'} steps next day`,
           evidence: `After sleeping >${Math.round(sleepMedian / 60)}h: avg ${Math.round(goodAvg).toLocaleString()} steps. After shorter sleep: avg ${Math.round(badAvg).toLocaleString()} steps.`,
-          actionable: 'Prioritize sleep to maintain activity levels.',
+          actionable: 'Prioritizing sleep may help maintain activity levels.',
           metricType: 'steps',
           confidence: sleepActConf,
           receipt: {

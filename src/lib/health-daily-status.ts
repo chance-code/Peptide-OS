@@ -1,11 +1,13 @@
 // Daily Status Classification Engine
 // Classifies today based on overnight metrics and evaluates yesterday's recommendation
 
-import { subDays, format } from 'date-fns'
+import { subDays, format, differenceInDays } from 'date-fns'
 import { computeBaseline, type DailyMetricValue, METRIC_POLARITY } from './health-baselines'
 import { getUnifiedMetrics } from './health-synthesis'
 import type { MetricType } from './health-providers'
 import { normalizeMetricUnit } from './health-providers'
+import prisma from '@/lib/prisma'
+import { BIOMARKER_REGISTRY } from '@/lib/lab-biomarker-contract'
 
 export type DailyStatusType = 'recovery_priority' | 'training_window' | 'maintain' | 'peak_performance'
 
@@ -25,6 +27,21 @@ export interface NextDayEvaluation {
   metrics: { metric: string; yesterday: number; today: number; change_pct: number }[]
 }
 
+export interface LabAlert {
+  biomarkerKey: string
+  displayName: string
+  value: number
+  unit: string
+  flag: string
+}
+
+export interface LabContext {
+  daysSinceTest: number
+  totalMarkers: number
+  alerts: LabAlert[]
+  stalenessMessage: string
+}
+
 export interface DailyStatus {
   date: string
   status: DailyStatusType
@@ -35,6 +52,7 @@ export interface DailyStatus {
   signals: DailySignal[]
   recommendation: string
   evaluation?: NextDayEvaluation
+  labContext?: LabContext
 }
 
 const KEY_METRICS: MetricType[] = [
@@ -48,7 +66,7 @@ const CONFIG: Record<DailyStatusType, {
     title: 'Recovery Priority',
     subtitle: 'Low HRV and poor sleep — focus on rest today',
     icon: 'bed.double.fill', color: 'red',
-    recommendation: 'Prioritize 8+ hours tonight. Skip intense exercise.',
+    recommendation: 'Prioritizing sleep and lighter activity today may support recovery.',
   },
   maintain: {
     title: 'Steady Day',
@@ -132,6 +150,7 @@ export async function getDailyStatus(userId: string): Promise<DailyStatus> {
   const status = classifyScore(totalScore)
   const cfg = CONFIG[status]
   const evaluation = buildEvaluation(metricsMap)
+  const labContext = await getLabContext(userId, now)
 
   return {
     date: today, status,
@@ -139,6 +158,7 @@ export async function getDailyStatus(userId: string): Promise<DailyStatus> {
     icon: cfg.icon, color: cfg.color,
     signals, recommendation: cfg.recommendation,
     evaluation: evaluation ?? undefined,
+    labContext: labContext ?? undefined,
   }
 }
 
@@ -189,5 +209,55 @@ function buildEvaluation(
     todayOutcome: `${topChange.metric.replace(/_/g, ' ')} ${dir} by ${Math.abs(topChange.change_pct)}%`,
     improved,
     metrics: changes,
+  }
+}
+
+// ─── Lab Context ──────────────────────────────────────────────────────
+
+async function getLabContext(userId: string, now: Date): Promise<LabContext | null> {
+  const latestUpload = await prisma.labUpload.findFirst({
+    where: { userId },
+    orderBy: { testDate: 'desc' },
+    include: { biomarkers: true },
+  })
+
+  if (!latestUpload) return null
+
+  const daysSinceTest = differenceInDays(now, latestUpload.testDate)
+  const flaggedMarkers = latestUpload.biomarkers.filter(bm =>
+    ['critical_low', 'critical_high', 'high', 'low'].includes(bm.flag)
+  )
+
+  // Only include lab context if there are actionable findings or data is stale
+  if (flaggedMarkers.length === 0 && daysSinceTest < 90) return null
+
+  const alerts: LabAlert[] = flaggedMarkers
+    .sort((a, b) => {
+      const priority = (f: string) => f.startsWith('critical') ? 0 : 1
+      return priority(a.flag) - priority(b.flag)
+    })
+    .slice(0, 5)
+    .map(bm => {
+      const def = BIOMARKER_REGISTRY[bm.biomarkerKey]
+      return {
+        biomarkerKey: bm.biomarkerKey,
+        displayName: def?.displayName ?? bm.rawName ?? bm.biomarkerKey,
+        value: bm.value,
+        unit: bm.unit,
+        flag: bm.flag,
+      }
+    })
+
+  let stalenessMessage: string
+  if (daysSinceTest < 30) stalenessMessage = 'Recently tested'
+  else if (daysSinceTest < 90) stalenessMessage = 'Consider retesting soon'
+  else if (daysSinceTest < 180) stalenessMessage = 'Results may be outdated'
+  else stalenessMessage = 'Retest recommended'
+
+  return {
+    daysSinceTest,
+    totalMarkers: latestUpload.biomarkers.length,
+    alerts,
+    stalenessMessage,
   }
 }

@@ -647,7 +647,7 @@ export async function calculateRecoveryStatus(userId: string): Promise<RecoveryS
   const recommendations: Record<RecoveryStatus['status'], string> = {
     excellent: 'Your recovery is optimal. Great day for intense training or challenging work.',
     good: 'Solid recovery. You can handle normal activities and moderate exercise.',
-    moderate: 'Recovery is below optimal. Consider lighter activity and prioritize sleep tonight.',
+    moderate: 'Recovery is below optimal. Lighter activity and prioritizing sleep tonight may help.',
     poor: 'Your body needs rest. Focus on recovery activities: sleep, hydration, light movement.'
   }
 
@@ -1042,9 +1042,9 @@ export async function generateSynthesizedInsights(userId: string): Promise<Synth
         priority: 'high',
         title: 'Recovery Needs Attention',
         description: recovery.recommendation,
-        details: `Sleep quality: ${recovery.sleepQuality}. Consider lighter activities today.`,
+        details: `Sleep quality: ${recovery.sleepQuality}. Lighter activities today may support recovery.`,
         metrics: ['hrv', 'rhr', 'sleep_score'],
-        actionable: 'Prioritize rest, hydration, and an earlier bedtime tonight.'
+        actionable: 'Rest, hydration, and an earlier bedtime tonight may help your body recover.'
       })
     }
   }
@@ -1087,7 +1087,7 @@ export async function generateSynthesizedInsights(userId: string): Promise<Synth
           description: `Only ${optimalPct.toFixed(0)}% of nights had optimal bed temperature (16-21°C). Your average: ${sleepArch.avgBedTemp.toFixed(1)}°C.`,
           details: 'Cooler sleeping temperatures (around 18°C) promote deeper sleep.',
           metrics: ['bed_temperature'],
-          actionable: 'Consider adjusting your bedroom temperature or bedding.'
+          actionable: 'Adjusting bedroom temperature or bedding may help improve sleep quality.'
         })
       }
     }
@@ -1164,7 +1164,7 @@ export async function generateSynthesizedInsights(userId: string): Promise<Synth
         description: `Both body fat (+${Math.abs(bodyFatTrend.changePercent).toFixed(1)}%) and ${massLabel} (${massTrend.changePercent.toFixed(1)}%) are trending unfavorably.`,
         details: 'This may indicate inadequate nutrition, overtraining, or insufficient recovery.',
         metrics: ['body_fat_percentage', massTrend.metricType],
-        actionable: 'Review protein intake, training volume, and recovery quality.',
+        actionable: 'Protein intake, training volume, and recovery quality may all be worth reviewing.',
         confidence: 70,
       })
     }
@@ -1210,7 +1210,7 @@ export async function generateSynthesizedInsights(userId: string): Promise<Synth
         priority: 'low',
         title: 'Sleep Pattern Discovered',
         description: `Your best sleep is on ${bestDay.dayName}s (avg ${bestDay.avgSleepScore.toFixed(0)}) and worst on ${worstDay.dayName}s (avg ${worstDay.avgSleepScore.toFixed(0)}).`,
-        details: `That's a ${diff.toFixed(0)} point difference. Consider what activities differ between these days.`,
+        details: `That's a ${diff.toFixed(0)} point difference. Reviewing what activities differ between these days may reveal useful patterns.`,
         metrics: ['sleep_score']
       })
     }
@@ -1375,7 +1375,7 @@ export async function generateSynthesizedInsights(userId: string): Promise<Synth
         description: `Sleep is ${sleepTrend.trend} while HRV is ${hrvTrend.trend}. This divergence is worth monitoring.`,
         details: 'Factors like stress, alcohol, or overtraining can cause HRV to diverge from sleep quality.',
         metrics: ['sleep_score', 'hrv'],
-        actionable: actionableRecs || 'Check for stress, alcohol, or overtraining factors.'
+        actionable: actionableRecs || 'Stress, alcohol, or overtraining may be contributing factors worth reviewing.'
       })
     }
   }
@@ -1398,7 +1398,7 @@ export async function generateSynthesizedInsights(userId: string): Promise<Synth
         priority: 'high',
         title: 'Poor Recovery May Impact Body Composition',
         description: `Recovery is low (${recovery.score}/100) and body fat is trending up. Poor sleep and recovery can increase cortisol, promoting fat storage.`,
-        actionable: 'Prioritize sleep quality and consider reducing training intensity until recovery improves.',
+        actionable: 'Prioritizing sleep quality and lighter training may help until recovery improves.',
         metrics: ['hrv', 'rhr', 'body_fat_percentage'],
       })
     }

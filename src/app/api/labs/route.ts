@@ -1,34 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { verifyUserAccess } from '@/lib/api-auth'
+import { BIOMARKER_REGISTRY, normalizeBiomarkerName } from '@/lib/lab-biomarker-contract'
+import { runComputePipeline } from '@/lib/labs/lab-compute-pipeline'
 
-interface MarkerInput {
+// Legacy response shape for iOS compatibility
+interface LegacyMarker {
   name: string
   value: number
   unit: string
-  rangeLow?: number
-  rangeHigh?: number
+  rangeLow?: number | null
+  rangeHigh?: number | null
+  flag: string
 }
 
-interface Marker extends MarkerInput {
-  flag: 'normal' | 'high' | 'low'
-}
-
-function computeFlag(value: number, rangeLow?: number, rangeHigh?: number): 'normal' | 'high' | 'low' {
-  if (rangeHigh !== undefined && value > rangeHigh) return 'high'
-  if (rangeLow !== undefined && value < rangeLow) return 'low'
+function computeFlag(value: number, rangeLow?: number | null, rangeHigh?: number | null): 'normal' | 'high' | 'low' {
+  if (rangeHigh != null && value > rangeHigh) return 'high'
+  if (rangeLow != null && value < rangeLow) return 'low'
   return 'normal'
 }
 
-function parseMarkers(markersJson: string): Marker[] {
-  try {
-    return JSON.parse(markersJson)
-  } catch {
-    return []
-  }
-}
-
-// GET /api/labs - List all lab results for a user
+// GET /api/labs - List all lab results (reads from enriched LabUpload + LabBiomarker)
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams
@@ -39,29 +31,46 @@ export async function GET(request: NextRequest) {
     if (!auth.success) return auth.response
     const { userId } = auth
 
-    const [results, total] = await Promise.all([
-      prisma.labResult.findMany({
+    const [uploads, total] = await Promise.all([
+      prisma.labUpload.findMany({
         where: { userId },
         orderBy: { testDate: 'desc' },
         take: limit,
         skip: offset,
+        include: { biomarkers: true },
       }),
-      prisma.labResult.count({ where: { userId } }),
+      prisma.labUpload.count({ where: { userId } }),
     ])
 
-    const parsed = results.map((r) => ({
-      ...r,
-      markers: parseMarkers(r.markers),
+    // Convert enriched format to legacy response shape
+    const results = uploads.map((upload) => ({
+      id: upload.id,
+      userId: upload.userId,
+      testDate: upload.testDate.toISOString(),
+      labName: upload.labName,
+      notes: upload.notes,
+      markers: upload.biomarkers.map((bm): LegacyMarker => {
+        const def = BIOMARKER_REGISTRY[bm.biomarkerKey]
+        return {
+          name: def?.displayName || bm.rawName || bm.biomarkerKey,
+          value: bm.value,
+          unit: bm.unit,
+          rangeLow: bm.rangeLow,
+          rangeHigh: bm.rangeHigh,
+          flag: bm.flag,
+        }
+      }),
+      createdAt: upload.createdAt.toISOString(),
     }))
 
-    return NextResponse.json({ results: parsed, total })
+    return NextResponse.json({ results, total })
   } catch (error) {
     console.error('Error fetching lab results:', error)
     return NextResponse.json({ error: 'Failed to fetch lab results' }, { status: 500 })
   }
 }
 
-// POST /api/labs - Create a new lab result
+// POST /api/labs - Create a new lab result (writes to enriched LabUpload + LabBiomarker)
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -77,28 +86,75 @@ export async function POST(request: NextRequest) {
     const auth = await verifyUserAccess(userId)
     if (!auth.success) return auth.response
 
-    // Auto-compute flags for each marker
-    const processedMarkers: Marker[] = markers.map((m: MarkerInput) => ({
-      name: m.name,
-      value: m.value,
-      unit: m.unit,
-      rangeLow: m.rangeLow,
-      rangeHigh: m.rangeHigh,
-      flag: computeFlag(m.value, m.rangeLow, m.rangeHigh),
-    }))
+    // Normalize markers and create enriched records
+    const biomarkerData = markers.map((m: { name: string; value: number; unit: string; rangeLow?: number; rangeHigh?: number }) => {
+      const biomarkerKey = normalizeBiomarkerName(m.name) || m.name.toLowerCase().replace(/[^a-z0-9]+/g, '_')
+      const def = BIOMARKER_REGISTRY[biomarkerKey]
+      const flag = computeFlag(m.value, m.rangeLow, m.rangeHigh)
+      return {
+        biomarkerKey,
+        rawName: m.name,
+        value: m.value,
+        unit: m.unit || def?.unit || '',
+        rangeLow: m.rangeLow ?? null,
+        rangeHigh: m.rangeHigh ?? null,
+        flag,
+        confidence: 1.0,
+        category: def?.category || null,
+      }
+    })
 
-    const result = await prisma.labResult.create({
+    // Deduplicate by biomarkerKey
+    const seen = new Set<string>()
+    const uniqueBiomarkers = biomarkerData.filter((bm: { biomarkerKey: string }) => {
+      if (seen.has(bm.biomarkerKey)) return false
+      seen.add(bm.biomarkerKey)
+      return true
+    })
+
+    const upload = await prisma.labUpload.create({
       data: {
         userId,
         testDate: new Date(testDate),
         labName: labName || null,
+        source: 'manual',
         notes: notes || null,
-        markers: JSON.stringify(processedMarkers),
+        confidence: 1.0,
+        biomarkers: {
+          create: uniqueBiomarkers,
+        },
       },
+      include: { biomarkers: true },
+    })
+
+    // Run compute pipeline in background (non-blocking)
+    runComputePipeline(userId, upload.id).catch((err) => {
+      console.error('[Labs] Compute pipeline error for manual entry:', err)
+    })
+
+    // Return legacy response shape
+    const legacyMarkers: LegacyMarker[] = upload.biomarkers.map((bm) => {
+      const def = BIOMARKER_REGISTRY[bm.biomarkerKey]
+      return {
+        name: def?.displayName || bm.rawName || bm.biomarkerKey,
+        value: bm.value,
+        unit: bm.unit,
+        rangeLow: bm.rangeLow,
+        rangeHigh: bm.rangeHigh,
+        flag: bm.flag,
+      }
     })
 
     return NextResponse.json(
-      { ...result, markers: processedMarkers },
+      {
+        id: upload.id,
+        userId: upload.userId,
+        testDate: upload.testDate.toISOString(),
+        labName: upload.labName,
+        notes: upload.notes,
+        markers: legacyMarkers,
+        createdAt: upload.createdAt.toISOString(),
+      },
       { status: 201 }
     )
   } catch (error) {

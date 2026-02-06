@@ -175,23 +175,23 @@ function generateTunings(
   if (phase === 'responding') {
     tunings.push({ type: 'duration_extension', title: 'Protocol is working -- maintain current approach', rationale: `${name} is producing measurable improvements. No adjustments recommended.`, confidence: 'high', metrics, priority: 7 })
     if (metrics.length === 1 && synergy) {
-      tunings.push({ type: 'stack_suggestion', title: `Consider pairing with ${synergy}`, rationale: `${name} is improving ${metrics[0].replace(/_/g, ' ')} but only one metric is responding. ${synergy} has synergistic mechanisms that may broaden the effect.`, confidence: 'medium', metrics, priority: 4 })
+      tunings.push({ type: 'stack_suggestion', title: `${synergy} may complement this protocol`, rationale: `${name} is improving ${metrics[0].replace(/_/g, ' ')} but only one metric is responding. ${synergy} has synergistic mechanisms that may broaden the effect — discuss with your provider.`, confidence: 'medium', metrics, priority: 4 })
     }
     return tunings
   }
 
   if (phase === 'plateau') {
-    tunings.push({ type: 'dose_increase', title: 'Consider dose adjustment', rationale: `${name} response has plateaued after ${days} days. A modest dose increase may restart progress. Discuss with your provider.`, confidence: 'medium', metrics, priority: 7 })
-    tunings.push({ type: 'timing_change', title: 'Try shifting administration timing', rationale: `Changing administration time (e.g., morning to evening) can improve absorption and reset the response curve.`, confidence: 'low', metrics, priority: 5 })
+    tunings.push({ type: 'dose_increase', title: 'Discuss dosing adjustment with your provider', rationale: `${name} response has plateaued after ${days} days. Your provider can help determine whether a dosing adjustment might restart progress.`, confidence: 'medium', metrics, priority: 7 })
+    tunings.push({ type: 'timing_change', title: 'Discuss administration timing with your provider', rationale: `Shifting administration timing (e.g., morning to evening) may improve absorption and reset the response curve — your provider can advise.`, confidence: 'low', metrics, priority: 5 })
     if (synergy) {
-      tunings.push({ type: 'stack_suggestion', title: `Consider adding ${synergy}`, rationale: `${synergy} has synergistic mechanisms with ${name} that may help push past the current plateau.`, confidence: 'medium', metrics, priority: 6 })
+      tunings.push({ type: 'stack_suggestion', title: `${synergy} may help push past this plateau`, rationale: `${synergy} has synergistic mechanisms with ${name} that may help push past the current plateau — your provider can advise on whether this combination is appropriate.`, confidence: 'medium', metrics, priority: 6 })
     }
     return tunings
   }
 
   // diminishing
-  tunings.push({ type: 'consider_cycling', title: 'Consider a washout period', rationale: `${name} showing diminishing returns after ${days} days. A 2-week washout may restore receptor sensitivity.`, confidence: 'high', metrics, priority: 9 })
-  tunings.push({ type: 'dose_decrease', title: 'Consider reducing dose', rationale: `Receptor desensitization may be occurring. A lower maintenance dose could sustain benefits with less downregulation.`, confidence: 'medium', metrics, priority: 6 })
+  tunings.push({ type: 'consider_cycling', title: 'Discuss a washout period with your provider', rationale: `${name} showing diminishing returns after ${days} days. A washout period may restore receptor sensitivity — your provider can help determine the right approach.`, confidence: 'high', metrics, priority: 9 })
+  tunings.push({ type: 'dose_decrease', title: 'Discuss dosing with your provider', rationale: `Receptor desensitization may be occurring. Your provider can help determine whether a lower maintenance dose could sustain benefits with less downregulation.`, confidence: 'medium', metrics, priority: 6 })
   return tunings
 }
 

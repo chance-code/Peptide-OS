@@ -79,8 +79,8 @@ export const PROTOCOL_MECHANISMS: Record<string, ProtocolMechanism> = {
       earlyImproving: "Early positive signals with BPC-157. {metric} is trending up—this aligns with BPC-157's tissue repair timeline (typically 2-6 weeks for full effects).",
       improving: "BPC-157's angiogenic and tissue repair properties are contributing to your {metric} improvement ({change}). The peptide promotes blood vessel formation via VEGFR2 and nitric oxide pathways.",
       stable: "BPC-157 effects on {metric} are stable. This peptide works through gradual tissue repair mechanisms—continue monitoring.",
-      declining: "{metric} is down while on BPC-157. BPC-157 supports recovery but can't overcome excessive stress. Consider training load and sleep quality.",
-      noData: "Start tracking {metric} to measure BPC-157's recovery effects.",
+      declining: "{metric} is down while on BPC-157. BPC-157 supports recovery but can't overcome excessive stress. Training load and sleep quality may be worth reviewing.",
+      noData: "Tracking {metric} would help measure BPC-157's recovery effects.",
       onTrack: "Your {metric} improvement aligns with BPC-157's expected 2-4 week timeline for healing mechanisms to take effect."
     },
     synergyWith: ['TB-500', 'GHK-Cu'],
@@ -249,8 +249,8 @@ export const PROTOCOL_MECHANISMS: Record<string, ProtocolMechanism> = {
       earlyImproving: "CJC-1295 appears active—{metric} improving. Its extended half-life provides sustained GH elevation.",
       improving: "CJC-1295's GHRH activity is prolonging your GH pulses, reflected in {metric} improvement ({change}). This sustained elevation supports deeper sleep and enhanced recovery.",
       stable: "{metric} holding steady. CJC-1295 body comp effects emerge over 2-4 months—patience is key.",
-      declining: "{metric} declining on CJC-1295. Consider timing and ensure you're not eating within 2 hours of injection.",
-      noData: "Add {metric} tracking to measure CJC-1295 effectiveness.",
+      declining: "{metric} declining on CJC-1295. Timing and meal proximity to administration may be worth discussing with your provider.",
+      noData: "Tracking {metric} would help measure CJC-1295 effectiveness.",
       onTrack: "Your {metric} trajectory aligns with expected CJC-1295 effects on the GH/IGF-1 axis."
     },
     synergyWith: ['Ipamorelin'],
@@ -419,7 +419,7 @@ export const PROTOCOL_MECHANISMS: Record<string, ProtocolMechanism> = {
       improving: "Tirzepatide's dual GLP-1/GIP action is driving strong improvement in {metric} ({change}). Clinical data shows it outperforms single-target approaches.",
       stable: "{metric} stable—Tirzepatide effects may require dose titration. Consult your provider.",
       declining: "Unexpected {metric} change on Tirzepatide. Review diet and dosing consistency.",
-      noData: "Start tracking {metric} to measure Tirzepatide effectiveness.",
+      noData: "Tracking {metric} would help measure Tirzepatide effectiveness.",
       onTrack: "Your {metric} trajectory matches or exceeds typical tirzepatide response curves from clinical trials."
     },
     evidenceLevel: 'clinical_trials',
@@ -548,7 +548,7 @@ export const PROTOCOL_MECHANISMS: Record<string, ProtocolMechanism> = {
       earlyImproving: "Semax's neurotrophic effects may be starting—{metric} trending positively. Cognitive effects (attention, focus) are often noticed quickly.",
       improving: "Semax's neurotrophic effects, including BDNF upregulation, may be contributing to improved stress resilience reflected in your {metric} ({change}).",
       stable: "Semax effects are primarily cognitive. {metric} stability while using suggests no negative autonomic impact.",
-      declining: "{metric} declining—Semax is unlikely the cause. Consider whether sleep timing or stress levels have changed.",
+      declining: "{metric} declining—Semax is unlikely the cause. Sleep timing or stress levels may be worth reviewing.",
       noData: "Semax benefits are primarily cognitive (focus, attention) and may not show in standard health metrics."
     },
     evidenceLevel: 'preclinical',
@@ -816,7 +816,7 @@ export const PROTOCOL_MECHANISMS: Record<string, ProtocolMechanism> = {
       'One of the most researched sports supplements',
       'Strong evidence for strength and power output',
       'Emerging evidence for cognitive benefits, especially under stress or sleep deprivation',
-      'Safe for long-term use at 3-5g daily'
+      'Well-researched with a strong long-term safety profile — your provider can help determine appropriate dosing'
     ],
     confounds: ['Training intensity', 'Protein intake', 'Hydration status']
   },
@@ -864,7 +864,7 @@ export const PROTOCOL_MECHANISMS: Record<string, ProtocolMechanism> = {
     evidenceLevel: 'clinical_trials',
     researchNotes: [
       'Many adults are magnesium deficient',
-      '90-day study showed clear HRV improvements with 400mg daily',
+      'Studies show clear HRV improvements with consistent magnesium supplementation',
       'Different forms have varying absorption (glycinate, threonate better for CNS)',
       'Threonate form (Magtein) shows cognitive benefits in trials'
     ],
@@ -916,7 +916,7 @@ export const PROTOCOL_MECHANISMS: Record<string, ProtocolMechanism> = {
       improving: "Vitamin D is supporting circadian regulation and immune function, reflected in your {metric} improvement ({change}). Its effects are wide-ranging through VDR activation.",
       stable: "Vitamin D maintains foundational health—{metric} stability is a positive sign.",
       declining: "{metric} down—vitamin D is unlikely the cause. It's a slow-acting nutrient that supports, not drives, performance.",
-      noData: "Consider blood testing to confirm vitamin D levels (optimal 40-60 ng/mL) alongside metric tracking.",
+      noData: "Blood testing can help confirm vitamin D levels alongside metric tracking — your provider can advise on optimal ranges.",
       onTrack: "Your {metric} improvement aligns with vitamin D's effects on circadian rhythm and inflammatory regulation."
     },
     evidenceLevel: 'clinical_trials',
@@ -984,7 +984,7 @@ export const PROTOCOL_MECHANISMS: Record<string, ProtocolMechanism> = {
       'EPA may be more important for CV benefits than DHA',
       'Anti-arrhythmic effects reduce sudden cardiac death risk',
       'Look for 2:1 or 3:1 EPA:DHA ratio for CV focus',
-      'Effective dose typically 2-4g combined EPA+DHA'
+      'Your provider can help determine the right EPA+DHA dosing for your goals'
     ],
     confounds: ['Dietary fish intake', 'Overall fat intake', 'Medication interactions (blood thinners)']
   }

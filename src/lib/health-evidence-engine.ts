@@ -1006,7 +1006,7 @@ function analyzeConfounds(
 
   if (confoundRatio > 0.4 || normalizedScore > 50) {
     impact = 'high'
-    recommendation = 'Too many confounding events to reliably attribute changes. Consider restarting analysis after a cleaner period.'
+    recommendation = 'Too many confounding events to reliably attribute changes. A cleaner period of data collection may help clarify the picture.'
   } else if (confoundRatio > 0.2 || normalizedScore > 25) {
     impact = 'medium'
     recommendation = 'Some confounding events present. Results should be interpreted with caution.'
@@ -1335,7 +1335,7 @@ function determineVerdict(
     return {
       verdict: 'possible_negative',
       verdictScore: 30,
-      verdictExplanation: `Some metrics moved unfavorably since starting ${protocolName}. ${topAdverse.metricName} ${topAdverse.change.direction === 'up' ? 'increased' : 'decreased'} ${Math.abs(topAdverse.change.percent).toFixed(0)}%. Consider reviewing dosing or timing.`,
+      verdictExplanation: `Some metrics moved unfavorably since starting ${protocolName}. ${topAdverse.metricName} ${topAdverse.change.direction === 'up' ? 'increased' : 'decreased'} ${Math.abs(topAdverse.change.percent).toFixed(0)}%. Discussing dosing or timing with your provider may help.`,
     }
   }
 
