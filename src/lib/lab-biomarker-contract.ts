@@ -253,7 +253,7 @@ export const BIOMARKER_REGISTRY: Record<string, BiomarkerDefinition> = {
   free_t3: {
     key: 'free_t3',
     displayName: 'Free T3',
-    aliases: ['FT3', 'Triiodothyronine Free', 'Free Triiodothyronine'],
+    aliases: ['FT3', 'Triiodothyronine Free', 'Free Triiodothyronine', 'T3 Free', 'T3, Free'],
     category: 'hormones_thyroid',
     unit: 'pg/dL',
     polarity: 'optimal_range',
@@ -266,7 +266,7 @@ export const BIOMARKER_REGISTRY: Record<string, BiomarkerDefinition> = {
   free_t4: {
     key: 'free_t4',
     displayName: 'Free T4',
-    aliases: ['FT4', 'Thyroxine Free', 'Free Thyroxine'],
+    aliases: ['FT4', 'Thyroxine Free', 'Free Thyroxine', 'T4 Free', 'T4, Free'],
     category: 'hormones_thyroid',
     unit: 'ng/dL',
     polarity: 'optimal_range',
@@ -492,7 +492,7 @@ export const BIOMARKER_REGISTRY: Record<string, BiomarkerDefinition> = {
   iron: {
     key: 'iron',
     displayName: 'Iron',
-    aliases: ['Serum Iron', 'Fe'],
+    aliases: ['Serum Iron', 'Fe', 'Iron Total', 'Iron, Total'],
     category: 'minerals',
     unit: 'ug/dL',
     polarity: 'optimal_range',
@@ -1050,7 +1050,7 @@ export const BIOMARKER_REGISTRY: Record<string, BiomarkerDefinition> = {
     key: 'transferrin_saturation',
     displayName: 'Transferrin Saturation',
     shortName: 'TSAT',
-    aliases: ['Iron Saturation', 'TSAT', 'Transferrin Sat', 'Iron Sat %'],
+    aliases: ['Iron Saturation', 'TSAT', 'Transferrin Sat', 'Iron Sat %', '% Saturation', 'Saturation'],
     category: 'minerals',
     unit: '%',
     polarity: 'optimal_range',
@@ -1086,7 +1086,7 @@ export const BIOMARKER_REGISTRY: Record<string, BiomarkerDefinition> = {
     key: 'omega_3_index',
     displayName: 'Omega-3 Index',
     shortName: 'Ω-3',
-    aliases: ['Omega 3 Index', 'O3 Index', 'EPA + DHA Index'],
+    aliases: ['Omega 3 Index', 'O3 Index', 'EPA + DHA Index', 'EPA+DPA+DHA', 'OmegaCheck', 'EPA DPA DHA'],
     category: 'vitamins',
     unit: '%',
     polarity: 'higher_better',
@@ -1352,8 +1352,14 @@ export function normalizeBiomarkerName(raw: string): string | null {
   const entries = Array.from(aliasMap.entries())
   for (const [aliasNorm, key] of entries) {
     // Check if all words in the raw string appear in the alias
+    // Use stricter threshold for single-word inputs to prevent false positives:
+    // "globulin" → "thyroglobulinab" (53%), "protein" → "creactiveprotein" (44%)
     if (words.every(word => aliasNorm.includes(word))) {
-      return key
+      const rawLength = words.reduce((sum, w) => sum + w.length, 0)
+      const threshold = words.length === 1 ? 0.8 : 0.4
+      if (rawLength >= aliasNorm.length * threshold) {
+        return key
+      }
     }
     // Check if all words in the alias appear in the raw string
     const aliasWords = aliasNorm.split(/[^a-z0-9]+/).filter(w => w.length > 1)

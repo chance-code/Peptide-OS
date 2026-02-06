@@ -84,6 +84,14 @@ const UNIT_ALIASES: Record<string, string> = {
   'M/uL': '10^6/uL',
   'fl': 'fL',
   'FL': 'fL',
+  // Quest Diagnostics unit names
+  'mcg/dL': 'ug/dL',
+  'mcg/L': 'ug/L',
+  'mcg/mL': 'ug/mL',
+  'Thousand/uL': '10^3/uL',
+  'Thousand /uL': '10^3/uL',
+  'Million/uL': '10^6/uL',
+  '% by wt': '%',
 }
 
 /**
