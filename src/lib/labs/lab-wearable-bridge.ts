@@ -4,8 +4,12 @@
 import prisma from '@/lib/prisma'
 import { BIOMARKER_REGISTRY, type BiomarkerFlag } from '@/lib/lab-biomarker-contract'
 import { type LabPattern } from './lab-analyzer'
+import { getLabExpectationsForProtocol, getRecommendedLabSchedule } from '@/lib/protocol-lab-expectations'
+import { differenceInDays, subDays, format } from 'date-fns'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
+
+export type BridgeMode = 'reactive' | 'predictive' | 'confirmation' | 'protocol_aware' | 'monitoring'
 
 export interface BridgeInsight {
   bridgeKey: string
@@ -29,6 +33,7 @@ export interface BridgeInsight {
   actionability: string
   confidence: 'high' | 'medium' | 'speculative'
   priority: 'high' | 'medium' | 'low'
+  mode: BridgeMode
 }
 
 // ─── Wearable Data Helpers ──────────────────────────────────────────────────
@@ -160,6 +165,7 @@ async function bridgeHRVMetabolic(
     actionability: 'Discuss metabolic health with your provider. Regular exercise, balanced nutrition, and consistent sleep all support both insulin sensitivity and HRV.',
     confidence: homaIR > 3.5 ? 'high' : 'medium',
     priority: 'high',
+    mode: 'reactive',
   }
 }
 
@@ -194,6 +200,7 @@ async function bridgeRecoveryInflammation(
     actionability: 'Discuss the hs-CRP elevation with your provider to identify the underlying cause. Sleep, nutrition, and regular exercise all support healthy inflammatory balance.',
     confidence: crp.value > 5.0 ? 'high' : 'medium',
     priority: 'high',
+    mode: 'reactive',
   }
 }
 
@@ -229,6 +236,7 @@ async function bridgeSleepThyroid(
     actionability: 'Discuss thyroid function with your provider. If treatment is initiated, tracking deep sleep trends over time can help assess response.',
     confidence: 'medium',
     priority: 'medium',
+    mode: 'reactive',
   }
 }
 
@@ -269,6 +277,7 @@ async function bridgeBodyCompHormonal(
     actionability: 'Discuss these hormonal results with your provider. Sleep, stress management, and exercise all influence hormone levels.',
     confidence: testLow && cortisolHigh ? 'high' : 'medium',
     priority: 'high',
+    mode: 'reactive',
   }
 }
 
@@ -304,6 +313,7 @@ async function bridgeVO2Cardiovascular(
     actionability: 'Discuss these advanced lipid markers with a cardiologist or lipidologist for personalized guidance. Continue regular exercise — it remains cardioprotective regardless of lipid levels.',
     confidence: 'medium',
     priority: 'high',
+    mode: 'reactive',
   }
 }
 
@@ -343,6 +353,7 @@ async function bridgeRHRIron(
     actionability: 'Discuss iron supplementation with your provider. Monitoring your resting heart rate trend can help assess response to treatment.',
     confidence: hemoglobin && hemoglobin.value < 10 ? 'high' : 'medium',
     priority: rhrTrend === 'declining' ? 'high' : 'medium',
+    mode: 'reactive',
   }
 }
 
@@ -391,39 +402,428 @@ async function bridgeActivityNutrient(
     actionability: 'Discuss targeted supplementation with your provider based on which nutrients are deficient. Retest in 3 months to confirm improvement.',
     confidence: depletionCount >= 3 ? 'high' : 'medium',
     priority: exercise.trend === 'declining' ? 'high' : 'medium',
+    mode: 'reactive',
   }
+}
+
+// ─── Predictive Mode (wearable → lab suggestion) ─────────────────────────────
+
+// Wearable trend thresholds that suggest confirmatory labwork
+const WEARABLE_LAB_SUGGESTIONS: Array<{
+  metricType: string
+  threshold: { direction: 'decline' | 'increase'; percent: number; windowDays: number }
+  suggestedLabs: Array<{ biomarkerKey: string; displayName: string; rationale: string }>
+}> = [
+  {
+    metricType: 'hrv',
+    threshold: { direction: 'decline', percent: 15, windowDays: 21 },
+    suggestedLabs: [
+      { biomarkerKey: 'hs_crp', displayName: 'hs-CRP', rationale: 'Sustained HRV decline may reflect systemic inflammation' },
+      { biomarkerKey: 'cortisol', displayName: 'Cortisol', rationale: 'Chronic stress can suppress parasympathetic tone' },
+      { biomarkerKey: 'fasting_insulin', displayName: 'Fasting Insulin', rationale: 'Insulin resistance is associated with reduced HRV' },
+    ],
+  },
+  {
+    metricType: 'resting_heart_rate',
+    threshold: { direction: 'increase', percent: 10, windowDays: 21 },
+    suggestedLabs: [
+      { biomarkerKey: 'tsh', displayName: 'TSH', rationale: 'Thyroid dysfunction can alter resting heart rate' },
+      { biomarkerKey: 'hemoglobin', displayName: 'Hemoglobin', rationale: 'Anemia causes compensatory heart rate increase' },
+      { biomarkerKey: 'ferritin', displayName: 'Ferritin', rationale: 'Iron deficiency can elevate resting heart rate' },
+    ],
+  },
+  {
+    metricType: 'deep_sleep',
+    threshold: { direction: 'decline', percent: 20, windowDays: 28 },
+    suggestedLabs: [
+      { biomarkerKey: 'tsh', displayName: 'TSH', rationale: 'Thyroid hormones influence sleep architecture' },
+      { biomarkerKey: 'free_t3', displayName: 'Free T3', rationale: 'Low T3 is associated with reduced deep sleep' },
+      { biomarkerKey: 'cortisol', displayName: 'Cortisol', rationale: 'Elevated evening cortisol can disrupt sleep stages' },
+    ],
+  },
+]
+
+async function generatePredictiveInsights(userId: string): Promise<BridgeInsight[]> {
+  const insights: BridgeInsight[] = []
+
+  for (const suggestion of WEARABLE_LAB_SUGGESTIONS) {
+    const recentWindow = Math.min(suggestion.threshold.windowDays, 7)
+    const baselineWindow = suggestion.threshold.windowDays
+
+    const [recent, baseline] = await Promise.all([
+      getRecentMetric(userId, suggestion.metricType, recentWindow),
+      getRecentMetric(userId, suggestion.metricType, baselineWindow),
+    ])
+
+    if (!recent || !baseline || baseline.avg === 0) continue
+
+    const changePercent = ((recent.avg - baseline.avg) / baseline.avg) * 100
+    const isTriggered = suggestion.threshold.direction === 'decline'
+      ? changePercent < -suggestion.threshold.percent
+      : changePercent > suggestion.threshold.percent
+
+    if (!isTriggered) continue
+
+    const directionWord = suggestion.threshold.direction === 'decline' ? 'declined' : 'increased'
+    const labList = suggestion.suggestedLabs.map(l => l.displayName).join(', ')
+
+    insights.push({
+      bridgeKey: `predictive_${suggestion.metricType}`,
+      title: `${METRIC_DISPLAY_NAMES[suggestion.metricType] ?? suggestion.metricType} trend suggests considering labwork`,
+      narrative: `Your ${METRIC_DISPLAY_NAMES[suggestion.metricType] ?? suggestion.metricType} has ${directionWord} ${Math.abs(Math.round(changePercent))}% over the past ${baselineWindow} days. This sustained change may have underlying causes that could show up in bloodwork. Consider discussing ${labList} with your provider.`,
+      labFindings: [],
+      wearableFindings: [{
+        metricType: suggestion.metricType,
+        displayName: METRIC_DISPLAY_NAMES[suggestion.metricType] ?? suggestion.metricType,
+        recentAvg: recent.avg,
+        unit: recent.unit,
+        trend: recent.trend,
+      }],
+      connection: suggestion.suggestedLabs.map(l => `${l.displayName}: ${l.rationale}`).join('. '),
+      actionability: `Consider requesting ${labList} at your next provider visit to investigate this trend.`,
+      confidence: 'speculative',
+      priority: 'medium',
+      mode: 'predictive',
+    })
+  }
+
+  return insights
+}
+
+// ─── Confirmation Mode (lab → wearable explanation) ──────────────────────────
+
+// Maps abnormal lab findings to wearable metrics that could corroborate
+const LAB_WEARABLE_CORROBORATION: Array<{
+  biomarkerKey: string
+  displayName: string
+  abnormalCondition: (value: number) => boolean
+  corroboratingMetrics: Array<{
+    metricType: string
+    expectedTrend: 'declining' | 'improving'
+    explanation: string
+  }>
+}> = [
+  {
+    biomarkerKey: 'tsh',
+    displayName: 'TSH',
+    abnormalCondition: (v) => v > 4.0,
+    corroboratingMetrics: [
+      { metricType: 'deep_sleep', expectedTrend: 'declining', explanation: 'Elevated TSH may explain your reduced deep sleep, as thyroid hormones regulate sleep architecture' },
+      { metricType: 'resting_heart_rate', expectedTrend: 'declining', explanation: 'Elevated TSH is consistent with a lower resting heart rate, as hypothyroidism slows cardiac function' },
+    ],
+  },
+  {
+    biomarkerKey: 'free_testosterone',
+    displayName: 'Free Testosterone',
+    abnormalCondition: (v) => v < 5.0,
+    corroboratingMetrics: [
+      { metricType: 'recovery_score', expectedTrend: 'declining', explanation: 'Low free testosterone may be contributing to reduced recovery, as testosterone supports muscle repair and autonomic balance' },
+      { metricType: 'body_fat_percentage', expectedTrend: 'improving', explanation: 'Low free testosterone is associated with increased body fat accumulation' },
+    ],
+  },
+  {
+    biomarkerKey: 'ferritin',
+    displayName: 'Ferritin',
+    abnormalCondition: (v) => v < 30,
+    corroboratingMetrics: [
+      { metricType: 'resting_heart_rate', expectedTrend: 'improving', explanation: 'Low ferritin may explain your elevated resting heart rate, as iron deficiency causes compensatory cardiac output' },
+      { metricType: 'exercise_minutes', expectedTrend: 'declining', explanation: 'Low ferritin can reduce exercise tolerance due to impaired oxygen transport' },
+    ],
+  },
+  {
+    biomarkerKey: 'hs_crp',
+    displayName: 'hs-CRP',
+    abnormalCondition: (v) => v > 3.0,
+    corroboratingMetrics: [
+      { metricType: 'hrv', expectedTrend: 'declining', explanation: 'Elevated hs-CRP may explain your HRV decline, as systemic inflammation suppresses parasympathetic tone' },
+      { metricType: 'recovery_score', expectedTrend: 'declining', explanation: 'Elevated hs-CRP may be impacting your recovery capacity through inflammatory pathways' },
+    ],
+  },
+]
+
+async function generateConfirmationInsights(
+  userId: string,
+  map: BiomarkerMap
+): Promise<BridgeInsight[]> {
+  const insights: BridgeInsight[] = []
+
+  for (const corr of LAB_WEARABLE_CORROBORATION) {
+    const labValue = map[corr.biomarkerKey]
+    if (!labValue || !corr.abnormalCondition(labValue.value)) continue
+
+    for (const metric of corr.corroboratingMetrics) {
+      const wearableData = await getRecentMetric(userId, metric.metricType)
+      if (!wearableData) continue
+
+      // For RHR, improving = higher values, so invert the trend interpretation
+      const isRHR = metric.metricType === 'rhr' || metric.metricType === 'resting_heart_rate'
+      const effectiveTrend = isRHR
+        ? (wearableData.trend === 'improving' ? 'declining' : wearableData.trend === 'declining' ? 'improving' : 'stable')
+        : wearableData.trend
+
+      // Only generate insight if the wearable trend matches the expected direction
+      if (effectiveTrend !== metric.expectedTrend) continue
+
+      insights.push({
+        bridgeKey: `confirmation_${corr.biomarkerKey}_${metric.metricType}`,
+        title: `${corr.displayName} result may explain your ${METRIC_DISPLAY_NAMES[metric.metricType] ?? metric.metricType} trend`,
+        narrative: `Your ${corr.displayName} of ${labValue.value} ${labValue.unit} is outside the reference range, and your ${METRIC_DISPLAY_NAMES[metric.metricType] ?? metric.metricType} has been trending ${wearableData.trend === 'declining' ? 'down' : 'up'}. ${metric.explanation}.`,
+        labFindings: [{
+          biomarkerKey: corr.biomarkerKey,
+          displayName: corr.displayName,
+          ...labValue,
+        }],
+        wearableFindings: [{
+          metricType: metric.metricType,
+          displayName: METRIC_DISPLAY_NAMES[metric.metricType] ?? metric.metricType,
+          recentAvg: wearableData.avg,
+          unit: wearableData.unit,
+          trend: wearableData.trend,
+        }],
+        connection: metric.explanation,
+        actionability: `Discuss this finding with your provider. If ${corr.displayName} is addressed, monitoring your ${METRIC_DISPLAY_NAMES[metric.metricType] ?? metric.metricType} trend can help assess response.`,
+        confidence: 'medium',
+        priority: 'medium',
+        mode: 'confirmation',
+      })
+    }
+  }
+
+  return insights
+}
+
+// ─── Protocol-Aware Mode (protocol + wearable → lab recommendation) ──────────
+
+async function generateProtocolAwareInsights(userId: string): Promise<BridgeInsight[]> {
+  const insights: BridgeInsight[] = []
+
+  // Get active protocols
+  const activeProtocols = await prisma.protocol.findMany({
+    where: { userId, status: 'active' },
+    include: { peptide: { select: { name: true, canonicalName: true } } },
+  })
+
+  for (const protocol of activeProtocols) {
+    const protocolName = protocol.peptide.canonicalName || protocol.peptide.name
+    const expectations = getLabExpectationsForProtocol(protocolName)
+    if (!expectations) continue
+
+    const weeksSinceStart = Math.floor(differenceInDays(new Date(), protocol.startDate) / 7)
+
+    // Check if any expected wearable-correlated effects are showing up
+    for (const effect of expectations.expectedLabEffects) {
+      // Map lab effects to wearable proxies
+      const wearableProxy = LAB_TO_WEARABLE_PROXY[effect.biomarkerKey]
+      if (!wearableProxy) continue
+
+      const wearableData = await getRecentMetric(userId, wearableProxy.metricType)
+      if (!wearableData) continue
+
+      // Check if we're within the expected onset window
+      if (weeksSinceStart < effect.onsetWeeks.min) continue
+
+      // Check if wearable signal is trending in the expected direction
+      const expectedWearableTrend = effect.expectedDirection === 'increase'
+        ? wearableProxy.whenIncreasing
+        : wearableProxy.whenDecreasing
+
+      if (wearableData.trend !== expectedWearableTrend) continue
+
+      // Wearable signal matches expected protocol effect — suggest confirmatory labs
+      insights.push({
+        bridgeKey: `protocol_aware_${protocol.id}_${effect.biomarkerKey}`,
+        title: `Wearable signal aligns with expected ${protocolName} effect`,
+        narrative: `You've been on ${protocolName} for ${weeksSinceStart} weeks. Your ${METRIC_DISPLAY_NAMES[wearableProxy.metricType] ?? wearableProxy.metricType} has been ${wearableData.trend === 'improving' ? 'improving' : 'trending in the expected direction'}, which is consistent with ${effect.displayName} ${effect.expectedDirection === 'increase' ? 'increasing' : 'decreasing'}. Confirmatory labwork could verify this effect.`,
+        labFindings: [],
+        wearableFindings: [{
+          metricType: wearableProxy.metricType,
+          displayName: METRIC_DISPLAY_NAMES[wearableProxy.metricType] ?? wearableProxy.metricType,
+          recentAvg: wearableData.avg,
+          unit: wearableData.unit,
+          trend: wearableData.trend,
+        }],
+        connection: `${effect.mechanism}. Expected ${effect.expectedDirection} of ${effect.magnitudeRange.min}-${effect.magnitudeRange.max}% in ${effect.biomarkerKey} by weeks ${effect.onsetWeeks.min}-${effect.peakWeeks.max}.`,
+        actionability: `Consider requesting ${effect.displayName} at your next lab draw to confirm whether ${protocolName} is producing the expected effect.`,
+        confidence: 'speculative',
+        priority: weeksSinceStart >= effect.onsetWeeks.max ? 'high' : 'medium',
+        mode: 'protocol_aware',
+      })
+    }
+  }
+
+  return insights
+}
+
+// Map lab biomarkers to wearable proxy metrics for protocol-aware mode
+const LAB_TO_WEARABLE_PROXY: Record<string, {
+  metricType: string
+  whenIncreasing: 'improving' | 'declining'
+  whenDecreasing: 'improving' | 'declining'
+}> = {
+  igf_1: { metricType: 'recovery_score', whenIncreasing: 'improving', whenDecreasing: 'declining' },
+  hs_crp: { metricType: 'hrv', whenIncreasing: 'declining', whenDecreasing: 'improving' },
+  hba1c: { metricType: 'hrv', whenIncreasing: 'declining', whenDecreasing: 'improving' },
+  fasting_glucose: { metricType: 'hrv', whenIncreasing: 'declining', whenDecreasing: 'improving' },
+  fasting_insulin: { metricType: 'hrv', whenIncreasing: 'declining', whenDecreasing: 'improving' },
+  free_testosterone: { metricType: 'recovery_score', whenIncreasing: 'improving', whenDecreasing: 'declining' },
+}
+
+// ─── Continuous Monitoring Mode (staleness + protocol → retest) ──────────────
+
+async function generateMonitoringInsights(userId: string): Promise<BridgeInsight[]> {
+  const insights: BridgeInsight[] = []
+
+  // Check days since last lab draw
+  const latestUpload = await prisma.labUpload.findFirst({
+    where: { userId },
+    orderBy: { testDate: 'desc' },
+    select: { testDate: true },
+  })
+
+  const daysSinceLastDraw = latestUpload
+    ? differenceInDays(new Date(), latestUpload.testDate)
+    : null
+
+  // Get active protocols with lab expectations
+  const activeProtocols = await prisma.protocol.findMany({
+    where: { userId, status: 'active' },
+    include: { peptide: { select: { name: true, canonicalName: true } } },
+  })
+
+  const protocolsWithExpectations = activeProtocols
+    .map(p => ({
+      protocol: p,
+      name: p.peptide.canonicalName || p.peptide.name,
+      expectations: getLabExpectationsForProtocol(p.peptide.canonicalName || p.peptide.name),
+      weeksSinceStart: Math.floor(differenceInDays(new Date(), p.startDate) / 7),
+    }))
+    .filter(p => p.expectations !== null)
+
+  if (protocolsWithExpectations.length === 0) return insights
+
+  // Check each protocol's recommended lab schedule
+  for (const { protocol, name, expectations, weeksSinceStart } of protocolsWithExpectations) {
+    if (!expectations) continue
+    const schedule = expectations.recommendedLabSchedule
+
+    // Check if we're near a midpoint or endpoint lab window
+    const nearMidpoint = Math.abs(weeksSinceStart - schedule.midpoint.weekNumber) <= 2
+    const nearEndpoint = Math.abs(weeksSinceStart - schedule.endpoint.weekNumber) <= 2
+    const pastMidpointNoLab = weeksSinceStart > schedule.midpoint.weekNumber + 2
+      && daysSinceLastDraw !== null
+      && daysSinceLastDraw > (schedule.midpoint.weekNumber * 7)
+
+    if (!nearMidpoint && !nearEndpoint && !pastMidpointNoLab) continue
+
+    let timepoint: string
+    let biomarkers: string[]
+    let urgency: 'high' | 'medium'
+
+    if (nearEndpoint) {
+      timepoint = 'endpoint'
+      biomarkers = schedule.endpoint.biomarkers
+      urgency = 'high'
+    } else if (nearMidpoint) {
+      timepoint = 'midpoint'
+      biomarkers = schedule.midpoint.biomarkers
+      urgency = 'medium'
+    } else {
+      timepoint = 'overdue midpoint'
+      biomarkers = schedule.midpoint.biomarkers
+      urgency = 'high'
+    }
+
+    const biomarkerNames = biomarkers
+      .map(k => BIOMARKER_REGISTRY[k]?.displayName ?? k)
+      .join(', ')
+
+    const staleNote = daysSinceLastDraw !== null
+      ? ` It's been ${daysSinceLastDraw} days since your last lab draw.`
+      : ' No previous lab draws on file.'
+
+    insights.push({
+      bridgeKey: `monitoring_${protocol.id}_${timepoint}`,
+      title: `${name}: ${timepoint} labs recommended`,
+      narrative: `You're at week ${weeksSinceStart} of ${name}, which is ${nearEndpoint ? 'the endpoint evaluation window' : nearMidpoint ? 'the midpoint check-in window' : 'past the recommended midpoint check'}.${staleNote} Recommended labs: ${biomarkerNames}.`,
+      labFindings: [],
+      wearableFindings: [],
+      connection: `The ${timepoint} lab panel for ${name} helps assess whether the protocol is producing expected effects and monitors safety markers.`,
+      actionability: `Schedule a lab draw including ${biomarkerNames} to evaluate your ${name} protocol progress.`,
+      confidence: 'high',
+      priority: urgency,
+      mode: 'monitoring',
+    })
+  }
+
+  return insights
 }
 
 // ─── Main Entry Point ───────────────────────────────────────────────────────
 
 /**
  * Generate bridge insights connecting lab results to wearable data.
- * @param userId - The user's ID (for querying wearable data)
- * @param biomarkers - The parsed lab biomarkers
+ * Supports multiple modes: reactive (lab+wearable), predictive (wearable→lab),
+ * confirmation (lab→wearable), protocol_aware, and monitoring (staleness+protocol).
+ *
+ * @param userId - The user's ID
+ * @param biomarkers - The parsed lab biomarkers (required for reactive + confirmation modes)
  * @param patterns - Optional pre-computed patterns from lab-analyzer
+ * @param options - Optional mode filter; defaults to all modes
  * @returns Array of bridge insights, sorted by priority
  */
 export async function generateBridgeInsights(
   userId: string,
   biomarkers: Array<{ biomarkerKey: string; value: number; unit: string; flag: BiomarkerFlag }>,
-  _patterns?: LabPattern[]
+  _patterns?: LabPattern[],
+  options?: { modes?: BridgeMode[] }
 ): Promise<BridgeInsight[]> {
+  const modes = options?.modes ?? ['reactive', 'predictive', 'confirmation', 'protocol_aware', 'monitoring']
   const map = buildBiomarkerMap(biomarkers)
 
-  // Run all bridge generators concurrently
-  const results = await Promise.all([
-    bridgeHRVMetabolic(userId, map),
-    bridgeRecoveryInflammation(userId, map),
-    bridgeSleepThyroid(userId, map),
-    bridgeBodyCompHormonal(userId, map),
-    bridgeVO2Cardiovascular(userId, map),
-    bridgeRHRIron(userId, map),
-    bridgeActivityNutrient(userId, map),
-  ])
+  const generators: Promise<(BridgeInsight | null)[] | BridgeInsight[]>[] = []
+
+  // Reactive mode: existing 7 bridges that require both lab + wearable data
+  if (modes.includes('reactive')) {
+    generators.push(
+      Promise.all([
+        bridgeHRVMetabolic(userId, map),
+        bridgeRecoveryInflammation(userId, map),
+        bridgeSleepThyroid(userId, map),
+        bridgeBodyCompHormonal(userId, map),
+        bridgeVO2Cardiovascular(userId, map),
+        bridgeRHRIron(userId, map),
+        bridgeActivityNutrient(userId, map),
+      ])
+    )
+  }
+
+  // Predictive mode: wearable trends → lab suggestions (no biomarker input needed)
+  if (modes.includes('predictive')) {
+    generators.push(generatePredictiveInsights(userId))
+  }
+
+  // Confirmation mode: abnormal labs → wearable corroboration
+  if (modes.includes('confirmation') && biomarkers.length > 0) {
+    generators.push(generateConfirmationInsights(userId, map))
+  }
+
+  // Protocol-aware mode: active protocols + wearable → lab recommendations
+  if (modes.includes('protocol_aware')) {
+    generators.push(generateProtocolAwareInsights(userId))
+  }
+
+  // Monitoring mode: lab staleness + protocol schedules → retest reminders
+  if (modes.includes('monitoring')) {
+    generators.push(generateMonitoringInsights(userId))
+  }
+
+  // Run all selected modes concurrently
+  const allResults = await Promise.all(generators)
+  const flatResults = allResults.flat()
 
   // Filter nulls and sort by priority
   const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 }
-  return results
+  return flatResults
     .filter((r): r is BridgeInsight => r !== null)
     .sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority])
 }

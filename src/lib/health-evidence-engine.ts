@@ -18,6 +18,7 @@ import { METRIC_POLARITY } from './health-baselines'
 import { MetricType, getMetricDisplayName } from './health-providers'
 import { normalizeProtocolName } from './supplement-normalization'
 import { SOURCE_PRIORITY } from './health-synthesis'
+import { getLabExpectationsForProtocol, type LabEffect } from './protocol-lab-expectations'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -155,6 +156,15 @@ export interface PremiumProtocolEvidence {
     isStable: boolean
     sensitivityAnalysis: RobustnessScenario[]
   }
+
+  // Lab biomarker effects (Phase 3A)
+  labEffects?: LabBiomarkerEffect[]
+  labVerdict?: LabEvidenceVerdict
+  labWearableConcordance?: {
+    concordant: string[]   // Biomarker keys where lab and wearable agree
+    discordant: string[]   // Biomarker keys where lab and wearable disagree
+    bonus: number          // Concordance confidence boost (0.0-0.3)
+  }
 }
 
 export interface MetricStatistics {
@@ -164,6 +174,29 @@ export interface MetricStatistics {
   before: { mean: number; stdDev: number; n: number; values: number[] }
   after: { mean: number; stdDev: number; n: number; values: number[] }
   effectSize: EffectSizeResult
+}
+
+// ─── Lab Evidence Types (Phase 3A) ───────────────────────────────────────────
+
+export type LabEvidenceVerdict =
+  | 'lab_confirms_positive'    // Lab matches expected direction
+  | 'lab_early_signal'         // Too few data points but trending right
+  | 'lab_no_effect'            // No change detected
+  | 'lab_contradicts_wearable' // Lab and wearable disagree
+  | 'lab_insufficient_data'    // <2 draws since protocol start
+
+export interface LabBiomarkerEffect {
+  biomarkerKey: string
+  displayName: string
+  expectedDirection: 'increase' | 'decrease'
+  actualDirection: 'increase' | 'decrease' | 'stable'
+  baselineValue: number | null   // From PersonalBaseline.personalMean
+  latestValue: number | null     // From latest LabBiomarker
+  percentChange: number | null
+  effectMatch: 'matched' | 'partial' | 'no_effect' | 'opposite'
+  confidence: 'high' | 'medium' | 'low'
+  dataPoints: number
+  explanation: string
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -828,6 +861,253 @@ export function detectMechanisms(signals: EnhancedSignal[]): Mechanism[] {
   return detected
 }
 
+// ─── Lab Biomarker Evidence (Phase 3A) ───────────────────────────────────────
+
+/**
+ * Compute lab biomarker effects for a protocol by comparing personal baselines
+ * to latest lab values, matched against expected effects from the registry.
+ */
+async function computeLabEffects(
+  userId: string,
+  protocolName: string,
+  protocolStartDate: Date
+): Promise<LabBiomarkerEffect[]> {
+  const expectations = getLabExpectationsForProtocol(protocolName)
+  if (!expectations || expectations.expectedLabEffects.length === 0) return []
+
+  // Get biomarker keys we care about
+  const expectedKeys = expectations.expectedLabEffects.map(e => e.biomarkerKey)
+
+  // Fetch personal baselines for these biomarkers
+  const baselines = await prisma.personalBaseline.findMany({
+    where: { userId, biomarkerKey: { in: expectedKeys } },
+  })
+  const baselineMap = new Map(baselines.map(b => [b.biomarkerKey, b]))
+
+  // Fetch latest lab upload biomarkers (only those after protocol start)
+  const latestUpload = await prisma.labUpload.findFirst({
+    where: { userId, testDate: { gte: protocolStartDate } },
+    orderBy: { testDate: 'desc' },
+    include: {
+      biomarkers: {
+        where: { biomarkerKey: { in: expectedKeys } },
+      },
+    },
+  })
+
+  const latestBiomarkers = new Map(
+    (latestUpload?.biomarkers ?? []).map(b => [b.biomarkerKey, b])
+  )
+
+  // Count total lab draws since protocol start
+  const drawCount = await prisma.labUpload.count({
+    where: { userId, testDate: { gte: protocolStartDate } },
+  })
+
+  const effects: LabBiomarkerEffect[] = []
+
+  for (const expected of expectations.expectedLabEffects) {
+    const baseline = baselineMap.get(expected.biomarkerKey)
+    const latest = latestBiomarkers.get(expected.biomarkerKey)
+
+    // No data at all
+    if (!baseline && !latest) {
+      effects.push({
+        biomarkerKey: expected.biomarkerKey,
+        displayName: expected.displayName,
+        expectedDirection: expected.expectedDirection,
+        actualDirection: 'stable',
+        baselineValue: null,
+        latestValue: null,
+        percentChange: null,
+        effectMatch: 'no_effect',
+        confidence: 'low',
+        dataPoints: 0,
+        explanation: `No ${expected.displayName} data available. Consider testing to track this biomarker.`,
+      })
+      continue
+    }
+
+    const baselineValue = baseline?.personalMean ?? null
+    const latestValue = latest?.value ?? baseline?.lastLabValue ?? null
+
+    if (baselineValue === null || latestValue === null) {
+      effects.push({
+        biomarkerKey: expected.biomarkerKey,
+        displayName: expected.displayName,
+        expectedDirection: expected.expectedDirection,
+        actualDirection: 'stable',
+        baselineValue,
+        latestValue,
+        percentChange: null,
+        effectMatch: 'no_effect',
+        confidence: 'low',
+        dataPoints: drawCount,
+        explanation: `Insufficient ${expected.displayName} data to determine effect. ${baselineValue === null ? 'No pre-protocol baseline.' : 'No post-protocol measurement.'}`,
+      })
+      continue
+    }
+
+    // Compute percent change
+    const percentChange = baselineValue !== 0
+      ? ((latestValue - baselineValue) / Math.abs(baselineValue)) * 100
+      : 0
+
+    // Determine actual direction
+    const changeThreshold = 3 // % change threshold to count as meaningful
+    let actualDirection: 'increase' | 'decrease' | 'stable'
+    if (percentChange > changeThreshold) actualDirection = 'increase'
+    else if (percentChange < -changeThreshold) actualDirection = 'decrease'
+    else actualDirection = 'stable'
+
+    // Determine effect match
+    let effectMatch: LabBiomarkerEffect['effectMatch']
+    if (actualDirection === expected.expectedDirection) {
+      // Check if magnitude is within expected range
+      const absChange = Math.abs(percentChange)
+      if (absChange >= expected.magnitudeRange.min) effectMatch = 'matched'
+      else effectMatch = 'partial'
+    } else if (actualDirection === 'stable') {
+      effectMatch = 'no_effect'
+    } else {
+      effectMatch = 'opposite'
+    }
+
+    // Determine confidence based on data quality
+    const personalSD = baseline?.personalSD ?? 0
+    const zScore = personalSD > 0 ? Math.abs(latestValue - baselineValue) / personalSD : 0
+    let confidence: 'high' | 'medium' | 'low'
+    if (drawCount >= 3 && zScore > 2.0) confidence = 'high'
+    else if (drawCount >= 2 && zScore > 1.0) confidence = 'medium'
+    else confidence = 'low'
+
+    // Build explanation
+    const explanation = buildLabEffectExplanation(
+      expected, actualDirection, percentChange, effectMatch, confidence, drawCount
+    )
+
+    effects.push({
+      biomarkerKey: expected.biomarkerKey,
+      displayName: expected.displayName,
+      expectedDirection: expected.expectedDirection,
+      actualDirection,
+      baselineValue: Math.round(baselineValue * 100) / 100,
+      latestValue: Math.round(latestValue * 100) / 100,
+      percentChange: Math.round(percentChange * 10) / 10,
+      effectMatch,
+      confidence,
+      dataPoints: drawCount,
+      explanation,
+    })
+  }
+
+  return effects
+}
+
+function buildLabEffectExplanation(
+  expected: LabEffect,
+  actual: 'increase' | 'decrease' | 'stable',
+  percentChange: number,
+  match: LabBiomarkerEffect['effectMatch'],
+  confidence: 'high' | 'medium' | 'low',
+  draws: number
+): string {
+  const dirWord = actual === 'increase' ? 'increased' : actual === 'decrease' ? 'decreased' : 'remained stable'
+  const pctStr = `${Math.abs(percentChange).toFixed(1)}%`
+
+  switch (match) {
+    case 'matched':
+      return `${expected.displayName} ${dirWord} ${pctStr}, consistent with the expected ${expected.expectedDirection} from ${expected.mechanism.split(',')[0]}. ${confidence === 'high' ? 'Strong signal.' : confidence === 'medium' ? 'Moderate signal — more data will strengthen this.' : 'Early signal — additional lab draws will improve confidence.'}`
+    case 'partial':
+      return `${expected.displayName} ${dirWord} ${pctStr}, trending in the expected direction but below the typical ${expected.magnitudeRange.min}-${expected.magnitudeRange.max}% range. May still be building — effects typically peak at ${expected.peakWeeks.min}-${expected.peakWeeks.max} weeks.`
+    case 'no_effect':
+      return `${expected.displayName} ${dirWord}. No significant change detected yet. ${draws < 2 ? 'More lab draws needed.' : `Effects typically appear at ${expected.onsetWeeks.min}-${expected.onsetWeeks.max} weeks.`}`
+    case 'opposite':
+      return `${expected.displayName} ${dirWord} ${pctStr}, which is opposite to the expected ${expected.expectedDirection}. This may reflect individual variation, confounding factors, or insufficient time on protocol.`
+    default:
+      return `${expected.displayName}: ${dirWord} ${pctStr}.`
+  }
+}
+
+/**
+ * Compute concordance bonus between wearable and lab evidence.
+ * When both agree in direction, confidence is boosted.
+ */
+function computeConcordanceBonus(
+  wearableSignals: EnhancedSignal[],
+  labEffects: LabBiomarkerEffect[]
+): { concordant: string[]; discordant: string[]; bonus: number } {
+  // Map wearable metric categories to lab biomarker connections
+  const WEARABLE_LAB_CONNECTIONS: Record<string, { biomarkerKeys: string[]; wearableImproving: 'decrease' | 'increase' }> = {
+    hrv: { biomarkerKeys: ['hs_crp', 'fasting_insulin'], wearableImproving: 'decrease' },
+    resting_heart_rate: { biomarkerKeys: ['ferritin', 'hemoglobin'], wearableImproving: 'increase' },
+    deep_sleep: { biomarkerKeys: ['tsh', 'free_t3'], wearableImproving: 'increase' },
+    body_fat_percentage: { biomarkerKeys: ['fasting_insulin', 'triglycerides'], wearableImproving: 'decrease' },
+    sleep_efficiency: { biomarkerKeys: ['hs_crp', 'cortisol'], wearableImproving: 'decrease' },
+  }
+
+  const concordant: string[] = []
+  const discordant: string[] = []
+
+  for (const signal of wearableSignals) {
+    const connection = WEARABLE_LAB_CONNECTIONS[signal.metricType]
+    if (!connection) continue
+
+    for (const labKey of connection.biomarkerKeys) {
+      const labEffect = labEffects.find(e => e.biomarkerKey === labKey)
+      if (!labEffect || labEffect.effectMatch === 'no_effect') continue
+
+      // Check if wearable improvement direction aligns with lab effect
+      const wearableIsPositive = signal.interpretation.isImprovement
+      const labIsPositive = labEffect.effectMatch === 'matched' || labEffect.effectMatch === 'partial'
+
+      if (wearableIsPositive === labIsPositive) {
+        concordant.push(labKey)
+      } else {
+        discordant.push(labKey)
+      }
+    }
+  }
+
+  // Deduplicate
+  const uniqueConcordant = [...new Set(concordant)]
+  const uniqueDiscordant = [...new Set(discordant)]
+
+  // Bonus: 0.1 per concordant marker, max 0.3
+  const bonus = Math.min(0.3, uniqueConcordant.length * 0.1)
+
+  return { concordant: uniqueConcordant, discordant: uniqueDiscordant, bonus }
+}
+
+/**
+ * Determine overall lab evidence verdict from individual effects.
+ */
+function determineLabVerdict(
+  labEffects: LabBiomarkerEffect[],
+  wearableSignals: EnhancedSignal[]
+): LabEvidenceVerdict {
+  if (labEffects.length === 0) return 'lab_insufficient_data'
+
+  const withData = labEffects.filter(e => e.dataPoints > 0 && e.latestValue !== null)
+  if (withData.length === 0) return 'lab_insufficient_data'
+
+  const matched = withData.filter(e => e.effectMatch === 'matched')
+  const partial = withData.filter(e => e.effectMatch === 'partial')
+  const opposite = withData.filter(e => e.effectMatch === 'opposite')
+  const noEffect = withData.filter(e => e.effectMatch === 'no_effect')
+
+  // Check for contradiction with wearable evidence
+  if (opposite.length > 0 && wearableSignals.some(s => s.interpretation.isImprovement)) {
+    return 'lab_contradicts_wearable'
+  }
+
+  if (matched.length > 0) return 'lab_confirms_positive'
+  if (partial.length > 0) return 'lab_early_signal'
+  if (noEffect.length === withData.length) return 'lab_no_effect'
+
+  return 'lab_insufficient_data'
+}
+
 // ─── Evidence Computation ────────────────────────────────────────────────────
 
 /**
@@ -840,7 +1120,8 @@ async function computeSingleProtocolEvidence(
   options: {
     includeNullFindings: boolean
     includeRobustness: boolean
-  }
+  },
+  userId?: string
 ): Promise<PremiumProtocolEvidence> {
   const today = new Date()
   const startDate = protocol.startDate
@@ -922,6 +1203,31 @@ async function computeSingleProtocolEvidence(
     )
   }
 
+  // Lab biomarker effects (Phase 3A)
+  let labEffects: LabBiomarkerEffect[] | undefined
+  let labVerdict: LabEvidenceVerdict | undefined
+  let labWearableConcordance: PremiumProtocolEvidence['labWearableConcordance'] | undefined
+
+  if (userId && daysOnProtocol >= 7) {
+    try {
+      labEffects = await computeLabEffects(userId, normalizedName, startDate)
+      if (labEffects.length > 0) {
+        labVerdict = determineLabVerdict(labEffects, signals)
+        labWearableConcordance = computeConcordanceBonus(signals, labEffects)
+
+        // Apply concordance bonus to confidence score
+        if (labWearableConcordance.bonus > 0) {
+          confidence.score = Math.min(100, confidence.score + labWearableConcordance.bonus * 100)
+          confidence.reasons.push(
+            `Lab-wearable concordance: ${labWearableConcordance.concordant.length} biomarker(s) agree with wearable signals (+${Math.round(labWearableConcordance.bonus * 100)}% confidence)`
+          )
+        }
+      }
+    } catch {
+      // Lab analysis is optional — don't fail the whole evidence computation
+    }
+  }
+
   return {
     protocolId: protocol.id,
     protocolName: normalizedName,
@@ -958,6 +1264,11 @@ async function computeSingleProtocolEvidence(
     confounds: confoundAnalysis,
 
     robustness,
+
+    // Lab biomarker effects (Phase 3A)
+    labEffects: labEffects && labEffects.length > 0 ? labEffects : undefined,
+    labVerdict,
+    labWearableConcordance,
   }
 }
 
@@ -1680,7 +1991,7 @@ export async function computePremiumEvidence(
     computeSingleProtocolEvidence(protocol, metrics, contextEvents, {
       includeNullFindings,
       includeRobustness,
-    })
+    }, userId)
   )
 
   const results = await Promise.all(evidencePromises)

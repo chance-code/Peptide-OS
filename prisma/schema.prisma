@@ -36,6 +36,8 @@ model UserProfile {
   healthBrainSnapshots HealthBrainSnapshot[]
   personalBaselines    PersonalBaseline[]
   labPriorResets       LabPriorResetEvent[]
+  weeklyBriefs         WeeklyHealthBrief[]
+  wearableLabCorrelations WearableLabCorrelation[]
 }
 
 // ============================================
@@ -101,6 +103,7 @@ model Protocol {
   doseLogs    DoseLog[]
   schedules   DoseSchedule[]
   history     ProtocolHistory[]
+  labExpectations ProtocolLabExpectation[]
 
   // Indexes for query performance
   @@index([userId])
@@ -639,4 +642,70 @@ model LabPriorResetEvent {
 
   @@index([userId, createdAt])
   @@index([labUploadId])
+}
+
+// ============================================
+// PROTOCOL LAB EXPECTATIONS (Expected biomarker changes per protocol)
+// ============================================
+model ProtocolLabExpectation {
+  id                     String   @id @default(cuid())
+  protocolId             String
+  biomarkerKey           String
+  expectedDirection      String   // "increase" | "decrease" | "stable"
+  expectedMagnitudeRange String   // JSON: {"min": 5, "max": 20} (% change)
+  onsetWeeks             String   // JSON: {"min": 4, "max": 8}
+  peakWeeks              String   // JSON: {"min": 8, "max": 16}
+  evidenceLevel          String   // "clinical_trials" | "preclinical" | "anecdotal" | "theoretical"
+  mechanism              String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  protocol               Protocol @relation(fields: [protocolId], references: [id], onDelete: Cascade)
+
+  @@unique([protocolId, biomarkerKey])
+  @@index([protocolId])
+  @@index([biomarkerKey])
+}
+
+// ============================================
+// WEEKLY HEALTH BRIEF (Cached weekly intelligence briefs)
+// ============================================
+model WeeklyHealthBrief {
+  id              String   @id @default(cuid())
+  userId          String
+  weekStartDate   DateTime
+  headline        String
+  domainSummaries String   // JSON
+  protocolUpdates String   // JSON
+  actionItems     String   // JSON
+  labStatus       String   // JSON
+  lookAhead       String   // Plain text summary
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, weekStartDate])
+  @@index([userId, weekStartDate])
+}
+
+// ============================================
+// WEARABLE-LAB CORRELATIONS (Personal cross-modal correlations)
+// ============================================
+model WearableLabCorrelation {
+  id                     String   @id @default(cuid())
+  userId                 String
+  wearableMetricType     String
+  biomarkerKey           String
+  correlationCoefficient Float
+  sampleSize             Int
+  directionality         String   // "direct" | "inverse" | "none"
+  lastUpdated            DateTime @default(now())
+  createdAt              DateTime @default(now())
+
+  user                   UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, wearableMetricType, biomarkerKey])
+  @@index([userId])
+  @@index([userId, wearableMetricType])
 }

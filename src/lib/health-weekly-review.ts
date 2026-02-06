@@ -10,6 +10,9 @@ import { safePercentChange, safeDivide } from './health-constants'
 import { getMetricDef } from './health-metric-contract'
 import type { MetricType } from './health-constants'
 import { BIOMARKER_REGISTRY } from '@/lib/lab-biomarker-contract'
+import { computePremiumEvidence } from './health-evidence-engine'
+import { runSafetyMonitor, type SafetyAlert } from './protocol-safety-monitor'
+import { getLabExpectationsForProtocol, getRecommendedLabSchedule } from './protocol-lab-expectations'
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -38,6 +41,13 @@ export interface WeeklyReview {
   topWins: MetricHighlight[]
   needsAttention: MetricHighlight[]
   recommendations: string[]
+
+  // Phase 3A enhancements
+  protocolEffectiveness: ProtocolWeeklyEffectiveness[]
+  topActions: RankedAction[]
+  labStatus: LabStatusSection
+  lookAhead: LookAheadSection
+  safetyAlerts: SafetyAlert[]
 }
 
 export interface CategoryBreakdown {
@@ -79,6 +89,52 @@ export interface BloodworkBreakdown {
   topConcerns: { biomarkerKey: string; displayName: string; value: number; unit: string; flag: string }[]
   narrative: string
 }
+
+// Phase 3A enhanced types
+
+export interface ProtocolWeeklyEffectiveness {
+  protocolId: string
+  protocolName: string
+  wearableVerdict: string
+  labVerdict: string | null
+  combinedConfidence: 'high' | 'medium' | 'low'
+  topSignal: string
+  labUpdateNeeded: boolean
+}
+
+export interface RankedAction {
+  rank: number
+  text: string
+  impactScore: number
+  confidenceScore: number
+  actionabilityScore: number
+  compositeScore: number
+  source: string
+  domain: string
+}
+
+export interface RetestRecommendation {
+  biomarkerKey: string
+  displayName: string
+  reason: string
+  urgency: 'soon' | 'scheduled' | 'routine'
+}
+
+export interface LabStatusSection {
+  lastDrawDate: string | null
+  daysSinceLastDraw: number | null
+  staleness: 'current' | 'aging' | 'stale' | 'no_data'
+  retestRecommendations: RetestRecommendation[]
+  protocolSpecificLabNeeds: string[]
+}
+
+export interface LookAheadSection {
+  nextWeekFocus: string
+  upcomingMilestones: string[]
+  labScheduleReminders: string[]
+}
+
+export type { SafetyAlert } from './protocol-safety-monitor'
 
 // ─── Constants ───────────────────────────────────────────────────────
 
@@ -175,6 +231,19 @@ export async function generateWeeklyReview(
   // Recommendations
   const recommendations = generateRecommendations(categories, needsAttention, protocols, bloodwork)
 
+  // Phase 3A: Enhanced sections (run concurrently)
+  const [protocolEffectiveness, labStatus, safetyResult] = await Promise.all([
+    computeProtocolEffectiveness(userId),
+    computeLabStatus(userId),
+    runSafetyMonitor(userId).catch(() => ({ alerts: [] as SafetyAlert[], protocolsChecked: 0, markersChecked: 0, allClear: true })),
+  ])
+
+  // Ranked actions (top 3 by impact × confidence × actionability)
+  const topActions = rankActions(needsAttention, recommendations, labStatus, protocolEffectiveness)
+
+  // Look-ahead
+  const lookAhead = generateLookAhead(protocols, labStatus)
+
   return {
     week: {
       start: format(weekStart, 'yyyy-MM-dd'),
@@ -193,6 +262,13 @@ export async function generateWeeklyReview(
     topWins,
     needsAttention,
     recommendations,
+
+    // Phase 3A
+    protocolEffectiveness,
+    topActions,
+    labStatus,
+    lookAhead,
+    safetyAlerts: safetyResult.alerts,
   }
 }
 
@@ -577,5 +653,263 @@ async function getBloodworkBreakdown(
     attentionCount,
     topConcerns,
     narrative,
+  }
+}
+
+// ─── Phase 3A: Protocol Effectiveness ─────────────────────────────────
+
+async function computeProtocolEffectiveness(
+  userId: string
+): Promise<ProtocolWeeklyEffectiveness[]> {
+  try {
+    const evidence = await computePremiumEvidence(userId)
+    return evidence.map(e => ({
+      protocolId: e.protocolId,
+      protocolName: e.protocolName,
+      wearableVerdict: e.verdict,
+      labVerdict: e.labVerdict ?? null,
+      combinedConfidence: e.confidence.level,
+      topSignal: e.effects.primary
+        ? `${e.effects.primary.metricName}: ${e.effects.primary.change.direction} ${Math.abs(e.effects.primary.change.percent).toFixed(1)}%`
+        : (e.labEffects?.[0]
+          ? `${e.labEffects[0].displayName}: ${e.labEffects[0].percentChange !== null ? `${e.labEffects[0].percentChange > 0 ? '+' : ''}${e.labEffects[0].percentChange.toFixed(1)}%` : 'pending'}`
+          : 'No detectable signal yet'),
+      labUpdateNeeded: !e.labEffects || e.labEffects.length === 0 || e.labVerdict === 'lab_insufficient_data',
+    }))
+  } catch {
+    return []
+  }
+}
+
+// ─── Phase 3A: Lab Status ─────────────────────────────────────────────
+
+async function computeLabStatus(
+  userId: string
+): Promise<LabStatusSection> {
+  // Find most recent lab date from personal baselines
+  const latestBaseline = await prisma.personalBaseline.findFirst({
+    where: { userId, lastLabDate: { not: null } },
+    orderBy: { lastLabDate: 'desc' },
+    select: { lastLabDate: true },
+  })
+
+  const lastDrawDate = latestBaseline?.lastLabDate ?? null
+  const daysSinceLastDraw = lastDrawDate
+    ? differenceInDays(new Date(), lastDrawDate)
+    : null
+
+  let staleness: LabStatusSection['staleness']
+  if (daysSinceLastDraw === null) staleness = 'no_data'
+  else if (daysSinceLastDraw <= 30) staleness = 'current'
+  else if (daysSinceLastDraw <= 90) staleness = 'aging'
+  else staleness = 'stale'
+
+  // Get active protocols and their lab needs
+  const activeProtocols = await prisma.protocol.findMany({
+    where: { userId, status: 'active' },
+    include: { peptide: { select: { name: true, canonicalName: true } } },
+  })
+
+  const retestRecommendations: RetestRecommendation[] = []
+  const protocolSpecificLabNeeds: string[] = []
+
+  for (const protocol of activeProtocols) {
+    const name = protocol.peptide.canonicalName || protocol.peptide.name
+    const schedule = getRecommendedLabSchedule(name)
+    if (!schedule) continue
+
+    const weeksSinceStart = Math.floor(differenceInDays(new Date(), protocol.startDate) / 7)
+
+    // Check if midpoint labs are due
+    if (weeksSinceStart >= schedule.midpoint.weekNumber - 1 && weeksSinceStart <= schedule.midpoint.weekNumber + 2) {
+      protocolSpecificLabNeeds.push(
+        `${name} is at week ${weeksSinceStart} — midpoint labs recommended (${schedule.midpoint.biomarkers.join(', ')})`
+      )
+      for (const biomarkerKey of schedule.midpoint.biomarkers) {
+        const def = BIOMARKER_REGISTRY[biomarkerKey]
+        retestRecommendations.push({
+          biomarkerKey,
+          displayName: def?.displayName ?? biomarkerKey,
+          reason: `${name} midpoint check (week ${schedule.midpoint.weekNumber})`,
+          urgency: 'soon',
+        })
+      }
+    }
+
+    // Check if endpoint labs are due
+    if (weeksSinceStart >= schedule.endpoint.weekNumber - 1) {
+      protocolSpecificLabNeeds.push(
+        `${name} is at week ${weeksSinceStart} — endpoint labs recommended (${schedule.endpoint.biomarkers.join(', ')})`
+      )
+      for (const biomarkerKey of schedule.endpoint.biomarkers) {
+        const def = BIOMARKER_REGISTRY[biomarkerKey]
+        retestRecommendations.push({
+          biomarkerKey,
+          displayName: def?.displayName ?? biomarkerKey,
+          reason: `${name} endpoint check (week ${schedule.endpoint.weekNumber})`,
+          urgency: 'scheduled',
+        })
+      }
+    }
+  }
+
+  // Staleness-based recommendations
+  if (staleness === 'stale' || staleness === 'no_data') {
+    retestRecommendations.push({
+      biomarkerKey: 'comprehensive_panel',
+      displayName: 'Comprehensive Panel',
+      reason: staleness === 'no_data'
+        ? 'No lab data on file — a baseline panel will unlock protocol-lab tracking'
+        : `Labs are ${daysSinceLastDraw} days old — fresh data will improve all health intelligence`,
+      urgency: staleness === 'no_data' ? 'soon' : 'routine',
+    })
+  }
+
+  // Deduplicate by biomarkerKey (keep highest urgency)
+  const urgencyOrder = { soon: 0, scheduled: 1, routine: 2 }
+  const dedupedRecs = new Map<string, RetestRecommendation>()
+  for (const rec of retestRecommendations) {
+    const existing = dedupedRecs.get(rec.biomarkerKey)
+    if (!existing || urgencyOrder[rec.urgency] < urgencyOrder[existing.urgency]) {
+      dedupedRecs.set(rec.biomarkerKey, rec)
+    }
+  }
+
+  return {
+    lastDrawDate: lastDrawDate ? format(lastDrawDate, 'yyyy-MM-dd') : null,
+    daysSinceLastDraw,
+    staleness,
+    retestRecommendations: Array.from(dedupedRecs.values()).sort(
+      (a, b) => urgencyOrder[a.urgency] - urgencyOrder[b.urgency]
+    ),
+    protocolSpecificLabNeeds,
+  }
+}
+
+// ─── Phase 3A: Ranked Actions ─────────────────────────────────────────
+
+function rankActions(
+  needsAttention: MetricHighlight[],
+  recommendations: string[],
+  labStatus: LabStatusSection,
+  protocolEffectiveness: ProtocolWeeklyEffectiveness[]
+): RankedAction[] {
+  const candidates: RankedAction[] = []
+
+  // From needsAttention (wearable concerns)
+  for (const item of needsAttention) {
+    candidates.push({
+      rank: 0,
+      text: item.narrative,
+      impactScore: Math.min(100, Math.abs(item.change) * 5),
+      confidenceScore: 70,
+      actionabilityScore: 60,
+      compositeScore: 0,
+      source: 'wearable',
+      domain: item.metric,
+    })
+  }
+
+  // From lab retest recommendations
+  for (const rec of labStatus.retestRecommendations.slice(0, 3)) {
+    candidates.push({
+      rank: 0,
+      text: `Retest ${rec.displayName}: ${rec.reason}`,
+      impactScore: rec.urgency === 'soon' ? 80 : rec.urgency === 'scheduled' ? 60 : 40,
+      confidenceScore: 90,
+      actionabilityScore: 90,
+      compositeScore: 0,
+      source: 'lab_status',
+      domain: rec.biomarkerKey,
+    })
+  }
+
+  // From protocol effectiveness (lab updates needed)
+  for (const pe of protocolEffectiveness.filter(p => p.labUpdateNeeded)) {
+    candidates.push({
+      rank: 0,
+      text: `${pe.protocolName}: Lab confirmation needed to validate wearable signals`,
+      impactScore: 70,
+      confidenceScore: 60,
+      actionabilityScore: 85,
+      compositeScore: 0,
+      source: 'protocol_evidence',
+      domain: pe.protocolName,
+    })
+  }
+
+  // From general recommendations
+  for (const rec of recommendations.slice(0, 2)) {
+    candidates.push({
+      rank: 0,
+      text: rec,
+      impactScore: 50,
+      confidenceScore: 60,
+      actionabilityScore: 70,
+      compositeScore: 0,
+      source: 'recommendation',
+      domain: 'general',
+    })
+  }
+
+  // Compute composite scores and rank
+  for (const c of candidates) {
+    c.compositeScore = (c.impactScore * c.confidenceScore * c.actionabilityScore) / 10000
+  }
+
+  candidates.sort((a, b) => b.compositeScore - a.compositeScore)
+
+  return candidates.slice(0, 3).map((c, i) => ({
+    ...c,
+    rank: i + 1,
+  }))
+}
+
+// ─── Phase 3A: Look-Ahead ────────────────────────────────────────────
+
+function generateLookAhead(
+  protocols: ProtocolWeeklyStatus[],
+  labStatus: LabStatusSection
+): LookAheadSection {
+  const upcomingMilestones: string[] = []
+  const labScheduleReminders: string[] = []
+
+  for (const p of protocols) {
+    // Check for upcoming phase transitions
+    if (p.daysSinceStart >= 5 && p.daysSinceStart <= 9) {
+      upcomingMilestones.push(`${p.protocolName} entering building phase this week — early signals may start to emerge`)
+    }
+    if (p.daysSinceStart >= 19 && p.daysSinceStart <= 23) {
+      upcomingMilestones.push(`${p.protocolName} entering peak response window — best time to evaluate`)
+    }
+    if (p.daysSinceStart >= 55 && p.daysSinceStart <= 63) {
+      upcomingMilestones.push(`${p.protocolName} reaching plateau phase — effects should be well-established`)
+    }
+  }
+
+  // Lab schedule reminders
+  for (const need of labStatus.protocolSpecificLabNeeds) {
+    labScheduleReminders.push(need)
+  }
+  if (labStatus.staleness === 'stale') {
+    labScheduleReminders.push(`Labs are ${labStatus.daysSinceLastDraw} days old — consider scheduling a draw`)
+  }
+
+  // Next week focus
+  let nextWeekFocus: string
+  if (labStatus.retestRecommendations.some(r => r.urgency === 'soon')) {
+    nextWeekFocus = 'Priority: Schedule lab draw for protocol monitoring'
+  } else if (upcomingMilestones.length > 0) {
+    nextWeekFocus = upcomingMilestones[0]
+  } else if (protocols.some(p => p.adherencePercent < 80)) {
+    nextWeekFocus = 'Focus on protocol adherence — consistency drives results'
+  } else {
+    nextWeekFocus = 'Continue current trajectory — consistency is your best tool'
+  }
+
+  return {
+    nextWeekFocus,
+    upcomingMilestones,
+    labScheduleReminders,
   }
 }
