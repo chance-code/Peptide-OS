@@ -153,12 +153,21 @@ export function validateAndCorrectMetric(
         return { valid: true, correctedValue: corrected, correctedUnit: 'lbs', reason: 'Converted kg to lbs' }
       }
     }
-    // Heuristic: for weight, values 20-100 with bounds expecting lbs (min=50, max=500)
-    // are likely kg if they seem too low for lbs
-    if (metricType === 'weight' && value >= 20 && value < 50 && bounds.min >= 50) {
+    // Heuristic: values in plausible kg range that are suspiciously low for lbs.
+    // - weight: 30-120 kg covers 66-264 lbs adults. Very few adults weigh 30-120 lbs,
+    //   but many weigh 30-120 kg. If converting gives a plausible lbs value, it's likely kg.
+    // - lean_body_mass/muscle_mass: 20-90 kg range
+    // - bone_mass: too small to distinguish (1-15 range overlaps), skip heuristic
+    if (metricType === 'weight' && value >= 30 && value < 120) {
       const corrected = value * 2.20462
       if (corrected >= bounds.min && corrected <= bounds.max) {
-        return { valid: true, correctedValue: corrected, correctedUnit: 'lbs', reason: 'Converted kg to lbs (heuristic)' }
+        return { valid: true, correctedValue: corrected, correctedUnit: 'lbs', reason: 'Converted kg to lbs (heuristic: value likely in kg)' }
+      }
+    }
+    if ((metricType === 'lean_body_mass' || metricType === 'muscle_mass') && value >= 20 && value < 90) {
+      const corrected = value * 2.20462
+      if (corrected >= bounds.min && corrected <= bounds.max) {
+        return { valid: true, correctedValue: corrected, correctedUnit: 'lbs', reason: 'Converted kg to lbs (heuristic: value likely in kg)' }
       }
     }
   }

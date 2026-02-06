@@ -134,6 +134,39 @@ export async function POST(request: NextRequest) {
     }
     const dedupedMetrics = Array.from(deduped.values())
 
+    // Weight continuity check — detect likely unit mismatches by comparing to recent history.
+    // The static heuristic in validateAndCorrectMetric catches obvious cases (30-120 range),
+    // but this catches edge cases where someone's weight is in the overlap zone.
+    const weightTypesInBatch = dedupedMetrics.filter(m =>
+      ['weight', 'lean_body_mass'].includes(m.metricType)
+    )
+
+    if (weightTypesInBatch.length > 0) {
+      const recentWeight = await prisma.healthMetric.findFirst({
+        where: {
+          userId,
+          metricType: 'weight',
+          recordedAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }
+        },
+        orderBy: { recordedAt: 'desc' },
+        select: { value: true }
+      })
+
+      if (recentWeight && recentWeight.value > 0) {
+        for (const m of weightTypesInBatch) {
+          const ratio = m.value / recentWeight.value
+          // If incoming value is ~40-60% of known weight, it's almost certainly in kg
+          if (ratio > 0.35 && ratio < 0.65) {
+            const corrected = m.value * 2.20462
+            console.info(`[Weight Fix] Correcting likely kg→lbs: ${m.value} → ${corrected.toFixed(1)} (recent: ${recentWeight.value})`)
+            correctedMetrics.push({ metricType: m.metricType, original: m.value, corrected, reason: 'User-context kg→lbs correction' })
+            m.value = corrected
+            m.unit = 'lbs'
+          }
+        }
+      }
+    }
+
     // Validate sleep stage proportions before storage
     const sleepMetricsByDay = new Map<string, { duration?: number; deep?: number; rem?: number }>()
 
