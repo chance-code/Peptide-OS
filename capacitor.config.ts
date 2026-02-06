@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.arcprotocol.app',
-  appName: 'Arc Protocol',
+  appName: 'Arc Protocol Web',
   webDir: 'out',
   server: {
     // Load from Vercel in production (your app has API routes that need a server)

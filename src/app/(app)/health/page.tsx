@@ -234,7 +234,7 @@ export default function HealthDashboardNew() {
   }
 
   // Fetch real health metrics (60 days)
-  const { data: realMetricsData, isLoading: isLoadingMetrics, error: metricsError } = useQuery({
+  const { data: realMetricsData, isLoading: isLoadingMetrics } = useQuery({
     queryKey: ['health-metrics-raw', currentUserId],
     queryFn: async () => {
       if (!currentUserId) return null
@@ -509,19 +509,6 @@ export default function HealthDashboardNew() {
   // Determine page state — used for single-return rendering
   const isLoading = !processedData && isLoadingMetrics && hasConnectedIntegrations
   const isNoData = !processedData && !isLoading
-
-  // ── Temporary debug info (remove after diagnosis) ──
-  const debugInfo = {
-    userId: currentUserId || 'null',
-    integrationsCount: integrations?.length ?? 'undefined',
-    connected: hasConnectedIntegrations ? 'Yes' : 'No',
-    metricsLoaded: realMetrics?.length ?? 0,
-    metricsLoading: isLoadingMetrics ? 'Yes' : 'No',
-    useDemoData: useDemoData ? 'Yes' : 'No',
-    hasProcessedData: processedData ? 'Yes' : 'No',
-    pageState: isLoading ? 'loading' : isNoData ? 'no_data' : 'data_ready',
-    metricsError: metricsError ? (metricsError as Error).message : 'none',
-  }
 
   return (
     <div className="bg-[var(--background)] pb-4">
@@ -824,18 +811,6 @@ export default function HealthDashboardNew() {
       </div>
 
       <div className="max-w-lg mx-auto px-4 pt-3 pb-6 space-y-6">
-        {/* ── Temp Debug Banner (REMOVE AFTER FIX) ── */}
-        <div className="p-3 bg-red-900 rounded-lg text-white text-sm font-mono border-2 border-red-500">
-          <div className="font-bold mb-1">DIAG v5</div>
-          <div>uid: {debugInfo.userId}</div>
-          <div>state: {debugInfo.pageState} | demo: {debugInfo.useDemoData}</div>
-          <div>int: {debugInfo.integrationsCount} | conn: {debugInfo.connected}</div>
-          <div>metrics: {debugInfo.metricsLoaded} | loading: {debugInfo.metricsLoading}</div>
-          {debugInfo.metricsError !== 'none' && (
-            <div className="text-red-300 mt-1">ERR: {debugInfo.metricsError}</div>
-          )}
-        </div>
-
         {/* ═══════════════ LOADING STATE ═══════════════ */}
         {isLoading && (
           <>
@@ -937,20 +912,6 @@ export default function HealthDashboardNew() {
                 </div>
               </div>
 
-              <div className="text-xs text-[var(--muted-foreground)] p-3 bg-[var(--muted)] rounded-lg space-y-1">
-                <div className="font-medium">Debug Info</div>
-                <div>User ID: {currentUserId || 'Not logged in'}</div>
-                <div>Integrations: {integrations?.length || 0}</div>
-                <div>Connected: {hasConnectedIntegrations ? 'Yes' : 'No'}</div>
-                <div>Metrics loaded: {realMetrics?.length || 0}</div>
-                <div>Metrics loading: {isLoadingMetrics ? 'Yes' : 'No'}</div>
-                <div>Use demo: {useDemoData ? 'Yes' : 'No'}</div>
-                {metricsError && (
-                  <div className="text-[var(--error)] mt-1">
-                    Error: {(metricsError as Error).message}
-                  </div>
-                )}
-              </div>
             </div>
           )
         })()}
