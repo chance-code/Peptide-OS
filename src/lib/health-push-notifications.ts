@@ -37,6 +37,12 @@ interface WeeklyDigestPayload {
   data: { type: 'weekly_digest'; deepLink: string }
 }
 
+interface StaleDataPayload {
+  title: string
+  body: string
+  data: { type: 'stale_data'; tab: 'today'; deepLink: string }
+}
+
 interface StoredVerdicts {
   [protocolId: string]: EvidenceVerdict
 }
@@ -210,6 +216,57 @@ async function saveStoredVerdicts(userId: string, verdicts: StoredVerdicts): Pro
  *
  * Always updates the stored verdicts at the end.
  */
+// ─── Stale Data Notification ────────────────────────────────────────────────
+
+/**
+ * Generate a stale data notification if any connected integration
+ * hasn't synced in over 24 hours.
+ *
+ * Returns null if all integrations are fresh or if the user has no integrations.
+ */
+export async function generateStaleDataNotification(
+  userId: string
+): Promise<StaleDataPayload | null> {
+  try {
+    const integrations = await prisma.healthIntegration.findMany({
+      where: { userId, isConnected: true },
+      select: { provider: true, lastSyncAt: true },
+    })
+
+    if (integrations.length === 0) return null
+
+    const staleThreshold = 24 * 60 * 60 * 1000 // 24 hours
+    const now = Date.now()
+
+    const staleProviders = integrations.filter(i => {
+      if (!i.lastSyncAt) return true // never synced
+      return now - new Date(i.lastSyncAt).getTime() > staleThreshold
+    })
+
+    if (staleProviders.length === 0) return null
+
+    const providerNames = staleProviders.map(p => {
+      switch (p.provider) {
+        case 'apple_health': return 'Apple Health'
+        case 'oura': return 'Oura Ring'
+        case 'whoop': return 'WHOOP'
+        default: return p.provider
+      }
+    }).join(', ')
+
+    return {
+      title: 'Health data is getting stale',
+      body: `${providerNames} hasn't synced in over 24 hours. Open the app to refresh.`,
+      data: { type: 'stale_data', tab: 'today', deepLink: 'arcprotocol://health' },
+    }
+  } catch (error) {
+    console.error(`[health-push] Error generating stale data notification for ${userId}:`, error)
+    return null
+  }
+}
+
+// ─── Evidence Milestones ─────────────────────────────────────────────────────
+
 export async function checkEvidenceMilestones(
   userId: string
 ): Promise<EvidenceMilestonePayload[]> {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { sendAPNsNotification, isAPNsConfigured } from '@/lib/native-push'
-import { generateMorningBriefing, checkEvidenceMilestones, generateWeeklyDigest } from '@/lib/health-push-notifications'
+import { generateMorningBriefing, checkEvidenceMilestones, generateWeeklyDigest, generateStaleDataNotification } from '@/lib/health-push-notifications'
 
 // Vercel Cron: runs daily
 // Sends health briefings, evidence milestone notifications, and weekly digests to users
@@ -231,6 +231,28 @@ export async function GET(request: NextRequest) {
           }
         }
       }
+
+      // 4. Stale data notification
+      const staleNotification = await generateStaleDataNotification(userId)
+
+      if (staleNotification) {
+        for (const dt of deviceTokens) {
+          if (dt.platform === 'ios' && isAPNsConfigured()) {
+            const result = await sendAPNsNotification(
+              dt.token,
+              staleNotification.title,
+              staleNotification.body,
+              staleNotification.data
+            )
+            sentResults.push({
+              userId,
+              type: 'stale_data',
+              platform: 'ios',
+              success: result.success,
+            })
+          }
+        }
+      }
     }
 
     return NextResponse.json({
@@ -242,6 +264,7 @@ export async function GET(request: NextRequest) {
         briefings: sentResults.filter(r => r.type === 'health_briefing' && r.success).length,
         milestones: sentResults.filter(r => r.type === 'evidence_milestone' && r.success).length,
         weeklyDigests: sentResults.filter(r => r.type === 'weekly_digest' && r.success).length,
+        staleData: sentResults.filter(r => r.type === 'stale_data' && r.success).length,
       },
     })
   } catch (error) {
