@@ -30,7 +30,7 @@ import { scoreClinicalSignificance, type ClinicalWeight } from './labs/lab-clini
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-export type BrainTrigger = 'lab_upload' | 'daily_wearable_sync' | 'protocol_change' | 'manual_refresh'
+export type BrainTrigger = 'lab_upload' | 'daily_wearable_sync' | 'protocol_change' | 'manual_refresh' | 'user_refresh'
 
 export interface DomainAssessment {
   domain: string
@@ -72,6 +72,26 @@ export interface AgingVelocityAssessment {
   daysGainedAnnually: number | null
   concordanceScore: number
   concordanceLabel: 'high' | 'moderate' | 'low'
+  // Branded pace model (v2.1)
+  overallVelocityCI?: [number, number] | null
+  missingDomains?: string[]
+  effectiveDomainsCount?: number
+  // EWMA smoothing (v2.2)
+  note?: string | null
+  // Days gained display (v2.3)
+  daysGainedAnnuallyBucket?: number | null
+  // Velocity-based trend (v2.4)
+  trendDirection?: 'improving' | 'worsening' | 'stable'
+  delta28d?: number | null
+  delta28dDays?: number | null
+  topDrivers?: VelocityDriver[]
+}
+
+export interface VelocityDriver {
+  domain: string
+  direction: 'improving' | 'worsening'
+  magnitude: number
+  plainEnglishReasonHint: string
 }
 
 export interface AllostasisAssessment {
@@ -162,6 +182,89 @@ export interface BrainOutput {
   unifiedScore: number | null
   dailyStatus: DailyStatus | null
   dataCompleteness: number
+  // Publish pipeline
+  publishedVelocity: AgingVelocityAssessment | null
+  publishedVelocityAt: string | null
+  velocityComputedAt: string
+  velocityWindowDays: number
+  velocityVersion: string
+}
+
+// ─── Stable Velocity Response Types ─────────────────────────────────────────
+
+export interface StableSystemVelocity {
+  system: string
+  velocity: number | null
+  confidence: number
+  trend: 'decelerating' | 'steady' | 'accelerating'
+}
+
+export interface StableVelocityResponse {
+  status: 'published' | 'initializing'
+  value: {
+    overallVelocityStable: number | null
+    daysGainedAnnuallyDisplay: string | null
+    daysGainedAnnuallyExact: number | null
+    daysGainedAnnuallyLabel: string | null
+    systemVelocitiesStable: StableSystemVelocity[]
+  }
+  meta: {
+    publishedAt: string | null
+    computedAt: string | null
+    windowDays: number
+    dataCompletenessScore: number
+    confidence: 'high' | 'medium' | 'low'
+    concordanceScore: number | null
+    version: string
+    timezone: string
+    overallVelocityCI?: [number, number] | null
+    missingDomains?: string[]
+    effectiveDomainsCount?: number
+    note?: string | null
+    trendDirection?: 'improving' | 'worsening' | 'stable'
+    delta28d?: number | null
+    delta28dDays?: number | null
+    topDrivers?: VelocityDriver[]
+  }
+  // Legacy fields (backwards compatibility with iOS BrainVelocityResponse)
+  agingVelocity: AgingVelocityAssessment | null
+  evaluatedAt: string | null
+}
+
+// ─── Velocity Publish Rules ─────────────────────────────────────────────────
+
+const VELOCITY_PUBLISH_HOUR_UTC = 6
+
+/**
+ * Determine whether the daily publish gate is open.
+ * Rule A: publish once per day, after 06:00 UTC. If already published today, don't republish.
+ */
+export function shouldPublishVelocity(
+  previousPublishedAt: Date | null,
+  now: Date = new Date(),
+): boolean {
+  const currentHourUTC = now.getUTCHours()
+
+  // Before 06:00 UTC — publish window not open today
+  if (currentHourUTC < VELOCITY_PUBLISH_HOUR_UTC) return false
+
+  // Never published — publish now
+  if (!previousPublishedAt) return true
+
+  // Already published today (UTC date)?
+  const todayUTC = now.toISOString().slice(0, 10)
+  const publishedDateUTC = previousPublishedAt.toISOString().slice(0, 10)
+  if (publishedDateUTC === todayUTC) return false
+
+  return true
+}
+
+/**
+ * Check if data is sufficient to publish a velocity number.
+ * If overallVelocity is null or data completeness < 20%, don't publish.
+ */
+export function isVelocityPublishable(velocity: AgingVelocityAssessment, dataCompleteness: number): boolean {
+  return velocity.overallVelocity != null && dataCompleteness >= 0.2
 }
 
 // ─── Internal Types ─────────────────────────────────────────────────────────
@@ -230,6 +333,274 @@ const DOMAIN_TO_VELOCITY_SYSTEM: Record<string, string> = {
   bodyComp: 'bodyComp',
   hormonal: 'hormonal',
   neuro: 'neuro',
+}
+
+// ─── Branded Pace Constants ──────────────────────────────────────────────────
+
+export const VELOCITY_CONFIDENCE_WEIGHTS: Record<string, number> = {
+  high: 1.0,
+  medium: 0.7,
+  low: 0.4,
+}
+
+export const VELOCITY_STABILITY_WEIGHTS: Record<string, number> = {
+  cardiovascular: 0.95,
+  metabolic: 1.0,
+  inflammatory: 0.95,
+  fitness: 0.7,
+  bodyComp: 0.8,
+  hormonal: 1.0,
+  neuro: 0.85,
+}
+
+// ─── Pipeline Version ──────────────────────────────────────────────────────
+// Bump when mapping, weights, or smoothing logic changes.
+export const VELOCITY_PIPELINE_VERSION = '2.1.0'
+
+// ─── Output Safety Bounds ──────────────────────────────────────────────────
+const VELOCITY_OUTPUT_MIN = 0.75
+const VELOCITY_OUTPUT_MAX = 1.35
+
+/**
+ * Piecewise-linear score-to-velocity mapping (branded pace model).
+ * Monotonic: higher score → lower velocity (slower aging).
+ * Neutral at score=70 (velocity=1.00).
+ */
+export function scoreToVelocity(score: number): number {
+  const clamped = Math.max(0, Math.min(100, score))
+  let velocity: number
+  if (clamped >= 90) {
+    velocity = 0.85
+  } else if (clamped >= 70) {
+    velocity = 1.00 - ((clamped - 70) / 20) * 0.15
+  } else if (clamped >= 40) {
+    velocity = 1.15 - ((clamped - 40) / 30) * 0.15
+  } else {
+    velocity = 1.30 - (clamped / 40) * 0.15
+  }
+  return Math.round(Math.min(velocity, 1.35) * 100) / 100
+}
+
+/**
+ * Compute composite weight for a domain in the velocity weighted average.
+ * weight = confidenceWeight × completenessWeight × stabilityWeight
+ */
+export function computeDomainWeight(
+  domain: DomainAssessment,
+  systemName: string
+): number {
+  const confidenceWeight = VELOCITY_CONFIDENCE_WEIGHTS[domain.confidence] ?? 0.4
+  const labWeight = domain.labContribution?.weight ?? 0
+  const baseCompleteness = 0.5 + 0.5 * labWeight
+  const staleHours = domain.staleness >= 0 ? domain.staleness : 168
+  const freshnessMultiplier = Math.max(0.5, 1.0 - (staleHours / 168) * 0.5)
+  const completenessWeight = baseCompleteness * freshnessMultiplier
+  const stabilityWeight = VELOCITY_STABILITY_WEIGHTS[systemName] ?? 0.8
+  return Math.round(confidenceWeight * completenessWeight * stabilityWeight * 1000) / 1000
+}
+
+/**
+ * Compute uncertainty margin for the overall velocity.
+ * Increases when concordance is low, effective weight sum is low, or key domains are missing.
+ */
+export function computeVelocityUncertainty(
+  concordanceScore: number,
+  effectiveWeightSum: number,
+  effectiveDomainCount: number,
+  totalDomainCount: number
+): number {
+  const BASE = 0.02
+  const concordancePenalty = Math.max(0, (1 - concordanceScore)) * 0.06
+  const weightPenalty = Math.max(0, 1 - effectiveWeightSum / 4) * 0.04
+  const missingRatio = 1 - effectiveDomainCount / totalDomainCount
+  const missingPenalty = missingRatio * 0.05
+  const err = BASE + concordancePenalty + weightPenalty + missingPenalty
+  return Math.round(Math.min(err, 0.15) * 100) / 100
+}
+
+// ─── EWMA Smoothing ─────────────────────────────────────────────────────────
+
+const EWMA_SHOCK_THRESHOLD = 0.12
+const EWMA_MAX_DAILY_MOVEMENT = 0.05
+
+/**
+ * Compute EWMA alpha based on confidence level and data completeness.
+ * Higher alpha = faster response to new data.
+ */
+export function computeEWMAAlpha(
+  confidence: 'high' | 'medium' | 'low',
+  dataCompleteness: number
+): number {
+  if (confidence === 'high' && dataCompleteness >= 0.5) return 0.25
+  if (confidence === 'medium' || (confidence === 'high' && dataCompleteness < 0.5)) return 0.18
+  return 0.12
+}
+
+export interface EWMAResult {
+  stableVelocity: number
+  wasShockCapped: boolean
+  rawDelta: number
+}
+
+/**
+ * Apply EWMA smoothing to the overall velocity with shock capping.
+ * Returns the smoothed stable velocity and whether a shock cap was applied.
+ */
+export function applyVelocityEWMA(
+  prevStable: number,
+  computed: number,
+  alpha: number
+): EWMAResult {
+  const rawDelta = computed - prevStable
+  const absDelta = Math.abs(rawDelta)
+
+  // Shock handling: if delta > threshold, cap movement
+  if (absDelta > EWMA_SHOCK_THRESHOLD) {
+    const cappedDelta = Math.sign(rawDelta) * EWMA_MAX_DAILY_MOVEMENT
+    const stableVelocity = Math.round((prevStable + cappedDelta) * 100) / 100
+    return { stableVelocity, wasShockCapped: true, rawDelta: Math.round(rawDelta * 100) / 100 }
+  }
+
+  // Standard EWMA: stable = (1 - alpha) * prevStable + alpha * computed
+  const ewma = (1 - alpha) * prevStable + alpha * computed
+  const stableVelocity = Math.round(ewma * 100) / 100
+  return { stableVelocity, wasShockCapped: false, rawDelta: Math.round(rawDelta * 100) / 100 }
+}
+
+// ─── Days Gained Display ────────────────────────────────────────────────────
+
+const DAYS_BUCKET_SIZE = 5
+const DAYS_HYSTERESIS_MARGIN = 3
+
+/**
+ * Quantize exact days to nearest 5-day bucket with hysteresis.
+ * Only changes bucket if exact value crosses the next bucket by >= 3 days.
+ */
+export function quantizeDaysGained(exactDays: number, prevBucket: number | null): number {
+  const naturalBucket = Math.round(exactDays / DAYS_BUCKET_SIZE) * DAYS_BUCKET_SIZE
+  if (prevBucket === null) return naturalBucket
+
+  // Hysteresis: only move if we've crossed the next bucket edge by >= margin
+  const distFromPrev = Math.abs(exactDays - prevBucket)
+  const halfBucket = DAYS_BUCKET_SIZE / 2
+  if (distFromPrev < halfBucket + DAYS_HYSTERESIS_MARGIN) {
+    return prevBucket
+  }
+  return naturalBucket
+}
+
+/**
+ * Format daysDisplay string with copy rules.
+ * - Low confidence: "Estimate stabilizing"
+ * - Bucket in [-5, +5]: "About neutral"
+ * - Otherwise: "+10", "-15", etc.
+ */
+export function formatDaysDisplay(
+  bucket: number,
+  confidence: 'high' | 'medium' | 'low'
+): string {
+  if (confidence === 'low') return 'Estimate stabilizing'
+  if (bucket >= -5 && bucket <= 5) return 'About neutral'
+  const sign = bucket > 0 ? '+' : ''
+  return `${sign}${bucket}`
+}
+
+/**
+ * Get the label for days gained direction.
+ */
+export function getDaysGainedLabel(bucket: number): 'Gaining' | 'Neutral' | 'Losing' {
+  if (bucket > 5) return 'Gaining'
+  if (bucket < -5) return 'Losing'
+  return 'Neutral'
+}
+
+// ─── Velocity Trend ─────────────────────────────────────────────────────────
+
+export interface VelocityTrendResult {
+  trendDirection: 'improving' | 'worsening' | 'stable'
+  delta28d: number | null
+  delta28dDays: number | null
+}
+
+/**
+ * Compute 28-day velocity trend from daily published velocity history.
+ * Uses 14-day mean comparison: recent 14d vs previous 14d.
+ * Lower velocity = improving (aging slower).
+ */
+export function computeVelocityTrend(
+  history: Array<{ date: string; velocity: number }>
+): VelocityTrendResult {
+  if (history.length < 4) {
+    return { trendDirection: 'stable', delta28d: null, delta28dDays: null }
+  }
+
+  // Sort by date ascending
+  const sorted = [...history].sort((a, b) => a.date.localeCompare(b.date))
+  const mid = Math.floor(sorted.length / 2)
+  const older = sorted.slice(0, mid)
+  const recent = sorted.slice(mid)
+
+  const olderMean = older.reduce((s, e) => s + e.velocity, 0) / older.length
+  const recentMean = recent.reduce((s, e) => s + e.velocity, 0) / recent.length
+
+  const delta28d = Math.round((recentMean - olderMean) * 1000) / 1000
+  const delta28dDays = Math.round((olderMean - recentMean) * 365) // positive = gaining more days
+
+  // Threshold: 0.005 velocity change is meaningful
+  let trendDirection: VelocityTrendResult['trendDirection'] = 'stable'
+  if (delta28d < -0.005) trendDirection = 'improving'
+  else if (delta28d > 0.005) trendDirection = 'worsening'
+
+  return { trendDirection, delta28d, delta28dDays }
+}
+
+const DRIVER_HINTS: Record<string, string> = {
+  cardiovascular: 'Heart health markers',
+  metabolic: 'Metabolic markers',
+  inflammatory: 'Inflammation markers',
+  fitness: 'Activity and fitness',
+  bodyComp: 'Body composition',
+  hormonal: 'Hormone levels',
+  neuro: 'Cognitive and neuro markers',
+}
+
+/**
+ * Compute top domain drivers of velocity change.
+ * contribution_i = weight_i * (velocity_i - overallVelocity)
+ * Compares current contributions vs previous, returns top movers.
+ */
+export function computeTopDrivers(
+  currentSystems: Record<string, { velocity: number | null; confidence: number }>,
+  currentOverall: number,
+  previousSystems: Record<string, { velocity: number | null; confidence: number }> | null,
+  previousOverall: number | null,
+  maxDrivers: number = 3
+): VelocityDriver[] {
+  if (!previousSystems || previousOverall === null) return []
+
+  const drivers: VelocityDriver[] = []
+
+  for (const [system, current] of Object.entries(currentSystems)) {
+    const prev = previousSystems[system]
+    if (current.velocity === null || !prev || prev.velocity === null) continue
+
+    const currentContrib = current.confidence * (current.velocity - currentOverall)
+    const prevContrib = prev.confidence * (prev.velocity - previousOverall)
+    const delta = currentContrib - prevContrib
+
+    if (Math.abs(delta) < 0.005) continue
+
+    drivers.push({
+      domain: system,
+      direction: delta < 0 ? 'improving' : 'worsening',
+      magnitude: Math.round(Math.abs(delta) * 1000) / 1000,
+      plainEnglishReasonHint: `${DRIVER_HINTS[system] || system} ${delta < 0 ? 'improved' : 'declined'}`,
+    })
+  }
+
+  return drivers
+    .sort((a, b) => b.magnitude - a.magnitude)
+    .slice(0, maxDrivers)
 }
 
 // ─── Main Pipeline ──────────────────────────────────────────────────────────
@@ -369,10 +740,18 @@ export async function evaluate(userId: string, trigger: BrainTrigger): Promise<B
     unifiedScore,
     dailyStatus,
     dataCompleteness,
+    // Publish pipeline — populated after storeSnapshot resolves the gate
+    publishedVelocity: null,
+    publishedVelocityAt: null,
+    velocityComputedAt: new Date().toISOString(),
+    velocityWindowDays: 90,
+    velocityVersion: VELOCITY_PIPELINE_VERSION,
   }
 
-  // Store snapshot
-  await storeSnapshot(userId, trigger, output, pipelineMs)
+  // Store snapshot and resolve publish state
+  const publishState = await storeSnapshot(userId, trigger, output, pipelineMs)
+  output.publishedVelocity = publishState.publishedVelocity
+  output.publishedVelocityAt = publishState.publishedAt?.toISOString() ?? null
 
   return output
 }
@@ -871,84 +1250,145 @@ async function computeAgingVelocity(
   userId: string,
   domains: Record<string, DomainAssessment>
 ): Promise<AgingVelocityAssessment> {
-  // Compute per-system velocities from current domain scores
-  // Velocity = inverse normalization: score 80 → 0.80 years/year (slower aging)
   const systemVelocities: AgingVelocityAssessment['systemVelocities'] = {}
-  const velocityValues: number[] = []
+  const weightedEntries: Array<{ velocity: number; weight: number }> = []
+  const missingDomains: string[] = []
+  const totalDomainCount = Object.keys(DOMAIN_TO_VELOCITY_SYSTEM).length
 
   for (const [domainKey, systemName] of Object.entries(DOMAIN_TO_VELOCITY_SYSTEM)) {
     const domain = domains[domainKey]
-    if (domain?.score !== null && domain.score !== undefined) {
-      // Score 0-100 → velocity: score 100 → 0.5x, score 50 → 1.0x, score 0 → 1.5x
-      const velocity = Math.round((1.5 - (domain.score / 100)) * 100) / 100
+    if (domain?.score !== null && domain?.score !== undefined) {
+      const velocity = scoreToVelocity(domain.score)
+      const weight = computeDomainWeight(domain, systemName)
       const domainTrend = domain.trend === 'improving' ? 'decelerating' as const
         : domain.trend === 'declining' ? 'accelerating' as const
         : 'steady' as const
       systemVelocities[systemName] = {
         velocity,
-        confidence: domain.confidence === 'high' ? 0.9 : domain.confidence === 'medium' ? 0.6 : 0.3,
+        confidence: weight,
         trend: domainTrend,
       }
-      velocityValues.push(velocity)
+      weightedEntries.push({ velocity, weight })
     } else {
       systemVelocities[systemName] = { velocity: null, confidence: 0, trend: 'steady' }
+      missingDomains.push(systemName)
     }
   }
 
-  // Overall velocity = weighted average
+  // Weighted mean
   let overallVelocity: number | null = null
   let daysGainedAnnually: number | null = null
-  if (velocityValues.length > 0) {
-    overallVelocity = Math.round(
-      (velocityValues.reduce((a, b) => a + b, 0) / velocityValues.length) * 100
-    ) / 100
+  const effectiveWeightSum = weightedEntries.reduce((s, e) => s + e.weight, 0)
+  const effectiveDomainsCount = weightedEntries.length
+
+  if (effectiveWeightSum > 0) {
+    const weightedSum = weightedEntries.reduce((s, e) => s + e.velocity * e.weight, 0)
+    const rawOverall = Math.round((weightedSum / effectiveWeightSum) * 100) / 100
+    overallVelocity = Math.max(VELOCITY_OUTPUT_MIN, Math.min(VELOCITY_OUTPUT_MAX, rawOverall))
+    if (rawOverall !== overallVelocity) {
+      console.log(JSON.stringify({
+        event: 'brain_velocity_guardrail',
+        guardrail: 'weighted_mean_clamp',
+        userId,
+        unclamped: rawOverall,
+        clamped: overallVelocity,
+        version: VELOCITY_PIPELINE_VERSION,
+      }))
+    }
     daysGainedAnnually = Math.round((1.0 - overallVelocity) * 365)
   }
 
   // Concordance: how much systems agree (low stddev = high concordance)
   let concordanceScore = 0
   let concordanceLabel: 'high' | 'moderate' | 'low' = 'low'
-  if (velocityValues.length >= 2) {
-    const mean = velocityValues.reduce((a, b) => a + b, 0) / velocityValues.length
-    const variance = velocityValues.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / velocityValues.length
+  if (weightedEntries.length >= 2) {
+    const velocities = weightedEntries.map(e => e.velocity)
+    const mean = velocities.reduce((a, b) => a + b, 0) / velocities.length
+    const variance = velocities.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / velocities.length
     const stdDev = Math.sqrt(variance)
-    concordanceScore = Math.round(Math.max(0, 1 - stdDev / 0.3) * 100) / 100 // 0.3 stddev = 0 concordance
+    concordanceScore = Math.round(Math.max(0, 1 - stdDev / 0.3) * 100) / 100
     if (concordanceScore >= 0.7) concordanceLabel = 'high'
     else if (concordanceScore >= 0.4) concordanceLabel = 'moderate'
   }
 
-  // Fetch last 90 days of snapshots for overall trend
-  const snapshots = await prisma.healthBrainSnapshot.findMany({
-    where: { userId, evaluatedAt: { gte: subDays(new Date(), 90) } },
-    orderBy: { evaluatedAt: 'asc' },
-    select: { unifiedScore: true, evaluatedAt: true },
-  })
-
-  const scores = snapshots.map(s => s.unifiedScore).filter((s): s is number => s !== null)
-
-  let trend: AgingVelocityAssessment['trend'] = 'steady'
-  let headline: string
-  let score90d: number | null = null
-  const confidence: AgingVelocityAssessment['confidence'] = snapshots.length >= 30 ? 'high'
-    : snapshots.length >= 14 ? 'medium' : 'low'
-
-  if (scores.length >= 4) {
-    const mid = Math.floor(scores.length / 2)
-    const firstAvg = scores.slice(0, mid).reduce((a, b) => a + b, 0) / mid
-    const secondAvg = scores.slice(mid).reduce((a, b) => a + b, 0) / (scores.length - mid)
-    const changePct = firstAvg !== 0 ? ((secondAvg - firstAvg) / Math.abs(firstAvg)) * 100 : 0
-    score90d = Math.round(secondAvg)
-
-    if (changePct > 3) trend = 'decelerating'
-    else if (changePct < -3) trend = 'accelerating'
-  } else {
-    const currentScores = Object.values(domains).map(d => d.score).filter((s): s is number => s !== null)
-    score90d = currentScores.length > 0
-      ? Math.round(currentScores.reduce((a, b) => a + b, 0) / currentScores.length)
-      : null
+  // Confidence interval
+  let overallVelocityCI: [number, number] | null = null
+  if (overallVelocity !== null) {
+    const err = computeVelocityUncertainty(
+      concordanceScore, effectiveWeightSum, effectiveDomainsCount, totalDomainCount
+    )
+    overallVelocityCI = [
+      Math.round((overallVelocity - err) * 100) / 100,
+      Math.round((overallVelocity + err) * 100) / 100,
+    ]
   }
 
+  // Fetch last 28 days of published velocity history for trend
+  const trendSnapshots = await prisma.healthBrainSnapshot.findMany({
+    where: {
+      userId,
+      agingVelocityPublishedAt: { not: null },
+      evaluatedAt: { gte: subDays(new Date(), 28) },
+    },
+    orderBy: { evaluatedAt: 'asc' },
+    select: {
+      agingVelocityPublishedJson: true,
+      agingVelocityPublishedAt: true,
+      evaluatedAt: true,
+    },
+  })
+
+  // Deduplicate by day (keep latest per UTC date)
+  const byDay = new Map<string, { date: string; velocity: number; systems: Record<string, { velocity: number | null; confidence: number }> | null; overall: number }>()
+  for (const snap of trendSnapshots) {
+    try {
+      const parsed = JSON.parse(snap.agingVelocityPublishedJson)
+      if (parsed.overallVelocity == null) continue
+      const day = new Date(snap.evaluatedAt).toISOString().slice(0, 10)
+      byDay.set(day, {
+        date: day,
+        velocity: parsed.overallVelocity,
+        systems: parsed.systemVelocities ?? null,
+        overall: parsed.overallVelocity,
+      })
+    } catch { /* skip unparseable */ }
+  }
+
+  const velocityHistory = Array.from(byDay.values()).sort((a, b) => a.date.localeCompare(b.date))
+  const trendResult = computeVelocityTrend(velocityHistory.map(h => ({ date: h.date, velocity: h.velocity })))
+
+  // Compute top drivers: compare current vs ~7-day-old snapshot
+  let topDrivers: VelocityDriver[] = []
+  if (overallVelocity !== null && velocityHistory.length >= 7) {
+    const olderEntry = velocityHistory[Math.max(0, velocityHistory.length - 8)]
+    if (olderEntry.systems) {
+      topDrivers = computeTopDrivers(
+        systemVelocities,
+        overallVelocity,
+        olderEntry.systems,
+        olderEntry.overall,
+      )
+    }
+  }
+
+  // Map trendDirection → legacy trend field
+  const trendDirection = trendResult.trendDirection
+  let trend: AgingVelocityAssessment['trend'] = 'steady'
+  if (trendDirection === 'improving') trend = 'decelerating'
+  else if (trendDirection === 'worsening') trend = 'accelerating'
+
+  // Confidence from snapshot count
+  const confidence: AgingVelocityAssessment['confidence'] = velocityHistory.length >= 21 ? 'high'
+    : velocityHistory.length >= 10 ? 'medium' : 'low'
+
+  // Score90d from current domain scores
+  const currentScores = Object.values(domains).map(d => d.score).filter((s): s is number => s !== null)
+  const score90d = currentScores.length > 0
+    ? Math.round(currentScores.reduce((a, b) => a + b, 0) / currentScores.length)
+    : null
+
   // Build headline
+  let headline: string
   if (overallVelocity !== null && daysGainedAnnually !== null) {
     if (daysGainedAnnually > 0) {
       headline = `Aging at ${overallVelocity.toFixed(2)} years/year — gaining ${daysGainedAnnually} days annually`
@@ -967,6 +1407,9 @@ async function computeAgingVelocity(
     headline, trend, confidence, score90d,
     systemVelocities, overallVelocity, daysGainedAnnually,
     concordanceScore, concordanceLabel,
+    overallVelocityCI, missingDomains, effectiveDomainsCount,
+    trendDirection, delta28d: trendResult.delta28d,
+    delta28dDays: trendResult.delta28dDays, topDrivers,
   }
 }
 
@@ -1609,14 +2052,137 @@ function countContradictedSignals(
 
 // ─── Storage ────────────────────────────────────────────────────────────────
 
-/** Store a snapshot of the Brain output */
+/** Store a snapshot of the Brain output with publish pipeline */
 async function storeSnapshot(
   userId: string,
   trigger: BrainTrigger,
   output: BrainOutput,
   pipelineMs: number
-): Promise<void> {
+): Promise<{ publishedVelocity: AgingVelocityAssessment | null; publishedAt: Date | null }> {
   try {
+    // Fetch previous snapshot's published state to carry forward
+    const previous = await prisma.healthBrainSnapshot.findFirst({
+      where: { userId },
+      orderBy: { evaluatedAt: 'desc' },
+      select: {
+        agingVelocityPublishedJson: true,
+        agingVelocityPublishedAt: true,
+      },
+    })
+
+    const previousPublishedAt = previous?.agingVelocityPublishedAt ?? null
+    const computedAt = new Date()
+    const canPublish = isVelocityPublishable(output.agingVelocity, output.dataCompleteness)
+    const gateOpen = shouldPublishVelocity(previousPublishedAt)
+    const willPublish = canPublish && gateOpen
+
+    let publishedJson: string
+    let publishedAt: Date | null
+
+    if (willPublish) {
+      // Parse previous published velocity for EWMA
+      const prevPublishedStr = previous?.agingVelocityPublishedJson ?? '{}'
+      const prevPublished = prevPublishedStr !== '{}'
+        ? JSON.parse(prevPublishedStr) as AgingVelocityAssessment
+        : null
+      const prevStable = prevPublished?.overallVelocity ?? null
+      const computedOverall = output.agingVelocity.overallVelocity
+
+      // Apply EWMA smoothing if we have both previous stable and computed values
+      let smoothedVelocity = { ...output.agingVelocity }
+      const prevBucket = prevPublished?.daysGainedAnnuallyBucket ?? null
+      if (prevStable !== null && computedOverall !== null) {
+        const alpha = computeEWMAAlpha(output.agingVelocity.confidence, output.dataCompleteness)
+        const ewma = applyVelocityEWMA(prevStable, computedOverall, alpha)
+
+        // Clamp EWMA output to safety bounds
+        const clampedStable = Math.round(Math.max(VELOCITY_OUTPUT_MIN, Math.min(VELOCITY_OUTPUT_MAX, ewma.stableVelocity)) * 100) / 100
+        if (clampedStable !== Math.round(ewma.stableVelocity * 100) / 100) {
+          console.log(JSON.stringify({
+            event: 'brain_velocity_guardrail',
+            guardrail: 'ewma_output_clamp',
+            userId,
+            unclamped: ewma.stableVelocity,
+            clamped: clampedStable,
+            version: VELOCITY_PIPELINE_VERSION,
+          }))
+        }
+
+        const exactDays = (1.0 - clampedStable) * 365
+        const bucket = quantizeDaysGained(exactDays, prevBucket)
+
+        smoothedVelocity = {
+          ...output.agingVelocity,
+          overallVelocity: clampedStable,
+          daysGainedAnnually: Math.round(exactDays),
+          daysGainedAnnuallyBucket: bucket,
+          note: ewma.wasShockCapped
+            ? 'Large data change detected; smoothing applied.'
+            : null,
+        }
+
+        // Update CI around the clamped stable value
+        if (smoothedVelocity.overallVelocityCI && output.agingVelocity.overallVelocityCI) {
+          const halfWidth = (output.agingVelocity.overallVelocityCI[1] - output.agingVelocity.overallVelocityCI[0]) / 2
+          smoothedVelocity.overallVelocityCI = [
+            Math.round((clampedStable - halfWidth) * 100) / 100,
+            Math.round((clampedStable + halfWidth) * 100) / 100,
+          ]
+        }
+
+        console.log(JSON.stringify({
+          event: 'brain_velocity_publish',
+          userId,
+          trigger,
+          prevStable,
+          computedOverall,
+          stableOverall: clampedStable,
+          alpha,
+          rawDelta: ewma.rawDelta,
+          shockCapped: ewma.wasShockCapped,
+          daysGainedAnnually: smoothedVelocity.daysGainedAnnually,
+          dataCompleteness: output.dataCompleteness,
+        }))
+
+        // Audit log: shock cap guardrail
+        if (ewma.wasShockCapped) {
+          console.log(JSON.stringify({
+            event: 'brain_velocity_guardrail',
+            guardrail: 'shock_cap',
+            userId,
+            prevStable,
+            computedOverall,
+            rawDelta: ewma.rawDelta,
+            cappedTo: clampedStable,
+            version: VELOCITY_PIPELINE_VERSION,
+          }))
+        }
+      } else {
+        // First publish or no computed — use computed directly, set initial bucket
+        if (output.agingVelocity.daysGainedAnnually != null) {
+          smoothedVelocity.daysGainedAnnuallyBucket = quantizeDaysGained(
+            output.agingVelocity.daysGainedAnnually, prevBucket
+          )
+        }
+        console.log(JSON.stringify({
+          event: 'brain_velocity_publish',
+          userId,
+          trigger,
+          overallVelocity: output.agingVelocity.overallVelocity,
+          daysGainedAnnually: output.agingVelocity.daysGainedAnnually,
+          daysGainedAnnuallyBucket: smoothedVelocity.daysGainedAnnuallyBucket,
+          dataCompleteness: output.dataCompleteness,
+          firstPublish: true,
+        }))
+      }
+
+      publishedJson = JSON.stringify(smoothedVelocity)
+      publishedAt = computedAt
+    } else {
+      publishedJson = previous?.agingVelocityPublishedJson ?? '{}'
+      publishedAt = previousPublishedAt
+    }
+
     await prisma.healthBrainSnapshot.create({
       data: {
         userId,
@@ -1635,10 +2201,24 @@ async function storeSnapshot(
         dailyStatusJson: JSON.stringify(output.dailyStatus),
         confidenceJson: JSON.stringify(output.systemConfidence),
         dataCompleteness: output.dataCompleteness,
+        // Publish pipeline
+        agingVelocityPublishedJson: publishedJson,
+        agingVelocityPublishedAt: publishedAt,
+        agingVelocityComputedAt: computedAt,
+        agingVelocityWindowDays: 90,
+        agingVelocityVersion: VELOCITY_PIPELINE_VERSION,
       },
     })
+
+    // Resolve published velocity for caller
+    const publishedVelocity = publishedJson && publishedJson !== '{}'
+      ? JSON.parse(publishedJson) as AgingVelocityAssessment
+      : null
+
+    return { publishedVelocity, publishedAt }
   } catch (e) {
     console.error('Brain: failed to store snapshot:', e)
+    return { publishedVelocity: null, publishedAt: null }
   }
 }
 
@@ -1674,6 +2254,14 @@ export async function getLatestSnapshot(userId: string): Promise<BrainOutput | n
       unifiedScore: snapshot.unifiedScore,
       dailyStatus: JSON.parse(snapshot.dailyStatusJson),
       dataCompleteness: snapshot.dataCompleteness,
+      // Publish pipeline
+      publishedVelocity: snapshot.agingVelocityPublishedJson && snapshot.agingVelocityPublishedJson !== '{}'
+        ? JSON.parse(snapshot.agingVelocityPublishedJson)
+        : null,
+      publishedVelocityAt: snapshot.agingVelocityPublishedAt?.toISOString() ?? null,
+      velocityComputedAt: snapshot.agingVelocityComputedAt?.toISOString() ?? snapshot.evaluatedAt.toISOString(),
+      velocityWindowDays: snapshot.agingVelocityWindowDays ?? 90,
+      velocityVersion: snapshot.agingVelocityVersion ?? VELOCITY_PIPELINE_VERSION,
     }
   } catch (e) {
     console.error('Brain: failed to parse snapshot:', e)
