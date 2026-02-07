@@ -18,9 +18,10 @@ model UserProfile {
   id        String   @id @default(cuid())
   name      String
   notes     String?
-  isActive  Boolean  @default(false) // Currently selected profile
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isActive    Boolean  @default(false) // Currently selected profile
+  cohortOptIn Boolean  @default(false) // Opt-in for anonymous cohort intelligence
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   // Relations
   protocols          Protocol[]
@@ -38,6 +39,12 @@ model UserProfile {
   labPriorResets       LabPriorResetEvent[]
   weeklyBriefs         WeeklyHealthBrief[]
   wearableLabCorrelations WearableLabCorrelation[]
+  bayesianChangepoints    BayesianChangepoint[]
+  causalAnalyses          CausalAnalysis[]
+  healthPredictions       HealthPrediction[]
+  cohortInsights          CohortInsight[]
+  hypotheses              UserHypothesis[]
+  insightEngagements      InsightEngagement[]
 }
 
 // ============================================
@@ -708,4 +715,141 @@ model WearableLabCorrelation {
   @@unique([userId, wearableMetricType, biomarkerKey])
   @@index([userId])
   @@index([userId, wearableMetricType])
+}
+
+// ============================================
+// BAYESIAN CHANGEPOINT DETECTION (Protocol onset detection)
+// ============================================
+model BayesianChangepoint {
+  id                 String   @id @default(cuid())
+  userId             String
+  protocolId         String
+  metricType         String
+  detectedDate       DateTime
+  posteriorProb      Float
+  credibleIntervalLo DateTime
+  credibleIntervalHi DateTime
+  effectSize         Float?
+  preMean            Float?
+  postMean           Float?
+  runLength          Int?
+  confidenceLevel    String   @default("low")
+  multiStreamCluster String?
+  computedAt         DateTime @default(now())
+
+  user               UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, protocolId])
+  @@index([userId, metricType])
+}
+
+// ============================================
+// CAUSAL ANALYSIS (N-of-1 protocol causal inference)
+// ============================================
+model CausalAnalysis {
+  id                   String   @id @default(cuid())
+  userId               String
+  protocolId           String
+  metricType           String
+  unadjustedEffect     Float
+  adjustedEffect       Float
+  adjustmentDelta      Float
+  confoundersJson      String   @default("[]")
+  causalDagJson        String   @default("{}")
+  confidenceLevel      String   @default("low")
+  narrativeExplanation String   @default("")
+  computedAt           DateTime @default(now())
+
+  user                 UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, protocolId, metricType])
+  @@index([userId, protocolId])
+}
+
+// ============================================
+// HEALTH PREDICTIONS (GP lab forecasting cache)
+// ============================================
+model HealthPrediction {
+  id                    String   @id @default(cuid())
+  userId                String
+  biomarkerKey          String
+  currentEstimate       Float?
+  currentCI             String?
+  forecast3m            Float?
+  forecast3mCI          String?
+  forecast6m            Float?
+  forecast6mCI          String?
+  thresholdCrossProb    Float?
+  thresholdType         String?
+  dataPoints            Int      @default(0)
+  confidenceLevel       String   @default("low")
+  stalenessWarning      String?
+  protocolAdjustmentJson String?
+  computedAt            DateTime @default(now())
+
+  user                  UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, biomarkerKey])
+  @@index([userId])
+}
+
+// ============================================
+// COHORT INSIGHTS (anonymous aggregate intelligence)
+// ============================================
+model CohortInsight {
+  id             String    @id @default(cuid())
+  userId         String
+  cohortKey      String    // "bpc157_oura_hrv", "creatine_sleep"
+  title          String
+  body           String
+  sampleSize     Int
+  medianEffect   Float
+  percentileRank Float?    // User's rank in cohort
+  generatedAt    DateTime  @default(now())
+  expiresAt      DateTime
+
+  user           UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, generatedAt])
+  @@index([cohortKey])
+}
+
+// ============================================
+// USER HYPOTHESES (N-of-1 hypothesis testing)
+// ============================================
+model UserHypothesis {
+  id                String    @id @default(cuid())
+  userId            String
+  title             String    // "Cold plunges improve my HRV"
+  description       String?
+  interventionType  String    // "protocol" | "habit" | "supplement" | "other"
+  interventionId    String?   // Optional protocol ID
+  metricType        String    // "hrv", "deep_sleep_duration", etc.
+  expectedDirection String    // "increase" | "decrease"
+  status            String    @default("active") // active | completed | abandoned
+  resultSummary     String?   // JSON: { verdict, effectSize, adjustedEffect, confidence, narrative }
+  createdAt         DateTime  @default(now())
+  completedAt       DateTime?
+
+  user              UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+}
+
+// ============================================
+// INSIGHT ENGAGEMENT (A/B testing + analytics)
+// ============================================
+model InsightEngagement {
+  id          String    @id @default(cuid())
+  userId      String
+  insightId   String
+  insightType String
+  action      String    // "impression" | "tap" | "dismiss" | "time_spent"
+  value       Float?    // seconds for time_spent
+  createdAt   DateTime  @default(now())
+
+  user        UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, insightId])
+  @@index([insightType, action])
 }

@@ -102,10 +102,8 @@ export default function NewInventoryPage() {
 
   useEffect(() => {
     fetchPeptides()
-    if (currentUserId) {
-      fetchProtocols()
-    }
-  }, [currentUserId])
+    fetchProtocols()
+  }, [])
 
   // Handle image capture and scanning
   async function handleImageCapture(e: React.ChangeEvent<HTMLInputElement>) {
@@ -338,7 +336,7 @@ export default function NewInventoryPage() {
 
   async function fetchProtocols() {
     try {
-      const res = await fetch(`/api/protocols?userId=${currentUserId}`)
+      const res = await fetch('/api/protocols')
       if (res.ok) {
         const data = await res.json()
         setProtocols(data)

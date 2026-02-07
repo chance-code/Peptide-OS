@@ -1,11 +1,11 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
 import type { UserProfile } from '@/types'
 
 interface AppState {
   // Current user
   currentUserId: string | null
   currentUser: UserProfile | null
+  isUserHydrated: boolean
 
   // Premium state
   isPremium: boolean
@@ -18,6 +18,7 @@ interface AppState {
   // Actions
   setCurrentUser: (user: UserProfile | null) => void
   setCurrentUserId: (id: string | null) => void
+  setUserHydrated: (hydrated: boolean) => void
   setIsPremium: (isPremium: boolean) => void
   setShowPaywall: (show: boolean) => void
   setLoading: (loading: boolean) => void
@@ -26,32 +27,29 @@ interface AppState {
 }
 
 export const useAppStore = create<AppState>()(
-  persist(
-    (set) => ({
-      currentUserId: null,
-      currentUser: null,
-      isPremium: true, // Default to true for now (no paywall until configured)
-      showPaywall: false,
-      isLoading: false,
-      error: null,
+  (set) => ({
+    currentUserId: null,
+    currentUser: null,
+    isUserHydrated: false,
+    isPremium: true,
+    showPaywall: false,
+    isLoading: false,
+    error: null,
 
-      setCurrentUser: (user) => set({ currentUser: user, currentUserId: user?.id ?? null }),
-      setCurrentUserId: (id) => set({ currentUserId: id }),
-      setIsPremium: (isPremium) => set({ isPremium }),
-      setShowPaywall: (show) => set({ showPaywall: show }),
-      setLoading: (loading) => set({ isLoading: loading }),
-      setError: (error) => set({ error }),
-      clearError: () => set({ error: null }),
-    }),
-    {
-      name: 'peptide-os-storage',
-      partialize: (state) => ({ currentUserId: state.currentUserId }),
-    }
-  )
+    setCurrentUser: (user) => set({ currentUser: user, currentUserId: user?.id ?? null }),
+    setCurrentUserId: (id) => set({ currentUserId: id }),
+    setUserHydrated: (hydrated) => set({ isUserHydrated: hydrated }),
+    setIsPremium: (isPremium) => set({ isPremium }),
+    setShowPaywall: (show) => set({ showPaywall: show }),
+    setLoading: (loading) => set({ isLoading: loading }),
+    setError: (error) => set({ error }),
+    clearError: () => set({ error: null }),
+  })
 )
 
 // Selector hooks for convenience
 export const useCurrentUser = () => useAppStore((state) => state.currentUser)
 export const useCurrentUserId = () => useAppStore((state) => state.currentUserId)
+export const useIsUserHydrated = () => useAppStore((state) => state.isUserHydrated)
 export const useIsLoading = () => useAppStore((state) => state.isLoading)
 export const useError = () => useAppStore((state) => state.error)

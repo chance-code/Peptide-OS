@@ -5,19 +5,23 @@ import prisma from '@/lib/prisma'
 
 // GET /api/health/discovery-feed
 export async function GET() {
+  const start = Date.now()
   try {
     const authResult = await getAuthenticatedUserId()
     if (!authResult.success) return authResult.response
 
     const feed = await generateDailyFeed(authResult.userId)
+    const isEmpty = feed.insights.length === 0
 
-    return NextResponse.json(feed, {
+    console.log(`[health/discovery-feed] userId=${authResult.userId} ${Date.now() - start}ms 200 insights=${feed.insights.length} empty=${isEmpty}`)
+
+    return NextResponse.json({ ...feed, isEmpty }, {
       headers: { 'Cache-Control': 'private, max-age=300' },
     })
   } catch (error) {
-    console.error('Error generating discovery feed:', error)
+    console.error(`[health/discovery-feed] ${Date.now() - start}ms 500`, error instanceof Error ? error.message : error)
     return NextResponse.json(
-      { error: 'Failed to generate discovery feed' },
+      { error: 'Failed to generate discovery feed. Please try again.' },
       { status: 500 },
     )
   }
@@ -67,7 +71,7 @@ export async function PUT(request: NextRequest) {
       dismissed: updated.dismissed,
     })
   } catch (error) {
-    console.error('Error updating discovery insight:', error)
+    console.error('[discovery-feed] Error updating insight:', error instanceof Error ? error.message : error)
     return NextResponse.json(
       { error: 'Failed to update insight' },
       { status: 500 },

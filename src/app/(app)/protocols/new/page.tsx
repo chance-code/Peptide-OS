@@ -4,7 +4,6 @@ import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import { Lightbulb, History, Syringe, Pill, Camera, X, Loader2, Plus, CheckCircle, AlertCircle } from 'lucide-react'
-import { useAppStore } from '@/store'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -58,8 +57,6 @@ const TIMING_PRESETS = [
 
 export default function NewProtocolPage() {
   const router = useRouter()
-  const { currentUserId } = useAppStore()
-
   const [peptides, setPeptides] = useState<Peptide[]>([])
   const [existingProtocols, setExistingProtocols] = useState<ProtocolWithPeptide[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -134,10 +131,8 @@ export default function NewProtocolPage() {
 
   useEffect(() => {
     fetchPeptides()
-    if (currentUserId) {
-      fetchExistingProtocols()
-    }
-  }, [currentUserId])
+    fetchExistingProtocols()
+  }, [])
 
   // Check for recommendations when peptide is selected
   useEffect(() => {
@@ -153,7 +148,7 @@ export default function NewProtocolPage() {
 
   async function fetchExistingProtocols() {
     try {
-      const res = await fetch(`/api/protocols?userId=${currentUserId}`)
+      const res = await fetch('/api/protocols')
       if (res.ok) {
         const data = await res.json()
         setExistingProtocols(data)
@@ -284,7 +279,7 @@ export default function NewProtocolPage() {
     e.preventDefault()
 
     // Validation
-    if (!currentUserId || !peptideId) return
+    if (!peptideId) return
     if (itemType === 'peptide' && !doseAmount) return
     if (itemType === 'supplement' && !servingSize) return
 
@@ -307,7 +302,6 @@ export default function NewProtocolPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: currentUserId,
           peptideId,
           startDate,
           endDate: indefinite ? null : endDate || null,

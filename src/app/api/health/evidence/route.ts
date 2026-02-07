@@ -26,6 +26,7 @@ import { getLatestSnapshot, isRecentSnapshot } from '@/lib/health-brain'
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
+  const start = Date.now()
   try {
     // Authenticate user
     const authResult = await getAuthenticatedUserId()
@@ -77,9 +78,14 @@ export async function GET(request: NextRequest) {
       brainConfidence = snapshot.systemConfidence?.level ?? null
     }
 
+    const isEmpty = enrichedEvidence.length === 0
+
+    console.log(`[health/evidence] userId=${userId} ${Date.now() - start}ms 200 protocols=${enrichedEvidence.length} empty=${isEmpty}`)
+
     return NextResponse.json(
       {
         evidence: enrichedEvidence,
+        isEmpty,
         summary,
         meta: {
           protocolCount: enrichedEvidence.length,
@@ -99,9 +105,9 @@ export async function GET(request: NextRequest) {
       }
     )
   } catch (error) {
-    console.error('Error computing protocol evidence:', error)
+    console.error(`[health/evidence] ${Date.now() - start}ms 500`, error instanceof Error ? error.message : error)
     return NextResponse.json(
-      { error: 'Failed to compute protocol evidence' },
+      { error: 'Failed to compute protocol evidence. Please try again.' },
       { status: 500 }
     )
   }
@@ -182,6 +188,15 @@ function generateEvidenceSummary(evidence: PremiumProtocolEvidence[]): {
   concerns: string[]
   recommendations: string[]
 } {
+  if (evidence.length === 0) {
+    return {
+      overallStatus: 'No active protocols to evaluate',
+      highlights: [],
+      concerns: [],
+      recommendations: ['Add a protocol to start tracking evidence.'],
+    }
+  }
+
   const highlights: string[] = []
   const concerns: string[] = []
   const recommendations: string[] = []

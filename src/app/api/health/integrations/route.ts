@@ -36,6 +36,7 @@ function computeErrorMetrics(state: MetricSyncState | null): string[] {
 
 // GET /api/health/integrations - List user's health integrations
 export async function GET() {
+  const start = Date.now()
   try {
     const authResult = await getAuthenticatedUserId()
     if (!authResult.success) {
@@ -87,13 +88,15 @@ export async function GET() {
       }
     })
 
+    const connected = result.filter((r: { integration: { isConnected: boolean } | null }) => r.integration?.isConnected).length
+    console.log(`[health/integrations] userId=${userId} ${Date.now() - start}ms 200 connected=${connected}`)
     return NextResponse.json(result, {
       headers: {
         'Cache-Control': 'private, max-age=30'
       }
     })
   } catch (error) {
-    console.error('Error fetching health integrations:', error)
+    console.error(`[health/integrations] ${Date.now() - start}ms 500`, error instanceof Error ? error.message : error)
     return NextResponse.json(
       { error: 'Failed to fetch health integrations' },
       { status: 500 }

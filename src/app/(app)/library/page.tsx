@@ -851,13 +851,12 @@ export default function LibraryPage() {
 
   // Fetch user's active protocols
   const { data: userProtocols = [] } = useQuery<UserProtocol[]>({
-    queryKey: ['protocols', currentUserId, 'active'],
+    queryKey: ['protocols', 'active'],
     queryFn: async () => {
-      const res = await fetch(`/api/protocols?userId=${currentUserId}&status=active`)
-      if (!res.ok) return []
+      const res = await fetch('/api/protocols?status=active')
+      if (!res.ok) throw new Error(`Failed to load protocols (${res.status})`)
       return res.json()
     },
-    enabled: !!currentUserId,
     staleTime: 1000 * 60 * 5,
   })
 
@@ -866,7 +865,7 @@ export default function LibraryPage() {
     queryKey: ['health-integrations', currentUserId],
     queryFn: async () => {
       const res = await fetch(`/api/health/integrations?userId=${currentUserId}`)
-      if (!res.ok) return []
+      if (!res.ok) throw new Error(`Failed to load integrations (${res.status})`)
       return res.json()
     },
     enabled: !!currentUserId,

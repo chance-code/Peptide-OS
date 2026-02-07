@@ -1,17 +1,16 @@
 import { getServerSession } from 'next-auth/next'
 import { NextResponse } from 'next/server'
 import { authOptions } from '@/lib/auth'
-import prisma from '@/lib/prisma'
 
 /**
  * Verify that the authenticated user owns the requested userId.
- * Returns the validated userId or an error response.
+ * Compares the requested userId against session.user.id (profileId from JWT).
+ * No database queries — the profileId lives in the token.
  */
 export async function verifyUserAccess(requestedUserId: string | null): Promise<
   | { success: true; userId: string }
   | { success: false; response: NextResponse }
 > {
-  // Check if userId was provided
   if (!requestedUserId) {
     return {
       success: false,
@@ -22,10 +21,9 @@ export async function verifyUserAccess(requestedUserId: string | null): Promise<
     }
   }
 
-  // Get the authenticated session
   const session = await getServerSession(authOptions)
 
-  if (!session?.user?.name) {
+  if (!session?.user?.id) {
     return {
       success: false,
       response: NextResponse.json(
@@ -35,24 +33,7 @@ export async function verifyUserAccess(requestedUserId: string | null): Promise<
     }
   }
 
-  // Find the UserProfile for the authenticated user
-  const userProfile = await prisma.userProfile.findFirst({
-    where: { name: session.user.name },
-    select: { id: true },
-  })
-
-  if (!userProfile) {
-    return {
-      success: false,
-      response: NextResponse.json(
-        { error: 'User profile not found' },
-        { status: 404 }
-      ),
-    }
-  }
-
-  // Verify the requested userId matches the authenticated user's profile
-  if (requestedUserId !== userProfile.id) {
+  if (requestedUserId !== session.user.id) {
     return {
       success: false,
       response: NextResponse.json(
@@ -66,8 +47,8 @@ export async function verifyUserAccess(requestedUserId: string | null): Promise<
 }
 
 /**
- * Get the authenticated user's profile ID.
- * Use this when you need the userId but it wasn't provided in the request.
+ * Get the authenticated user's profile ID directly from the session.
+ * No database queries — the profileId lives in the JWT token.
  */
 export async function getAuthenticatedUserId(): Promise<
   | { success: true; userId: string }
@@ -75,7 +56,7 @@ export async function getAuthenticatedUserId(): Promise<
 > {
   const session = await getServerSession(authOptions)
 
-  if (!session?.user?.name) {
+  if (!session?.user?.id) {
     return {
       success: false,
       response: NextResponse.json(
@@ -85,20 +66,5 @@ export async function getAuthenticatedUserId(): Promise<
     }
   }
 
-  const userProfile = await prisma.userProfile.findFirst({
-    where: { name: session.user.name },
-    select: { id: true },
-  })
-
-  if (!userProfile) {
-    return {
-      success: false,
-      response: NextResponse.json(
-        { error: 'User profile not found' },
-        { status: 404 }
-      ),
-    }
-  }
-
-  return { success: true, userId: userProfile.id }
+  return { success: true, userId: session.user.id }
 }

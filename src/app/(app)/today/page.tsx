@@ -5,72 +5,24 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import {
   Check,
-  CheckCheck,
   X,
   ChevronLeft,
   ChevronRight,
   AlertTriangle,
   Clock,
-  Syringe,
-  Pill,
 } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { BottomSheet } from '@/components/ui/bottom-sheet'
-import { DoseCardSkeleton } from '@/components/ui/skeleton'
-import { SyringeVisual } from '@/components/syringe-visual'
-import { AlertsBanner } from '@/components/alerts-banner'
 import { PullToRefresh } from '@/components/pull-to-refresh'
-import { SwipeableCard } from '@/components/swipeable-card'
-import { HeroCard } from '@/components/hero-card'
-import { cn } from '@/lib/utils'
+import { SyringeVisual } from '@/components/syringe-visual'
+import { DailySummary } from '@/components/today/daily-summary'
+import { NextUp } from '@/components/today/next-up'
+import { DosePlan } from '@/components/today/dose-plan'
+import { Exceptions } from '@/components/today/exceptions'
+import { TodayMeaningCard, computeMeaning, type DailyStatusResponse } from '@/components/today/meaning-card'
 import type { TodayDoseItem } from '@/types'
-
-// Animated checkmark button component
-function AnimatedCheckButton({
-  isCompleted,
-  justCompleted,
-  onComplete,
-  onUndo
-}: {
-  isCompleted: boolean
-  justCompleted: boolean
-  onComplete: () => void
-  onUndo: () => void
-}) {
-  if (isCompleted) {
-    return (
-      <button
-        type="button"
-        onClick={onUndo}
-        className="w-11 h-11 rounded-full bg-[var(--success)] flex items-center justify-center shadow-lg"
-        style={{
-          animation: justCompleted ? 'checkPop 0.4s cubic-bezier(0.16, 1, 0.3, 1)' : undefined,
-          boxShadow: justCompleted ? 'var(--glow-success)' : undefined,
-        }}
-      >
-        <Check
-          className="w-5 h-5 text-white"
-          style={{
-            animation: justCompleted ? 'checkDraw 0.4s ease-out 0.1s both' : undefined
-          }}
-        />
-      </button>
-    )
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={onComplete}
-      className="w-11 h-11 rounded-full border-2 border-[var(--border)] bg-[var(--card)] hover:border-[var(--success)] hover:bg-[var(--success-muted)] flex items-center justify-center transition-all active:scale-95"
-    >
-      <Check className="w-5 h-5 text-[var(--muted-foreground)]" />
-    </button>
-  )
-}
 
 interface TodayResponse {
   date: string
@@ -83,7 +35,7 @@ interface TodayResponse {
   }
 }
 
-// Warm glow celebration (replaces confetti — restrained, like a nod from a mentor)
+// Warm glow celebration (restrained, like a nod from a mentor)
 function triggerCelebration(containerRef: React.RefObject<HTMLDivElement | null>) {
   if (!containerRef.current) return
   const el = document.createElement('div')
@@ -97,13 +49,13 @@ function triggerCelebration(containerRef: React.RefObject<HTMLDivElement | null>
 }
 
 export default function TodayPage() {
-  const { currentUserId, currentUser } = useAppStore()
+  const { currentUserId } = useAppStore()
   const queryClient = useQueryClient()
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [justCompleted, setJustCompleted] = useState<Set<string>>(new Set())
   const [selectedDose, setSelectedDose] = useState<TodayDoseItem | null>(null)
   const prevCompletedRef = useRef<number | null>(null)
-  const hasTriggeredConfetti = useRef(false)
+  const hasTriggeredCelebration = useRef(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
   const dateParam = format(selectedDate, 'yyyy-MM-dd')
@@ -116,38 +68,52 @@ export default function TodayPage() {
       return res.json()
     },
     enabled: !!currentUserId,
-    staleTime: 1000 * 30, // 30 seconds - doses need fresh data
+    staleTime: 1000 * 30,
+  })
+
+  // Health body-state (silent fetch — card only renders when data arrives)
+  const { data: healthMeaning } = useQuery({
+    queryKey: ['health-daily-status'],
+    queryFn: async () => {
+      const res = await fetch('/api/health/daily-status')
+      if (!res.ok) return null
+      const json: DailyStatusResponse = await res.json()
+      return computeMeaning(json)
+    },
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
   })
 
   const handleRefresh = useCallback(async () => {
     await refetch()
   }, [refetch])
 
-  // Trigger confetti when all doses are completed
+  // Trigger celebration when all doses completed
   useEffect(() => {
     if (!data || data.summary.total === 0) {
-      hasTriggeredConfetti.current = false
+      hasTriggeredCelebration.current = false
       prevCompletedRef.current = null
       return
     }
 
     const allCompleted = data.summary.completed === data.summary.total
-    const wasNotAllCompleted = prevCompletedRef.current !== null && prevCompletedRef.current < data.summary.total
+    const wasNotAllCompleted =
+      prevCompletedRef.current !== null && prevCompletedRef.current < data.summary.total
 
-    if (allCompleted && wasNotAllCompleted && !hasTriggeredConfetti.current) {
-      hasTriggeredConfetti.current = true
+    if (allCompleted && wasNotAllCompleted && !hasTriggeredCelebration.current) {
+      hasTriggeredCelebration.current = true
       triggerCelebration(containerRef)
     }
 
     if (!allCompleted) {
-      hasTriggeredConfetti.current = false
+      hasTriggeredCelebration.current = false
     }
 
     prevCompletedRef.current = data.summary.completed
   }, [data])
 
   useEffect(() => {
-    hasTriggeredConfetti.current = false
+    hasTriggeredCelebration.current = false
     prevCompletedRef.current = null
   }, [dateParam])
 
@@ -157,7 +123,6 @@ export default function TodayPage() {
   ) {
     if (!currentUserId || !data) return
 
-    // Use item.id for tracking since same protocol can have multiple timings
     if (status === 'completed') {
       setJustCompleted(prev => new Set(prev).add(item.id))
       setTimeout(() => {
@@ -169,23 +134,21 @@ export default function TodayPage() {
       }, 600)
     }
 
-    // Match by item.id to handle multi-timing protocols correctly
-    queryClient.setQueryData<TodayResponse>(['today', currentUserId, dateParam], (old) => {
+    // Optimistic update
+    queryClient.setQueryData<TodayResponse>(['today', currentUserId, dateParam], old => {
       if (!old) return old
       return {
         ...old,
-        items: old.items.map((i) =>
-          i.id === item.id ? { ...i, status } : i
-        ),
+        items: old.items.map(i => (i.id === item.id ? { ...i, status } : i)),
         summary: {
           ...old.summary,
-          completed: old.items.filter((i) =>
+          completed: old.items.filter(i =>
             i.id === item.id ? status === 'completed' : i.status === 'completed'
           ).length,
-          pending: old.items.filter((i) =>
+          pending: old.items.filter(i =>
             i.id === item.id ? status === 'pending' : i.status === 'pending'
           ).length,
-          skipped: old.items.filter((i) =>
+          skipped: old.items.filter(i =>
             i.id === item.id ? status === 'skipped' : i.status === 'skipped'
           ).length,
         },
@@ -207,25 +170,25 @@ export default function TodayPage() {
       })
       if (!res.ok) {
         console.error('Failed to save dose:', await res.text())
-        refetch() // Revert optimistic update
+        refetch()
       }
     } catch (error) {
       console.error('Error updating dose:', error)
-      refetch() // Revert optimistic update
+      refetch()
     }
   }
 
   async function handleMarkAllDone() {
     if (!currentUserId || !data) return
 
-    const pendingItems = data.items.filter((item) => item.status === 'pending')
+    const pendingItems = data.items.filter(item => item.status === 'pending')
     if (pendingItems.length === 0) return
 
-    queryClient.setQueryData<TodayResponse>(['today', currentUserId, dateParam], (old) => {
+    queryClient.setQueryData<TodayResponse>(['today', currentUserId, dateParam], old => {
       if (!old) return old
       return {
         ...old,
-        items: old.items.map((i) =>
+        items: old.items.map(i =>
           i.status === 'pending' ? { ...i, status: 'completed' as const } : i
         ),
         summary: {
@@ -238,7 +201,7 @@ export default function TodayPage() {
 
     try {
       await Promise.all(
-        pendingItems.map((item) =>
+        pendingItems.map(item =>
           fetch('/api/doses', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -261,20 +224,17 @@ export default function TodayPage() {
   const isToday = format(selectedDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
   const pendingCount = data?.summary.pending || 0
   const nextPendingDose = data?.items.find(item => item.status === 'pending')
-  const hasExpiredVials = data?.items.some(item => item.vialExpired) || false
 
   return (
     <div ref={containerRef}>
-      <AlertsBanner />
-
       <PullToRefresh onRefresh={handleRefresh} className="h-full">
-        <div className="p-4 pb-24">
-          {/* Date Navigation */}
-          <div className="flex items-center justify-between mb-4">
+        <div className="px-5 pt-4 pb-24 space-y-6">
+          {/* 1. Date Header */}
+          <div className="flex items-center justify-between">
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setSelectedDate((d) => new Date(d.getTime() - 86400000))}
+              onClick={() => setSelectedDate(d => new Date(d.getTime() - 86400000))}
               className="w-10 h-10 p-0"
             >
               <ChevronLeft className="w-5 h-5" />
@@ -293,7 +253,7 @@ export default function TodayPage() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setSelectedDate((d) => new Date(d.getTime() + 86400000))}
+              onClick={() => setSelectedDate(d => new Date(d.getTime() + 86400000))}
               className="w-10 h-10 p-0"
             >
               <ChevronRight className="w-5 h-5" />
@@ -302,11 +262,15 @@ export default function TodayPage() {
 
           {/* Error State */}
           {isError && !data && (
-            <Card className="mb-6">
+            <Card>
               <CardContent className="py-8 text-center">
                 <AlertTriangle className="w-8 h-8 text-[var(--warning)] mx-auto mb-3" />
-                <div className="text-[var(--foreground)] font-medium mb-1">Couldn&apos;t load doses</div>
-                <div className="text-sm text-[var(--muted-foreground)] mb-4">Pull down to refresh or tap below to retry.</div>
+                <div className="text-[var(--foreground)] font-medium mb-1">
+                  Couldn&apos;t load doses
+                </div>
+                <div className="text-sm text-[var(--muted-foreground)] mb-4">
+                  Pull down to refresh or tap below to retry.
+                </div>
                 <Button variant="secondary" size="sm" onClick={() => refetch()}>
                   Try again
                 </Button>
@@ -314,213 +278,63 @@ export default function TodayPage() {
             </Card>
           )}
 
-          {/* Hero Card */}
-          {isLoading ? (
-            <div className="h-[140px] rounded-2xl bg-[var(--muted)] animate-blur-reveal mb-6" />
-          ) : data ? (
-            <div className="mb-6 animate-card-in">
-              <HeroCard
-                completed={data.summary.completed}
-                total={data.summary.total}
-                pending={data.summary.pending}
-                nextDose={nextPendingDose ? {
-                  name: nextPendingDose.peptideName,
-                  time: nextPendingDose.timing ?? undefined,
-                } : undefined}
-                hasExpiredVials={hasExpiredVials}
-                userName={currentUser?.name}
+          {/* Loading skeleton */}
+          {isLoading && (
+            <div className="space-y-4 animate-pulse">
+              <div className="h-5 w-48 bg-[var(--muted)] rounded" />
+              <div className="h-20 bg-[var(--muted)] rounded-xl" />
+              <div className="space-y-2">
+                <div className="h-4 w-16 bg-[var(--muted)] rounded" />
+                <div className="h-10 bg-[var(--muted)] rounded-lg" />
+                <div className="h-10 bg-[var(--muted)] rounded-lg" />
+              </div>
+            </div>
+          )}
+
+          {/* Content — 5 sections in order */}
+          {data && (
+            <>
+              {/* 2. Daily Summary */}
+              <div>
+                <DailySummary items={data.items} summary={data.summary} />
+                {pendingCount > 1 && (
+                  <button
+                    type="button"
+                    onClick={handleMarkAllDone}
+                    className="text-sm text-[var(--accent)] hover:underline mt-1"
+                  >
+                    Complete all {pendingCount}
+                  </button>
+                )}
+              </div>
+
+              {/* Health meaning (conditional — only when data available) */}
+              {healthMeaning && <TodayMeaningCard meaning={healthMeaning} />}
+
+              {/* 3. Next Up (conditional) */}
+              {nextPendingDose && (
+                <NextUp
+                  item={nextPendingDose}
+                  onComplete={() => handleStatusChange(nextPendingDose, 'completed')}
+                  onSkip={() => handleStatusChange(nextPendingDose, 'skipped')}
+                  onTap={() => setSelectedDose(nextPendingDose)}
+                />
+              )}
+
+              {/* 4. Plan */}
+              <DosePlan
+                items={data.items}
+                nextUpId={nextPendingDose?.id}
+                onComplete={item => handleStatusChange(item, 'completed')}
+                onSkip={item => handleStatusChange(item, 'skipped')}
+                onUndo={item => handleStatusChange(item, 'pending')}
+                onTap={item => setSelectedDose(item)}
+                justCompleted={justCompleted}
               />
-            </div>
-          ) : null}
 
-          {/* Mark All Done Button */}
-          {pendingCount > 1 && (
-            <Button
-              onClick={handleMarkAllDone}
-              variant="success"
-              className="w-full mb-4"
-            >
-              <CheckCheck className="w-4 h-4 mr-2" />
-              Complete All ({pendingCount})
-            </Button>
-          )}
-
-          {/* Section Header */}
-          {data && data.items.length > 0 && pendingCount > 0 && (
-            <div className="flex items-center justify-end mb-3">
-              <span className="text-xs text-[var(--muted-foreground)]">
-                Swipe to complete or skip
-              </span>
-            </div>
-          )}
-
-          {/* Dose List */}
-          {isLoading ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className={`animate-card-in stagger-${i}`}>
-                  <DoseCardSkeleton />
-                </div>
-              ))}
-            </div>
-          ) : data && data.items.length > 0 ? (
-            <div className="space-y-3">
-              {data.items.map((item, index) => {
-                const itemType = item.itemType || 'peptide'
-                const isSupplement = itemType === 'supplement'
-                const isFirstOfType = index === 0 || (data.items[index - 1].itemType || 'peptide') !== itemType
-
-                return (
-                  <div key={item.id}>
-                    {/* Section header when type changes */}
-                    {isFirstOfType && (
-                      <div className="flex items-center gap-2 mb-2 pt-2">
-                        {isSupplement ? (
-                          <Pill className="w-4 h-4 text-[var(--success)]" />
-                        ) : (
-                          <Syringe className="w-4 h-4 text-[var(--accent)]" />
-                        )}
-                        <h3 className="text-label">{isSupplement ? 'Supplements' : 'Peptides'}</h3>
-                      </div>
-                    )}
-                    <div className={cn('animate-card-in', `stagger-${Math.min(index + 1, 10)}`)}>
-                      <SwipeableCard
-                        onSwipeRight={
-                          item.status === 'pending'
-                            ? () => handleStatusChange(item, 'completed')
-                            : undefined
-                        }
-                        onSwipeLeft={
-                          item.status === 'pending'
-                            ? () => handleStatusChange(item, 'skipped')
-                            : undefined
-                        }
-                        disabled={item.status !== 'pending'}
-                      >
-                        <Card
-                          interactive
-                          className={cn(
-                            'transition-all',
-                            item.status === 'completed' && 'opacity-60',
-                            item.vialExpired && 'border-l-4 border-l-[var(--warning)]'
-                          )}
-                        >
-                          <CardContent className="p-4">
-                            <div className="flex items-center gap-4">
-                              {/* Status indicator */}
-                              <div
-                                className={cn(
-                                  'w-1 h-12 rounded-full',
-                                  item.status === 'completed' && 'bg-[var(--success)]',
-                                  item.status === 'pending' && (isSupplement ? 'bg-[var(--success)]' : 'bg-[var(--accent)]'),
-                                  item.status === 'skipped' && 'bg-[var(--muted)]'
-                                )}
-                              />
-
-                              {/* Content */}
-                              <button
-                                type="button"
-                                onClick={() => setSelectedDose(item)}
-                                className="flex-1 min-w-0 text-left"
-                              >
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span className="font-semibold text-[var(--foreground)]">
-                                    {item.peptideName}
-                                  </span>
-                                  {item.penUnits && (
-                                    <Badge variant="accent">
-                                      {item.penUnits}u
-                                    </Badge>
-                                  )}
-                                  {item.vialExpired && (
-                                    <Badge variant="warning" className="flex items-center gap-1">
-                                      <AlertTriangle className="w-3 h-3" />
-                                      Expired
-                                    </Badge>
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-2 text-sm text-[var(--muted-foreground)]">
-                                  {isSupplement ? (
-                                    <Pill className="w-3.5 h-3.5" />
-                                  ) : (
-                                    <Syringe className="w-3.5 h-3.5" />
-                                  )}
-                                  <span>
-                                    {isSupplement && item.servingSize
-                                      ? `${item.servingSize} ${item.servingUnit || 'serving'}${item.servingSize > 1 ? 's' : ''}`
-                                      : `${item.doseAmount} ${item.doseUnit}`}
-                                  </span>
-                                  {item.timing && (
-                                    <>
-                                      <span className="text-[var(--border)]">•</span>
-                                      <span className="flex items-center gap-1">
-                                        <Clock className="w-3 h-3" />
-                                        {item.timing}
-                                      </span>
-                                    </>
-                                  )}
-                                </div>
-                              </button>
-
-                              {/* Action buttons */}
-                              <div className="flex items-center gap-2">
-                                {item.status === 'pending' ? (
-                                  <>
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      onClick={() => handleStatusChange(item, 'skipped')}
-                                      className="w-11 h-11 p-0"
-                                    >
-                                      <X className="w-5 h-5" />
-                                    </Button>
-                                    <AnimatedCheckButton
-                                      isCompleted={false}
-                                      justCompleted={false}
-                                      onComplete={() => handleStatusChange(item, 'completed')}
-                                      onUndo={() => handleStatusChange(item, 'pending')}
-                                    />
-                                  </>
-                                ) : item.status === 'completed' ? (
-                                  <AnimatedCheckButton
-                                    isCompleted={true}
-                                    justCompleted={justCompleted.has(item.id)}
-                                    onComplete={() => handleStatusChange(item, 'completed')}
-                                    onUndo={() => handleStatusChange(item, 'pending')}
-                                  />
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleStatusChange(item, 'pending')}
-                                    className="px-3 py-2.5 rounded-lg bg-[var(--muted)] hover:bg-[var(--border)] text-[var(--muted-foreground)] text-sm font-medium transition-colors active:scale-95"
-                                  >
-                                    Skipped
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </SwipeableCard>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
-            <Card className="mt-4">
-              <CardContent className="py-12 text-center">
-                <div className="w-16 h-16 rounded-full bg-[var(--muted)] flex items-center justify-center mx-auto mb-4">
-                  <Syringe className="w-8 h-8 text-[var(--muted-foreground)]" />
-                </div>
-                <div className="text-[var(--foreground)] font-medium mb-1">No doses scheduled</div>
-                <div className="text-sm text-[var(--muted-foreground)]">
-                  {isToday
-                    ? 'Add a protocol to get started'
-                    : 'No doses were scheduled for this day'}
-                </div>
-              </CardContent>
-            </Card>
+              {/* 5. Exceptions (conditional) */}
+              <Exceptions items={data.items} />
+            </>
           )}
         </div>
       </PullToRefresh>
@@ -533,22 +347,13 @@ export default function TodayPage() {
       >
         {selectedDose && (
           <div className="space-y-4">
-            {/* Pen Units - Primary Info */}
-            {selectedDose.penUnits ? (
-              <div className="text-center py-6 bg-[var(--accent-muted)] rounded-2xl relative overflow-hidden">
-                <div className="absolute inset-0 opacity-10" style={{ background: 'radial-gradient(circle at 50% 40%, var(--accent), transparent 70%)' }} />
-                <div className="relative text-hero text-[var(--accent)]">
+            {/* Pen Units */}
+            {selectedDose.penUnits != null && (
+              <div className="text-center py-4 bg-[var(--accent-muted)] rounded-xl">
+                <div className="text-3xl font-bold text-[var(--accent)]">
                   {selectedDose.penUnits}
                 </div>
-                <div className="relative text-[var(--accent)] mt-1 font-medium text-sm">
-                  units to draw
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-6 bg-[var(--muted)] rounded-2xl">
-                <div className="text-[var(--muted-foreground)]">
-                  Add reconstitution info to see pen units
-                </div>
+                <div className="text-sm text-[var(--accent)] mt-0.5">units to draw</div>
               </div>
             )}
 

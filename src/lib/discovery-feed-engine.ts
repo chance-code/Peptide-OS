@@ -15,6 +15,7 @@ export type InsightType =
   | 'retest'
   | 'achievement'
   | 'educational'
+  | 'cohort'
 
 interface GeneratedInsight {
   type: InsightType
@@ -54,6 +55,7 @@ export async function generateDailyFeed(userId: string): Promise<{
       dismissed: false,
     },
     orderBy: { priority: 'asc' },
+    take: 10,
   })
 
   if (existing.length > 0) {
@@ -74,11 +76,6 @@ export async function generateDailyFeed(userId: string): Promise<{
   // Take top 1-3
   const selected = filtered.slice(0, 3)
 
-  // Ensure at least 1 educational insight for cold start
-  if (selected.length === 0) {
-    selected.push(generateEducationalInsight())
-  }
-
   // Ensure 1+ surprise per week
   const surpriseThisWeek = recentTypes.get('surprise') ?? 0
   if (surpriseThisWeek === 0 && !selected.some(s => s.type === 'surprise')) {
@@ -86,6 +83,33 @@ export async function generateDailyFeed(userId: string): Promise<{
     if (surprise && selected.length < 3) {
       selected.push(surprise)
     }
+  }
+
+  // Inject cohort insight (max 1 per day)
+  if (selected.length < 3) {
+    try {
+      const cohortInsight = await prisma.cohortInsight.findFirst({
+        where: { userId, expiresAt: { gt: new Date() } },
+        orderBy: { generatedAt: 'desc' },
+      })
+      if (cohortInsight) {
+        selected.push({
+          type: 'cohort' as InsightType,
+          title: cohortInsight.title,
+          body: cohortInsight.body,
+          domain: null,
+          relatedMarkers: [],
+          priority: 4,
+        })
+      }
+    } catch {
+      // Cohort insights may not be available yet
+    }
+  }
+
+  // Final safeguard: always return at least 1 insight (educational bypasses frequency rules)
+  if (selected.length === 0) {
+    selected.push(generateEducationalInsight())
   }
 
   // Persist
@@ -123,17 +147,21 @@ export async function generateDailyFeed(userId: string): Promise<{
 async function generateCandidates(userId: string): Promise<GeneratedInsight[]> {
   const candidates: GeneratedInsight[] = []
 
-  // Fetch latest lab data
+  // Fetch latest lab data (limit biomarkers to top 30 for performance)
   const latestUpload = await prisma.labUpload.findFirst({
     where: { userId },
     orderBy: { testDate: 'desc' },
-    include: { biomarkers: true, review: true },
+    include: {
+      biomarkers: { take: 30 },
+      review: true,
+    },
   })
 
-  // Fetch active protocols
+  // Fetch active protocols (limit to 10)
   const protocols = await prisma.protocol.findMany({
     where: { userId, status: 'active' },
     include: { peptide: true },
+    take: 10,
   })
 
   // 1. Retesting Prompt

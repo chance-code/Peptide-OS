@@ -129,14 +129,13 @@ export default function ProtocolsPage() {
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
 
   const { data: protocols = [], isLoading, refetch } = useQuery<ProtocolWithPeptide[]>({
-    queryKey: ['protocols', currentUserId, filter],
+    queryKey: ['protocols', filter],
     queryFn: async () => {
-      const statusParam = filter !== 'all' ? `&status=${filter}` : ''
-      const res = await fetch(`/api/protocols?userId=${currentUserId}${statusParam}`)
+      const statusParam = filter !== 'all' ? `?status=${filter}` : ''
+      const res = await fetch(`/api/protocols${statusParam}`)
       if (!res.ok) throw new Error('Failed to fetch')
       return res.json()
     },
-    enabled: !!currentUserId,
     staleTime: 1000 * 60 * 5, // 5 minutes - pull to refresh for updates
   })
 
@@ -149,7 +148,7 @@ export default function ProtocolsPage() {
 
     // Optimistic update
     queryClient.setQueryData<ProtocolWithPeptide[]>(
-      ['protocols', currentUserId, filter],
+      ['protocols', filter],
       (old = []) => old.map(p => p.id === protocol.id ? { ...p, status: newStatus } : p)
     )
 

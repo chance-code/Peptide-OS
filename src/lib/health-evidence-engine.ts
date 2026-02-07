@@ -165,6 +165,21 @@ export interface PremiumProtocolEvidence {
     discordant: string[]   // Biomarker keys where lab and wearable disagree
     bonus: number          // Concordance confidence boost (0.0-0.3)
   }
+
+  // Phase 3B: Statistical deepening (optional — graceful degradation)
+  changepointAnalysis?: {
+    detected: boolean
+    changepointDate: string | null
+    posteriorProbability: number
+    clusteredStreams: string[]
+    alignment: 'aligned' | 'delayed' | 'unaligned' | 'no_changepoint'
+  }
+  causalAnalysis?: {
+    unadjustedEffect: number
+    adjustedEffect: number
+    topConfounders: string[]
+    adjustmentNarrative: string
+  }
 }
 
 export interface MetricStatistics {
@@ -1228,6 +1243,46 @@ async function computeSingleProtocolEvidence(
     }
   }
 
+  // Phase 3B: Changepoint detection + causal inference (optional)
+  let changepointAnalysis: PremiumProtocolEvidence['changepointAnalysis'] | undefined
+  let causalAnalysis: PremiumProtocolEvidence['causalAnalysis'] | undefined
+
+  if (userId && daysOnProtocol >= 14) {
+    try {
+      const { detectProtocolChangepoints } = await import('./protocol-changepoint-detection')
+      const cpResult = await detectProtocolChangepoints(userId, protocol.id)
+      if (cpResult.perStream.length > 0) {
+        const bestCluster = cpResult.clusteredChangepoints[0]
+        changepointAnalysis = {
+          detected: cpResult.perStream.some(r => r.detected),
+          changepointDate: bestCluster?.date?.toISOString() ?? null,
+          posteriorProbability: bestCluster?.clusterPosterior ?? 0,
+          clusteredStreams: bestCluster?.streams ?? [],
+          alignment: cpResult.protocolAttribution?.changepointAlignment ?? 'no_changepoint',
+        }
+      }
+    } catch {
+      // Changepoint analysis is optional — graceful degradation
+    }
+
+    try {
+      const { runCausalAnalysis } = await import('./protocol-causal-inference')
+      const causalResults = await runCausalAnalysis(userId, protocol.id)
+      if (causalResults.length > 0) {
+        // Use the first (primary) metric result
+        const primary = causalResults[0]
+        causalAnalysis = {
+          unadjustedEffect: primary.unadjustedAPTE,
+          adjustedEffect: primary.adjustedAPTE,
+          topConfounders: primary.detectedConfounders.map(c => c.name),
+          adjustmentNarrative: primary.narrativeExplanation,
+        }
+      }
+    } catch {
+      // Causal analysis is optional — graceful degradation
+    }
+  }
+
   return {
     protocolId: protocol.id,
     protocolName: normalizedName,
@@ -1269,6 +1324,10 @@ async function computeSingleProtocolEvidence(
     labEffects: labEffects && labEffects.length > 0 ? labEffects : undefined,
     labVerdict,
     labWearableConcordance,
+
+    // Phase 3B: Statistical deepening
+    changepointAnalysis,
+    causalAnalysis,
   }
 }
 

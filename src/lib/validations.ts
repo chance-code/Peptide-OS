@@ -9,7 +9,7 @@ const dateStringSchema = z.string().refine(
 
 // Protocol schemas
 export const createProtocolSchema = z.object({
-  userId: cuidSchema,
+  userId: cuidSchema.optional(),
   peptideId: cuidSchema,
   startDate: dateStringSchema,
   endDate: dateStringSchema.nullable().optional(),

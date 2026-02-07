@@ -6,74 +6,54 @@ import { useAppStore } from '@/store'
 import { BottomNav, TopHeader } from '@/components/nav'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { data: session, status: sessionStatus } = useSession()
-  const { currentUserId: storedUserId, setCurrentUser } = useAppStore()
+  const { status: sessionStatus } = useSession()
+  const { setCurrentUser, setCurrentUserId, setUserHydrated } = useAppStore()
   const [isLoading, setIsLoading] = useState(true)
-  const [currentUserId, setLocalCurrentUserId] = useState<string | null>(null)
+  const [hydrated, setHydrated] = useState(false)
 
   useEffect(() => {
-    // Wait for session to finish loading before making decisions
-    if (sessionStatus === 'loading') {
-      return
-    }
+    if (sessionStatus === 'loading') return
 
-    async function loadUser() {
+    async function bootstrap() {
       try {
-        // Get the logged-in user's info from the session
-        const sessionUserName = session?.user?.name
-        const sessionUserEmail = session?.user?.email
-
-        // Fetch all users
-        const usersRes = await fetch('/api/users')
-        if (!usersRes.ok) {
+        // Step 1: Get the profileId from the session (no DB query)
+        const meRes = await fetch('/api/me')
+        if (!meRes.ok) {
+          console.error('[layout] /api/me failed:', meRes.status)
           setIsLoading(false)
           return
         }
 
-        const users = await usersRes.json()
-        let userToUse = null
-
-        // Try to find user by name (mapped from email in auth callback)
-        if (sessionUserName) {
-          userToUse = users.find((u: { name: string }) => u.name === sessionUserName)
+        const { profileId, profileName } = await meRes.json()
+        if (!profileId) {
+          console.error('[layout] /api/me returned no profileId')
+          setIsLoading(false)
+          return
         }
 
-        // If session user doesn't exist in database, create them
-        if (!userToUse && (sessionUserName || sessionUserEmail)) {
-          const userName = sessionUserName || sessionUserEmail?.split('@')[0] || 'User'
-          const createRes = await fetch('/api/users', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: userName }),
-          })
-          if (createRes.ok) {
-            userToUse = await createRes.json()
+        // Step 2: Set the userId in the store immediately so queries can start
+        setCurrentUserId(profileId)
+
+        // Step 3: Fetch full user profile for display purposes
+        const usersRes = await fetch('/api/users')
+        if (usersRes.ok) {
+          const users = await usersRes.json()
+          const user = users.find((u: { id: string }) => u.id === profileId)
+          if (user) {
+            setCurrentUser(user)
           }
         }
 
-        // Fallback: check stored user ID
-        if (!userToUse && storedUserId) {
-          userToUse = users.find((u: { id: string }) => u.id === storedUserId)
-        }
-
-        // If still no user, use the first user (shouldn't happen with proper auth)
-        if (!userToUse && users.length > 0) {
-          userToUse = users[0]
-        }
-
-        if (userToUse) {
-          setCurrentUser(userToUse)
-          setLocalCurrentUserId(userToUse.id)
-        }
+        setHydrated(true)
+        setUserHydrated(true)
       } catch (error) {
-        console.error('Error loading user:', error)
+        console.error('[layout] Bootstrap error:', error)
       } finally {
         setIsLoading(false)
       }
     }
 
-    loadUser()
-  // Only re-run when session status changes (authenticated/unauthenticated)
+    bootstrap()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionStatus])
 
@@ -85,7 +65,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     )
   }
 
-  if (!currentUserId) {
+  if (!hydrated) {
     return (
       <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
         <div className="text-[var(--muted-foreground)] animate-blur-reveal">Setting up your profile...</div>

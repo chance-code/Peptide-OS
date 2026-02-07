@@ -287,6 +287,16 @@ export async function evaluate(userId: string, trigger: BrainTrigger): Promise<B
     console.error('Brain: protocol evidence failed:', e)
   }
 
+  // Step 6b: GP lab forecasting on lab_upload trigger (Phase 3B)
+  if (trigger === 'lab_upload') {
+    try {
+      const { forecastAllBiomarkers } = await import('./health-lab-forecasting')
+      await forecastAllBiomarkers(userId)
+    } catch (e) {
+      console.error('Brain: GP lab forecasting failed:', e)
+    }
+  }
+
   // Step 7: Domain fusion — single truth per domain
   const domains = fuseDomains(labScores, wearableAssessment, latestUpload, personalBaselines)
 

@@ -133,13 +133,12 @@ export default function CalendarPage() {
   const monthEnd = endOfMonth(currentMonth)
 
   const { data: protocols = [] } = useQuery<ProtocolWithPeptide[]>({
-    queryKey: ['protocols', currentUserId],
+    queryKey: ['protocols'],
     queryFn: async () => {
-      const res = await fetch(`/api/protocols?userId=${currentUserId}`)
+      const res = await fetch('/api/protocols')
       if (!res.ok) throw new Error('Failed to fetch')
       return res.json()
     },
-    enabled: !!currentUserId,
     staleTime: 1000 * 60 * 15, // 15 minutes - protocols don't change often
   })
 

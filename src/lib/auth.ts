@@ -22,6 +22,24 @@ const emailToProfileName: Record<string, string> = {
   'angelaolson8@gmail.com': 'Angela Olson',
 }
 
+/**
+ * Resolve or create a UserProfile for the given name.
+ * Called once per JWT lifecycle (initial sign-in) to embed profileId in the token.
+ */
+async function resolveProfileId(profileName: string): Promise<string> {
+  const existing = await prisma.userProfile.findFirst({
+    where: { name: profileName },
+    select: { id: true },
+  })
+  if (existing) return existing.id
+
+  const created = await prisma.userProfile.create({
+    data: { name: profileName, isActive: true },
+    select: { id: true },
+  })
+  return created.id
+}
+
 export const authOptions: NextAuthOptions = {
   providers: [
     // Google OAuth
@@ -68,12 +86,6 @@ export const authOptions: NextAuthOptions = {
 
           if (isValid) {
             console.log(`Login successful for ${userConfig.name}`)
-
-            // Don't modify database isActive flag here - each browser session
-            // manages its own current profile via localStorage independently.
-            // This allows multiple users to be logged in simultaneously on
-            // different devices without affecting each other.
-
             return {
               id: userConfig.name,
               name: userConfig.name,
@@ -95,30 +107,49 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     async signIn() {
-      // Allow all sign-ins - the app layout will handle user creation
       return true
     },
 
     async jwt({ token, user, account }) {
-      // On initial sign in, add user info to token
+      // On initial sign-in, resolve profileName and profileId once
       if (user) {
         token.email = user.email
         token.provider = account?.provider || 'credentials'
 
         // Map OAuth emails to existing profile names
-        if (user.email && emailToProfileName[user.email.toLowerCase()]) {
-          token.name = emailToProfileName[user.email.toLowerCase()]
-        } else {
-          token.name = user.name
+        const profileName =
+          user.email && emailToProfileName[user.email.toLowerCase()]
+            ? emailToProfileName[user.email.toLowerCase()]
+            : (user.name ?? user.email ?? 'Unknown')
+
+        token.profileName = profileName
+        token.name = profileName
+
+        // Resolve the DB profileId and embed it in the token
+        try {
+          token.profileId = await resolveProfileId(profileName)
+        } catch (err) {
+          console.error('[auth] Failed to resolve profileId:', err)
         }
       }
+
+      // Backfill profileId for existing sessions that don't have it yet
+      if (!token.profileId && token.name) {
+        try {
+          token.profileId = await resolveProfileId(token.name)
+        } catch (err) {
+          console.error('[auth] Failed to backfill profileId:', err)
+        }
+      }
+
       return token
     },
 
     async session({ session, token }) {
-      // Add custom fields to session
       if (token) {
-        session.user.provider = token.provider as string
+        session.user.id = token.profileId as string | undefined
+        session.user.name = (token.profileName ?? token.name) as string | undefined
+        session.user.provider = token.provider as string | undefined
       }
       return session
     },

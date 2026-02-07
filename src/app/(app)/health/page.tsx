@@ -39,7 +39,8 @@ import {
   SEED_DATA,
   SEED_INTERVENTIONS,
   SEED_CONTEXT_EVENTS,
-  type SeedMetric
+  type SeedMetric,
+  type SeedIntervention
 } from '@/lib/demo-data/seed-metrics'
 import {
   computeBaseline,
@@ -64,10 +65,14 @@ import {
 } from '@/lib/health-trajectory'
 import {
   computeProtocolEvidence,
-  type ProtocolEvidence
+  type ProtocolEvidence,
+  type ObservedSignal,
+  type EvidenceVerdict,
+  type RampPhase
 } from '@/lib/health-protocol-evidence'
 import { fetchAppleHealthWithStatus } from '@/lib/health-providers/apple-health'
 import { format, subDays, parseISO } from 'date-fns'
+import type { WeeklyReview } from '@/lib/health-weekly-review'
 
 // Demo mode flag - set false to use real data when available
 const FORCE_DEMO_MODE = false
@@ -104,7 +109,7 @@ interface ApiIntegrationResponse {
 export default function HealthDashboardNew() {
   const { currentUserId } = useAppStore()
   const queryClient = useQueryClient()
-  const [selectedSection, setSelectedSection] = useState<'overview' | 'evidence' | 'insights'>('overview')
+  const [selectedSection, setSelectedSection] = useState<'overview' | 'evidence' | 'discover' | 'weekly'>('overview')
   const [showIntegrations, setShowIntegrations] = useState(false)
   const [syncingProvider, setSyncingProvider] = useState<string | null>(null)
   const [showExplainModal, setShowExplainModal] = useState(false)
@@ -128,7 +133,10 @@ export default function HealthDashboardNew() {
     queryFn: async () => {
       if (!currentUserId) return []
       const res = await fetch(`/api/health/integrations?userId=${currentUserId}`)
-      if (!res.ok) return []
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '')
+        throw new Error(`Integrations ${res.status}: ${errText.slice(0, 200)}`)
+      }
       const data = await res.json() as ApiIntegrationResponse[]
       return data.map(item => ({
         id: item.integration?.id || item.name,
@@ -233,53 +241,148 @@ export default function HealthDashboardNew() {
     }
   }
 
-  // Fetch real health metrics (60 days)
-  const { data: realMetricsData, isLoading: isLoadingMetrics } = useQuery({
-    queryKey: ['health-metrics-raw', currentUserId],
+  // Fetch real health metrics (180 days, flat format — no context, no grouping)
+  const { data: realMetrics = [], isLoading: isLoadingMetrics } = useQuery<SeedMetric[]>({
+    queryKey: ['health-metrics-raw'],
     queryFn: async () => {
-      if (!currentUserId) return null
       const endDate = new Date().toISOString()
       const startDate = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString()
-      const res = await fetch(`/api/health/metrics?startDate=${startDate}&endDate=${endDate}`)
+      const res = await fetch(
+        `/api/health/metrics?startDate=${startDate}&endDate=${endDate}&format=flat`
+      )
       if (!res.ok) {
         const errText = await res.text().catch(() => 'unknown')
         throw new Error(`Metrics API ${res.status}: ${errText.slice(0, 200)}`)
       }
       const data = await res.json()
-      const flatMetrics: SeedMetric[] = []
-      if (data.metrics) {
-        for (const [metricType, values] of Object.entries(data.metrics)) {
-          for (const v of values as Array<{ recordedAt: string; value: number; unit: string; provider: string }>) {
-            flatMetrics.push({
-              date: format(new Date(v.recordedAt), 'yyyy-MM-dd'),
-              metricType,
-              value: v.value,
-              unit: v.unit,
-              source: v.provider
-            })
-          }
-        }
-      }
-      return { metrics: flatMetrics, stats: data.stats }
+      return data.metrics as SeedMetric[]
     },
-    enabled: !!currentUserId && !FORCE_DEMO_MODE,
+    enabled: !FORCE_DEMO_MODE,
     staleTime: 5 * 60 * 1000,
     retry: 2,
   })
 
-  const realMetrics = realMetricsData?.metrics || []
-
   // Fetch user's active protocols
   const { data: realProtocols } = useQuery({
-    queryKey: ['protocols', currentUserId],
+    queryKey: ['protocols'],
     queryFn: async () => {
-      if (!currentUserId) return []
-      const res = await fetch(`/api/protocols?userId=${currentUserId}`)
-      if (!res.ok) return []
+      const res = await fetch('/api/protocols')
+      if (!res.ok) throw new Error(`Failed to load protocols (${res.status})`)
       return res.json()
     },
-    enabled: !!currentUserId && !FORCE_DEMO_MODE,
+    enabled: !FORCE_DEMO_MODE,
     staleTime: 5 * 60 * 1000
+  })
+
+  // Fetch weekly review (only when tab is selected)
+  const { data: weeklyData, isLoading: weeklyLoading, error: weeklyError } = useQuery<{ review: WeeklyReview; isEmpty: boolean }>({
+    queryKey: ['weekly-review', currentUserId],
+    queryFn: async () => {
+      const res = await fetch('/api/health/weekly-review')
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '')
+        throw new Error(`Weekly review ${res.status}: ${errText.slice(0, 200)}`)
+      }
+      return res.json()
+    },
+    enabled: !!currentUserId && selectedSection === 'weekly',
+    staleTime: 5 * 60 * 1000,
+  })
+
+  // Fetch premium evidence from API (only when Evidence tab selected)
+  const { data: evidenceData, isLoading: evidenceLoading, error: evidenceError } = useQuery<{
+    evidence: Array<{
+      protocolId: string
+      protocolName: string
+      protocolType: 'peptide' | 'supplement'
+      daysOnProtocol: number
+      verdict: EvidenceVerdict
+      verdictExplanation: string
+      rampPhase: string
+      rampExplanation: string
+      effects: {
+        primary: { metricType: string; metricName: string; change: { percent: number }; effect: { cohensD: number; magnitude: 'large' | 'medium' | 'small' | 'negligible' }; interpretation: { isImprovement: boolean } } | null
+        supporting: Array<{ metricType: string; metricName: string; change: { percent: number }; effect: { cohensD: number; magnitude: 'large' | 'medium' | 'small' | 'negligible' }; interpretation: { isImprovement: boolean } }>
+        adverse: Array<{ metricType: string; metricName: string; change: { percent: number }; effect: { cohensD: number; magnitude: 'large' | 'medium' | 'small' | 'negligible' }; interpretation: { isImprovement: boolean } }>
+      }
+      confidence: { level: 'high' | 'medium' | 'low'; score: number; reasons: string[] }
+      confounds: { totalDays: number }
+    }>
+    isEmpty: boolean
+    summary: { overallStatus: string; highlights: string[]; concerns: string[]; recommendations: string[] }
+  }>({
+    queryKey: ['health-evidence', currentUserId],
+    queryFn: async () => {
+      const res = await fetch('/api/health/evidence')
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '')
+        throw new Error(`Evidence ${res.status}: ${errText.slice(0, 200)}`)
+      }
+      return res.json()
+    },
+    enabled: !!currentUserId && selectedSection === 'evidence',
+    staleTime: 5 * 60 * 1000,
+  })
+
+  // Map premium evidence to ProtocolEvidence shape for the card component
+  const mappedEvidence: ProtocolEvidence[] = useMemo(() => {
+    if (!evidenceData?.evidence) return []
+    return evidenceData.evidence.map(e => {
+      const signals: ObservedSignal[] = []
+      const mapSignal = (s: { metricType: string; metricName: string; change: { percent: number }; effect: { cohensD: number; magnitude: 'large' | 'medium' | 'small' | 'negligible' }; interpretation: { isImprovement: boolean } }): ObservedSignal => ({
+        metricType: s.metricType,
+        metricName: s.metricName,
+        percentChange: s.change.percent,
+        effectSize: s.effect.cohensD,
+        magnitude: s.effect.magnitude,
+        direction: s.interpretation.isImprovement ? 'positive' : 'negative',
+        isGood: s.interpretation.isImprovement,
+      })
+      if (e.effects.primary) signals.push(mapSignal(e.effects.primary))
+      for (const s of e.effects.supporting) signals.push(mapSignal(s))
+      for (const s of e.effects.adverse) signals.push(mapSignal(s))
+      return {
+        protocolId: e.protocolId,
+        protocolName: e.protocolName,
+        protocolType: e.protocolType,
+        daysOnProtocol: e.daysOnProtocol,
+        verdict: e.verdict,
+        verdictExplanation: e.verdictExplanation,
+        observedSignals: signals,
+        confidence: e.confidence,
+        rampPhase: e.rampPhase as RampPhase,
+        rampExplanation: e.rampExplanation,
+        confoundDays: e.confounds.totalDays,
+        totalDays: e.daysOnProtocol,
+      }
+    })
+  }, [evidenceData])
+
+  // Fetch discovery feed (only when Discover tab selected)
+  const { data: discoverData, isLoading: discoverLoading, error: discoverError } = useQuery<{
+    insights: Array<{
+      id: string
+      type: string
+      title: string
+      body: string
+      domain: string | null
+      priority: number
+      seen: boolean
+    }>
+    isEmpty: boolean
+    generatedAt: string
+  }>({
+    queryKey: ['discovery-feed', currentUserId],
+    queryFn: async () => {
+      const res = await fetch('/api/health/discovery-feed')
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '')
+        throw new Error(`Discovery feed ${res.status}: ${errText.slice(0, 200)}`)
+      }
+      return res.json()
+    },
+    enabled: !!currentUserId && selectedSection === 'discover',
+    staleTime: 5 * 60 * 1000,
   })
 
   // Determine if we have enough real data or should use demo
@@ -301,50 +404,48 @@ export default function HealthDashboardNew() {
     setShowWhyModal(true)
   }, [])
 
-  // ── Data source selection ──
-  const dataSource = useMemo(() => {
+  // ── Metrics source (stable — only recomputes when metric data changes) ──
+  const metricsSource = useMemo(() => {
     let metrics: SeedMetric[]
-    let interventions: typeof SEED_INTERVENTIONS
-    let contextEvents: typeof SEED_CONTEXT_EVENTS
-
     if (useDemoData) {
       metrics = SEED_DATA.metrics
-      interventions = SEED_INTERVENTIONS
-      contextEvents = SEED_CONTEXT_EVENTS
-    } else if (realMetrics && realMetrics.length > 0) {
+    } else if (realMetrics.length > 0) {
       metrics = realMetrics
-      interventions = (realProtocols || []).map((p: { id: string; peptide?: { name: string; type?: string }; startDate: string; doseAmount?: number; doseUnit?: string; frequency: string; timing?: string }) => ({
-        id: p.id,
-        name: p.peptide?.name || 'Unknown',
-        type: (p.peptide?.type === 'supplement' ? 'supplement' : 'peptide') as 'peptide' | 'supplement',
-        startDate: format(new Date(p.startDate), 'yyyy-MM-dd'),
-        dose: `${p.doseAmount || ''}${p.doseUnit || ''}`,
-        frequency: p.frequency,
-        timing: p.timing || ''
-      }))
-      contextEvents = []
     } else {
       return null
     }
-
     const metricsByType = new Map<string, SeedMetric[]>()
     for (const m of metrics) {
-      if (!metricsByType.has(m.metricType)) {
-        metricsByType.set(m.metricType, [])
-      }
+      if (!metricsByType.has(m.metricType)) metricsByType.set(m.metricType, [])
       metricsByType.get(m.metricType)!.push(m)
     }
+    return { metrics, metricsByType, availableMetrics: new Set(metricsByType.keys()) }
+  }, [useDemoData, realMetrics])
 
-    const availableMetrics = new Set(metricsByType.keys())
+  // ── Interventions (only recomputes when protocols change) ──
+  const interventions = useMemo(() => {
+    if (useDemoData) return SEED_INTERVENTIONS
+    return (realProtocols || []).map((p: { id: string; peptide?: { name: string; type?: string }; startDate: string; doseAmount?: number; doseUnit?: string; frequency: string; timing?: string }) => ({
+      id: p.id,
+      name: p.peptide?.name || 'Unknown',
+      type: (p.peptide?.type === 'supplement' ? 'supplement' : 'peptide') as 'peptide' | 'supplement',
+      startDate: format(new Date(p.startDate), 'yyyy-MM-dd'),
+      dose: `${p.doseAmount || ''}${p.doseUnit || ''}`,
+      frequency: p.frequency,
+      timing: p.timing || ''
+    }))
+  }, [useDemoData, realProtocols])
 
-    return { metrics, interventions, contextEvents, metricsByType, availableMetrics }
-  }, [useDemoData, realMetrics, realProtocols])
+  // ── Context events (stable) ──
+  const contextEvents = useMemo(() => {
+    return useDemoData ? SEED_CONTEXT_EVENTS : []
+  }, [useDemoData])
 
   // ── Baselines ──
   const baselines = useMemo(() => {
-    if (!dataSource) return null
+    if (!metricsSource) return null
     const map = new Map<string, MetricBaseline>()
-    for (const [metricType, values] of dataSource.metricsByType) {
+    for (const [metricType, values] of metricsSource.metricsByType) {
       const baseline = computeBaseline(
         values.map(v => ({ date: v.date, value: v.value })),
         28
@@ -355,22 +456,22 @@ export default function HealthDashboardNew() {
       }
     }
     return map
-  }, [dataSource])
+  }, [metricsSource])
 
   // ── Trajectory + body composition ──
   const trajectory = useMemo(() => {
-    if (!dataSource || !baselines) return null
-    return computeTrajectory(dataSource.metrics, baselines, timeWindow)
-  }, [dataSource, baselines, timeWindow])
+    if (!metricsSource || !baselines) return null
+    return computeTrajectory(metricsSource.metrics, baselines, timeWindow)
+  }, [metricsSource, baselines, timeWindow])
 
   const bodyCompState = useMemo(() => {
-    if (!dataSource) return null
-    return computeBodyCompState(dataSource.metrics)
-  }, [dataSource])
+    if (!metricsSource) return null
+    return computeBodyCompState(metricsSource.metrics)
+  }, [metricsSource])
 
   // ── Today's deltas (signal classification) ──
   const todayDeltas = useMemo(() => {
-    if (!dataSource || !baselines) return []
+    if (!metricsSource || !baselines) return []
 
     const today = format(new Date(), 'yyyy-MM-dd')
     const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd')
@@ -388,8 +489,8 @@ export default function HealthDashboardNew() {
       const baseline = baselines.get(metricType)
       if (!baseline) continue
 
-      const todayValue = dataSource.metrics.find(m => m.date === today && m.metricType === metricType)
-      const yesterdayValue = dataSource.metrics.find(m => m.date === yesterday && m.metricType === metricType)
+      const todayValue = metricsSource.metrics.find(m => m.date === today && m.metricType === metricType)
+      const yesterdayValue = metricsSource.metrics.find(m => m.date === yesterday && m.metricType === metricType)
       const currentValue = todayValue || yesterdayValue
       if (!currentValue) continue
 
@@ -398,7 +499,7 @@ export default function HealthDashboardNew() {
 
       if (delta.significance === 'none') continue
 
-      const recentValues = dataSource.metrics
+      const recentValues = metricsSource.metrics
         .filter(m => m.metricType === metricType)
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
         .slice(0, 7)
@@ -425,23 +526,23 @@ export default function HealthDashboardNew() {
 
     deltas.sort((a, b) => Math.abs(b.zScore || 0) - Math.abs(a.zScore || 0))
     return deltas
-  }, [dataSource, baselines])
+  }, [metricsSource, baselines])
 
   // ── Claims, themes, recommendation ──
   const claimsData = useMemo(() => {
-    if (!dataSource || !baselines) return null
+    if (!metricsSource || !baselines) return null
 
     const allClaims = generateClaims({
-      metrics: dataSource.metrics,
-      interventions: dataSource.interventions,
-      contextEvents: dataSource.contextEvents,
+      metrics: metricsSource.metrics,
+      interventions,
+      contextEvents,
       baselines
     })
 
     const claims = allClaims.filter(c => {
       if (!c.metricType) return true
       if (c.id.startsWith('availability_')) return true
-      return dataSource.availableMetrics.has(c.metricType)
+      return metricsSource.availableMetrics.has(c.metricType)
     })
 
     const availabilityClaims = claims.filter(c => c.id.startsWith('availability_'))
@@ -464,17 +565,17 @@ export default function HealthDashboardNew() {
       : null
 
     return { insightClaims, availabilityClaims, themes, recommendation }
-  }, [dataSource, baselines])
+  }, [metricsSource, baselines, interventions, contextEvents])
 
   // ── Protocol evidence ──
   const protocolEvidence = useMemo(() => {
-    if (!dataSource || !baselines) return []
-    return computeProtocolEvidence(dataSource.interventions, dataSource.metrics, dataSource.contextEvents, baselines)
-  }, [dataSource, baselines])
+    if (!metricsSource || !baselines) return []
+    return computeProtocolEvidence(interventions, metricsSource.metrics, contextEvents, baselines)
+  }, [metricsSource, baselines, interventions, contextEvents])
 
   // ── Data status ──
   const dataStatus = useMemo(() => {
-    if (!dataSource) return null
+    if (!metricsSource) return null
     const status = {
       sleep: { tracked: 0, total: 3, metrics: ['sleep_duration', 'rem_sleep', 'hrv'] },
       body: { tracked: 0, total: 5, metrics: ['weight', 'body_fat_percentage', 'lean_body_mass', 'muscle_mass', 'bmi'] },
@@ -483,14 +584,14 @@ export default function HealthDashboardNew() {
       fitness: { tracked: 0, total: 1, metrics: ['vo2_max'] },
     }
     for (const [, info] of Object.entries(status)) {
-      info.tracked = info.metrics.filter(m => dataSource.availableMetrics.has(m)).length
+      info.tracked = info.metrics.filter(m => metricsSource.availableMetrics.has(m)).length
     }
     return status
-  }, [dataSource])
+  }, [metricsSource])
 
   // ── Assembled processedData ──
   const processedData = useMemo(() => {
-    if (!dataSource || !baselines || !trajectory || !bodyCompState || !dataStatus) return null
+    if (!metricsSource || !baselines || !trajectory || !bodyCompState || !dataStatus) return null
     return {
       trajectory,
       bodyCompState,
@@ -502,9 +603,9 @@ export default function HealthDashboardNew() {
       dataStatus,
       recommendation: claimsData?.recommendation ?? null,
       baselines,
-      interventions: dataSource.interventions,
+      interventions,
     }
-  }, [dataSource, baselines, trajectory, bodyCompState, todayDeltas, claimsData, protocolEvidence, dataStatus])
+  }, [metricsSource, baselines, trajectory, bodyCompState, todayDeltas, claimsData, protocolEvidence, dataStatus, interventions])
 
   // Determine page state — used for single-return rendering
   const isLoading = !processedData && isLoadingMetrics && hasConnectedIntegrations
@@ -602,8 +703,9 @@ export default function HealthDashboardNew() {
         <div className="max-w-lg mx-auto px-4 pb-2 flex gap-1">
           {[
             { id: 'overview', label: 'Today' },
+            { id: 'weekly', label: 'Weekly' },
             { id: 'evidence', label: 'Evidence' },
-            { id: 'insights', label: 'Insights' }
+            { id: 'discover', label: 'Discover' }
           ].map((tab) => (
             <button
               key={tab.id}
@@ -1204,22 +1306,220 @@ export default function HealthDashboardNew() {
           </>
         )}
 
+        {/* ═══════════════ WEEKLY TAB ═══════════════ */}
+        {selectedSection === 'weekly' && (
+          <div className="space-y-4">
+            {weeklyLoading && (
+              <div className="flex items-center justify-center py-16">
+                <Loader2 className="w-6 h-6 animate-spin text-[var(--muted-foreground)]" />
+                <span className="ml-2 text-sm text-[var(--muted-foreground)]">Generating weekly review...</span>
+              </div>
+            )}
+
+            {weeklyError && (
+              <div className="text-center py-12">
+                <AlertTriangle className="w-10 h-10 text-[var(--warning)] mx-auto mb-3" />
+                <p className="text-[var(--foreground)] font-medium mb-1">Failed to load weekly review</p>
+                <p className="text-sm text-[var(--muted-foreground)]">{weeklyError.message}</p>
+              </div>
+            )}
+
+            {weeklyData?.isEmpty && !weeklyLoading && !weeklyError && (
+              <div className="text-center py-12">
+                <Activity className="w-10 h-10 text-[var(--muted-foreground)] mx-auto mb-3" />
+                <p className="text-[var(--foreground)] font-medium mb-1">No weekly report yet</p>
+                <p className="text-sm text-[var(--muted-foreground)]">Connect a wearable or log some doses to generate your first weekly review.</p>
+              </div>
+            )}
+
+            {weeklyData && !weeklyData.isEmpty && !weeklyLoading && !weeklyError && (() => {
+              const r = weeklyData.review
+              return (
+                <>
+                  {/* Headline */}
+                  <div>
+                    <div className="text-xs text-[var(--muted-foreground)] uppercase tracking-wider mb-1">
+                      Week of {r.week.start} — {r.week.end}
+                    </div>
+                    <h2 className="text-lg font-bold text-[var(--foreground)]">{r.headline}</h2>
+                    <p className="text-sm text-[var(--muted-foreground)] mt-0.5">{r.subheadline}</p>
+                  </div>
+
+                  {/* Overall direction */}
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-[var(--card)] border border-[var(--border)]">
+                    {r.overall.direction === 'improving' ? <TrendingUp className="w-5 h-5 text-[var(--success)]" /> :
+                     r.overall.direction === 'declining' ? <TrendingDown className="w-5 h-5 text-[var(--warning)]" /> :
+                     <Minus className="w-5 h-5 text-[var(--muted-foreground)]" />}
+                    <div>
+                      <span className={cn(
+                        "text-sm font-semibold capitalize",
+                        r.overall.direction === 'improving' ? 'text-[var(--success)]' :
+                        r.overall.direction === 'declining' ? 'text-[var(--warning)]' :
+                        'text-[var(--muted-foreground)]'
+                      )}>
+                        {r.overall.direction}
+                      </span>
+                      <span className="text-xs text-[var(--muted-foreground)] ml-2">
+                        {r.overall.metricsImproving} up · {r.overall.metricsDeclining} down · {r.overall.metricsStable} stable
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Safety alerts */}
+                  {r.safetyAlerts.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="text-xs text-[var(--warning)] uppercase tracking-wider font-medium">Safety Alerts</div>
+                      {r.safetyAlerts.map((alert, i) => (
+                        <div key={i} className="p-3 rounded-xl bg-[var(--warning-muted)] border border-[var(--warning)]/20">
+                          <div className="flex items-start gap-2">
+                            <AlertTriangle className="w-4 h-4 text-[var(--warning)] mt-0.5 shrink-0" />
+                            <div>
+                              <span className="text-sm font-medium text-[var(--foreground)]">{alert.protocolName}: {alert.explanation}</span>
+                              <p className="text-xs text-[var(--muted-foreground)] mt-0.5">{alert.recommendation}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Top wins */}
+                  {r.topWins.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="text-xs text-[var(--success)] uppercase tracking-wider font-medium">Wins</div>
+                      {r.topWins.map((win, i) => (
+                        <div key={i} className="p-3 rounded-xl bg-[var(--card)] border border-[var(--border)]">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle2 className="w-4 h-4 text-[var(--success)] shrink-0" />
+                            <span className="text-sm text-[var(--foreground)]">{win.narrative}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Needs attention */}
+                  {r.needsAttention.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="text-xs text-[var(--warning)] uppercase tracking-wider font-medium">Needs Attention</div>
+                      {r.needsAttention.map((item, i) => (
+                        <div key={i} className="p-3 rounded-xl bg-[var(--card)] border border-[var(--border)]">
+                          <div className="flex items-center gap-2">
+                            <AlertTriangle className="w-4 h-4 text-[var(--warning)] shrink-0" />
+                            <span className="text-sm text-[var(--foreground)]">{item.narrative}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Protocol status */}
+                  {r.protocols.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="text-xs text-[var(--muted-foreground)] uppercase tracking-wider font-medium">Protocols</div>
+                      {r.protocols.map((p) => (
+                        <div key={p.protocolId} className="p-3 rounded-xl bg-[var(--card)] border border-[var(--border)]">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm font-medium text-[var(--foreground)]">{p.protocolName}</span>
+                            <span className="text-xs text-[var(--muted-foreground)]">Day {p.daysSinceStart}</span>
+                          </div>
+                          <div className="flex items-center gap-3 text-xs text-[var(--muted-foreground)]">
+                            <span>{p.dosesCompleted}/{p.dosesExpected} doses ({p.adherencePercent}%)</span>
+                            <span className="capitalize">{p.evidencePhase} phase</span>
+                          </div>
+                          {p.topSignal && (
+                            <p className="text-xs text-[var(--muted-foreground)] mt-1">{p.topSignal}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Top actions */}
+                  {r.topActions.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="text-xs text-[var(--accent)] uppercase tracking-wider font-medium">Top Actions</div>
+                      {r.topActions.map((action) => (
+                        <div key={action.rank} className="p-3 rounded-xl bg-[var(--card)] border border-[var(--border)] flex items-start gap-3">
+                          <span className="text-sm font-bold text-[var(--accent)] tabular-nums">{action.rank}.</span>
+                          <span className="text-sm text-[var(--foreground)]">{action.text}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Look ahead */}
+                  {r.lookAhead.nextWeekFocus && (
+                    <div className="p-3 rounded-xl bg-[var(--muted)] border border-[var(--border)]">
+                      <div className="text-xs text-[var(--muted-foreground)] uppercase tracking-wider font-medium mb-1">Next Week</div>
+                      <p className="text-sm text-[var(--foreground)]">{r.lookAhead.nextWeekFocus}</p>
+                      {r.lookAhead.upcomingMilestones.length > 0 && (
+                        <div className="mt-2 space-y-1">
+                          {r.lookAhead.upcomingMilestones.map((m, i) => (
+                            <p key={i} className="text-xs text-[var(--muted-foreground)]">{m}</p>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )
+            })()}
+          </div>
+        )}
+
         {/* ═══════════════ EVIDENCE TAB ═══════════════ */}
-        {processedData && selectedSection === 'evidence' && (
+        {selectedSection === 'evidence' && (
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-[var(--muted-foreground)] mb-2">
               <Beaker className="w-5 h-5" />
               <span className="text-sm font-medium uppercase tracking-wider">Protocol Evidence</span>
             </div>
 
-            {processedData.protocolEvidence.length === 0 && (
-              <div className="text-center py-12">
-                <Beaker className="w-10 h-10 text-[var(--muted-foreground)] mx-auto mb-3" />
-                <p className="text-[var(--muted-foreground)]">No active protocols to evaluate</p>
+            {evidenceLoading && (
+              <div className="flex items-center justify-center py-16">
+                <Loader2 className="w-6 h-6 animate-spin text-[var(--muted-foreground)]" />
+                <span className="ml-2 text-sm text-[var(--muted-foreground)]">Analyzing protocol evidence...</span>
               </div>
             )}
 
-            {processedData.protocolEvidence.map((evidence) => (
+            {evidenceError && (
+              <div className="text-center py-12">
+                <AlertTriangle className="w-10 h-10 text-[var(--warning)] mx-auto mb-3" />
+                <p className="text-[var(--foreground)] font-medium mb-1">Failed to load evidence</p>
+                <p className="text-sm text-[var(--muted-foreground)]">{evidenceError.message}</p>
+              </div>
+            )}
+
+            {evidenceData?.isEmpty && !evidenceLoading && !evidenceError && (
+              <div className="text-center py-12">
+                <Beaker className="w-10 h-10 text-[var(--muted-foreground)] mx-auto mb-3" />
+                <p className="text-[var(--foreground)] font-medium mb-1">No active protocols to evaluate</p>
+                <p className="text-sm text-[var(--muted-foreground)]">Add a protocol to start tracking evidence.</p>
+              </div>
+            )}
+
+            {!evidenceLoading && !evidenceError && !evidenceData?.isEmpty && evidenceData?.summary && (
+              <div className="p-3 rounded-xl bg-[var(--card)] border border-[var(--border)]">
+                <p className="text-sm font-medium text-[var(--foreground)]">{evidenceData.summary.overallStatus}</p>
+                {evidenceData.summary.highlights.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {evidenceData.summary.highlights.map((h, i) => (
+                      <p key={i} className="text-xs text-[var(--success)]">{h}</p>
+                    ))}
+                  </div>
+                )}
+                {evidenceData.summary.concerns.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {evidenceData.summary.concerns.map((c, i) => (
+                      <p key={i} className="text-xs text-[var(--warning)]">{c}</p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {mappedEvidence.map((evidence) => (
               <ProtocolEvidenceCard
                 key={evidence.protocolId}
                 evidence={evidence}
@@ -1228,42 +1528,88 @@ export default function HealthDashboardNew() {
           </div>
         )}
 
-        {/* ═══════════════ INSIGHTS TAB ═══════════════ */}
-        {processedData && selectedSection === 'insights' && (
+        {/* ═══════════════ DISCOVER TAB ═══════════════ */}
+        {selectedSection === 'discover' && (
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-[var(--muted-foreground)] mb-2">
               <Sparkles className="w-5 h-5" />
-              <span className="text-sm font-medium uppercase tracking-wider">Themed Insights</span>
+              <span className="text-sm font-medium uppercase tracking-wider">Daily Discoveries</span>
             </div>
 
-            {processedData.themes.length === 0 && (
-              <div className="text-center py-12">
-                <Sparkles className="w-10 h-10 text-[var(--muted-foreground)] mx-auto mb-3" />
-                <p className="text-[var(--muted-foreground)]">Not enough data for themed insights yet</p>
+            {discoverLoading && (
+              <div className="flex items-center justify-center py-16">
+                <Loader2 className="w-6 h-6 animate-spin text-[var(--muted-foreground)]" />
+                <span className="ml-2 text-sm text-[var(--muted-foreground)]">Finding insights...</span>
               </div>
             )}
 
-            {processedData.themes.map((theme) => (
-              <InsightThemeCard
-                key={theme.id}
-                theme={theme}
-              />
-            ))}
+            {discoverError && (
+              <div className="text-center py-12">
+                <AlertTriangle className="w-10 h-10 text-[var(--warning)] mx-auto mb-3" />
+                <p className="text-[var(--foreground)] font-medium mb-1">Failed to load discoveries</p>
+                <p className="text-sm text-[var(--muted-foreground)]">{discoverError.message}</p>
+              </div>
+            )}
 
-            {/* Remaining claims not in themes */}
-            {processedData.claims.length > 0 && (
+            {discoverData?.isEmpty && !discoverLoading && !discoverError && (
+              <div className="text-center py-12">
+                <Sparkles className="w-10 h-10 text-[var(--muted-foreground)] mx-auto mb-3" />
+                <p className="text-[var(--foreground)] font-medium mb-1">No discoveries yet</p>
+                <p className="text-sm text-[var(--muted-foreground)]">Connect a wearable or upload labs to generate personalized insights.</p>
+              </div>
+            )}
+
+            {!discoverLoading && !discoverError && !discoverData?.isEmpty && discoverData?.insights && (
+              <>
+                {discoverData.insights.map((insight) => (
+                  <div
+                    key={insight.id}
+                    className="p-4 rounded-xl bg-[var(--card)] border border-[var(--border)]"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={cn(
+                        'p-1.5 rounded-lg shrink-0 mt-0.5',
+                        insight.type === 'achievement' ? 'bg-[var(--success-muted)]' :
+                        insight.type === 'surprise' ? 'bg-[var(--accent-muted)]' :
+                        insight.type === 'predictive' || insight.type === 'retest' ? 'bg-[var(--warning-muted)]' :
+                        'bg-[var(--evidence-muted)]'
+                      )}>
+                        {insight.type === 'achievement' ? <CheckCircle2 className="w-4 h-4 text-[var(--success)]" /> :
+                         insight.type === 'surprise' ? <Sparkles className="w-4 h-4 text-[var(--accent)]" /> :
+                         insight.type === 'predictive' ? <TrendingUp className="w-4 h-4 text-[var(--warning)]" /> :
+                         insight.type === 'retest' ? <AlertTriangle className="w-4 h-4 text-[var(--warning)]" /> :
+                         insight.type === 'milestone' ? <Activity className="w-4 h-4 text-[var(--evidence)]" /> :
+                         <Brain className="w-4 h-4 text-[var(--evidence)]" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-sm font-medium text-[var(--foreground)]">{insight.title}</span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--muted)] text-[var(--muted-foreground)] capitalize shrink-0">
+                            {insight.type.replace('_', ' ')}
+                          </span>
+                        </div>
+                        <p className="text-sm text-[var(--muted-foreground)] leading-relaxed">{insight.body}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                <p className="text-xs text-center text-[var(--muted-foreground)]">
+                  New discoveries generated daily
+                </p>
+              </>
+            )}
+
+            {/* Themed insights (secondary, from client-side claims if available) */}
+            {processedData && processedData.themes.length > 0 && (
               <details className="group">
                 <summary className="cursor-pointer flex items-center gap-2 text-xs text-[var(--muted-foreground)] uppercase tracking-wider py-2">
-                  <span>All Claims ({processedData.claims.length})</span>
+                  <span>Themed Insights ({processedData.themes.length})</span>
                   <ChevronDown className="w-3 h-3 transition-transform group-open:rotate-180" />
                 </summary>
                 <div className="space-y-3 pt-2">
-                  {processedData.claims.slice(0, 8).map((claim) => (
-                    <ClaimWithReceipts
-                      key={claim.id}
-                      claim={claim}
-                      onViewDays={() => {}}
-                    />
+                  {processedData.themes.map((theme) => (
+                    <InsightThemeCard key={theme.id} theme={theme} />
                   ))}
                 </div>
               </details>
@@ -1382,7 +1728,7 @@ export default function HealthDashboardNew() {
           <div className="space-y-3">
             <h4 className="font-medium text-[var(--foreground)]">Possible explanations:</h4>
             <div className="space-y-2">
-              {processedData?.interventions.slice(0, 3).map((intervention) => (
+              {processedData?.interventions.slice(0, 3).map((intervention: SeedIntervention) => (
                 <div
                   key={intervention.id}
                   className="p-3 rounded-lg bg-[var(--muted)] border border-[var(--border)]"

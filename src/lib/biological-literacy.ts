@@ -108,20 +108,27 @@ function computeAutoProgression(record: {
   detailTaps: number
   labViewCount: number
   insightViews: number
+  createdAt: Date
+  lastLevelChange: Date | null
 }): LiteracyLevel | null {
-  const { level, detailTaps, labViewCount } = record
+  const { level, detailTaps, labViewCount, createdAt, lastLevelChange } = record
+  const weeksOnLevel = (Date.now() - (lastLevelChange ?? createdAt).getTime()) / (7 * 86400000)
 
-  // Explorer → Student: 10+ detail taps
-  if (level === 'explorer' && detailTaps >= 10) {
+  // Explorer → Student: 5+ insight taps, 3+ domain views, 2+ weeks
+  if (level === 'explorer' && detailTaps >= 5 && labViewCount >= 3 && weeksOnLevel >= 2) {
     return 'student'
   }
 
-  // Student → Practitioner: 20+ detail taps AND 1+ lab uploads viewed
-  if (level === 'student' && detailTaps >= 20 && labViewCount >= 1) {
+  // Student → Practitioner: 15+ detail taps, 3+ lab views, 6+ weeks
+  if (level === 'student' && detailTaps >= 15 && labViewCount >= 3 && weeksOnLevel >= 6) {
     return 'practitioner'
   }
 
-  // Practitioner → Scientist: self-select only (no auto-progression)
+  // Practitioner → Scientist: self-select only OR 12+ weeks with extensive engagement
+  if (level === 'practitioner' && detailTaps >= 50 && labViewCount >= 10 && weeksOnLevel >= 12) {
+    return 'scientist'
+  }
+
   return null
 }
 

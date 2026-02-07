@@ -553,7 +553,7 @@ function generateRecommendations(
   if (bloodwork && bloodwork.daysSinceTest >= 180) {
     recs.push('Lab results are over 6 months old. Updated bloodwork would improve the accuracy of your health insights.')
   } else if (bloodwork && bloodwork.criticalCount > 0) {
-    recs.push(`${bloodwork.criticalCount} lab marker${bloodwork.criticalCount > 1 ? 's are' : ' is'} flagged as critical. Discuss with your healthcare provider.`)
+    recs.push(`${bloodwork.criticalCount} lab marker${bloodwork.criticalCount > 1 ? 's' : ''} outside reference range — worth discussing with your healthcare provider.`)
   }
 
   // Sleep recommendation
@@ -639,7 +639,7 @@ async function getBloodworkBreakdown(
   // Build narrative
   let narrative = `Bloodwork: ${biomarkers.length} markers tested`
   if (optimalCount > 0) narrative += `, ${optimalCount} optimal`
-  if (criticalCount > 0) narrative += `, ${criticalCount} critical`
+  if (criticalCount > 0) narrative += `, ${criticalCount} outside range`
   if (attentionCount > 0) narrative += `, ${attentionCount} need attention`
   narrative += '.'
   if (daysSinceTest >= 90) narrative += ` Results are ${daysSinceTest} days old.`

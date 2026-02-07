@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/health-sync",
       "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/cohort-insights",
+      "schedule": "0 3 * * 1"
     }
   ]
 }

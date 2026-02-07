@@ -12,6 +12,7 @@ function getProviderPriority(provider: string, metricType: string): number {
 
 // GET /api/health/metrics - Query health metrics
 export async function GET(request: NextRequest) {
+  const start = Date.now()
   try {
     const authResult = await getAuthenticatedUserId()
     if (!authResult.success) {
@@ -26,6 +27,8 @@ export async function GET(request: NextRequest) {
     const endDateStr = searchParams.get('endDate')
     const metricTypesStr = searchParams.get('metricTypes')
     const provider = searchParams.get('provider')
+    const includeContext = searchParams.get('includeContext') === 'true'
+    const flat = searchParams.get('format') === 'flat'
 
     // Default to last 180 days
     const endDate = endDateStr ? new Date(endDateStr) : new Date()
@@ -53,7 +56,7 @@ export async function GET(request: NextRequest) {
       where.metricType = { in: metricTypes }
     }
 
-    // Fetch metrics
+    // Fetch metrics — skip context column unless explicitly requested
     const metrics = await prisma.healthMetric.findMany({
       where,
       orderBy: { recordedAt: 'asc' },
@@ -64,7 +67,7 @@ export async function GET(request: NextRequest) {
         value: true,
         unit: true,
         recordedAt: true,
-        context: true
+        ...(includeContext ? { context: true } : {}),
       }
     })
 
@@ -82,6 +85,23 @@ export async function GET(request: NextRequest) {
     }
     const dedupedMetrics = Array.from(dedupMap.values())
 
+    // Flat format: return lean SeedMetric[] — no grouping, no stats, no context
+    if (flat) {
+      console.log(`[health/metrics] userId=${userId} ${Date.now() - start}ms 200 flat=${dedupedMetrics.length}pts`)
+      return NextResponse.json({
+        metrics: dedupedMetrics.map(m => ({
+          date: m.recordedAt.toISOString().split('T')[0],
+          metricType: m.metricType,
+          value: m.value,
+          unit: m.unit,
+          source: m.provider,
+        })),
+        dateRange: { start: startDate, end: endDate }
+      }, {
+        headers: { 'Cache-Control': 'private, max-age=60' }
+      })
+    }
+
     // Group by metric type for easier frontend consumption
     const groupedMetrics: Record<string, Array<{
       id: string
@@ -89,7 +109,7 @@ export async function GET(request: NextRequest) {
       value: number
       unit: string
       recordedAt: Date
-      context: unknown
+      context?: unknown
     }>> = {}
 
     for (const metric of dedupedMetrics) {
@@ -98,9 +118,9 @@ export async function GET(request: NextRequest) {
       }
 
       let parsedContext = null
-      if (metric.context) {
+      if (includeContext && (metric as { context?: string }).context) {
         try {
-          parsedContext = JSON.parse(metric.context)
+          parsedContext = JSON.parse((metric as { context: string }).context)
         } catch {
           parsedContext = null
         }
@@ -112,7 +132,7 @@ export async function GET(request: NextRequest) {
         value: metric.value,
         unit: metric.unit,
         recordedAt: metric.recordedAt,
-        context: parsedContext
+        ...(includeContext ? { context: parsedContext } : {}),
       })
     }
 
@@ -143,6 +163,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    console.log(`[health/metrics] userId=${userId} ${Date.now() - start}ms 200 grouped=${Object.keys(groupedMetrics).length}types`)
     return NextResponse.json({
       metrics: groupedMetrics,
       stats,
@@ -156,7 +177,7 @@ export async function GET(request: NextRequest) {
       }
     })
   } catch (error) {
-    console.error('Error fetching health metrics:', error)
+    console.error(`[health/metrics] ${Date.now() - start}ms 500`, error instanceof Error ? error.message : error)
     return NextResponse.json(
       { error: 'Failed to fetch health metrics' },
       { status: 500 }

@@ -1,18 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { verifyUserAccess } from '@/lib/api-auth'
+import { getAuthenticatedUserId } from '@/lib/api-auth'
 import { createProtocolSchema, validate } from '@/lib/validations'
 
-// GET /api/protocols - List protocols for a user
+// GET /api/protocols - List protocols for the authenticated user
 export async function GET(request: NextRequest) {
   try {
-    const searchParams = request.nextUrl.searchParams
-    const status = searchParams.get('status')
-
-    // Verify user has access to requested userId
-    const auth = await verifyUserAccess(searchParams.get('userId'))
+    const auth = await getAuthenticatedUserId()
     if (!auth.success) return auth.response
     const { userId } = auth
+
+    const searchParams = request.nextUrl.searchParams
+    const status = searchParams.get('status')
 
     const protocols = await prisma.protocol.findMany({
       where: {
@@ -21,18 +20,17 @@ export async function GET(request: NextRequest) {
       },
       include: {
         peptide: true,
-        // Note: doseLogs removed - fetch separately when needed for specific protocol
       },
       orderBy: { createdAt: 'desc' },
     })
 
     return NextResponse.json(protocols, {
       headers: {
-        'Cache-Control': 'private, max-age=60', // 1 min cache
+        'Cache-Control': 'private, max-age=60',
       },
     })
   } catch (error) {
-    console.error('Error fetching protocols:', error)
+    console.error('[protocols] Error fetching:', error instanceof Error ? error.message : error)
     return NextResponse.json({ error: 'Failed to fetch protocols' }, { status: 500 })
   }
 }
@@ -42,15 +40,15 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
 
-    // Validate input
+    // Validate input (userId is optional in body — we use the session)
     const validation = validate(createProtocolSchema, body)
     if (!validation.success) {
       return NextResponse.json({ error: validation.error }, { status: 400 })
     }
     const data = validation.data
 
-    // Verify user has access to requested userId
-    const auth = await verifyUserAccess(data.userId)
+    // Always use authenticated user's ID, ignore body.userId
+    const auth = await getAuthenticatedUserId()
     if (!auth.success) return auth.response
     const { userId } = auth
 
@@ -98,7 +96,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(protocol, { status: 201 })
   } catch (error) {
-    console.error('Error creating protocol:', error)
+    console.error('[protocols] Error creating:', error instanceof Error ? error.message : error)
     return NextResponse.json({ error: 'Failed to create protocol' }, { status: 500 })
   }
 }

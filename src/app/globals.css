@@ -240,10 +240,32 @@ input[type='number'] {
 }
 
 /* ========================================
-   TYPOGRAPHY — Three-Font System
+   SPACING SCALE (4px base)
+   Use these values consistently. Avoid fractional (.5) values.
+   ──────────────────────────────────────────
+   1  =  4px   micro gaps (icon-to-text)
+   2  =  8px   tight spacing (within groups)
+   3  = 12px   standard spacing (between items, section header → content)
+   4  = 16px   section padding (card interiors, page horizontal)
+   5  = 20px   page margins
+   6  = 24px   section gaps (vertical rhythm between sections)
+   8  = 32px   major breaks
+   ======================================== */
+
+/* ========================================
+   TYPOGRAPHY — Three-Font System + Hierarchy
    Display: DM Serif Display (editorial warmth)
    Body: Plus Jakarta Sans (clean precision)
    Mono: JetBrains Mono (data clarity)
+   ──────────────────────────────────────────
+   Hierarchy (use in this order):
+   .text-display     — Page titles, hero cards (28px, serif)
+   .text-title       — Card titles, section headers (22px, sans)
+   .text-label       — Section labels, uppercase tags (11px, uppercase)
+   text-sm (14px)    — Primary body text, list items
+   text-xs (12px)    — Meta text, timestamps, confidence badges
+   .text-caption     — Tertiary labels (12px, tracked)
+   .text-data[-sm]   — Numerical values (mono, tabular)
    ======================================== */
 
 /* Display XL — Status words, major verdicts */
