@@ -2122,6 +2122,7 @@ async function storeSnapshot(
       select: {
         agingVelocityPublishedJson: true,
         agingVelocityPublishedAt: true,
+        agingVelocityVersion: true,
       },
     })
 
@@ -2143,10 +2144,14 @@ async function storeSnapshot(
       const prevStable = prevPublished?.overallVelocity ?? null
       const computedOverall = output.agingVelocity.overallVelocity
 
+      // Detect pipeline version change — skip EWMA anchor from old model
+      const prevVersion = previous?.agingVelocityVersion ?? null
+      const versionChanged = prevVersion !== null && prevVersion !== VELOCITY_PIPELINE_VERSION
+
       // Apply EWMA smoothing if we have both previous stable and computed values
       let smoothedVelocity = { ...output.agingVelocity }
       const prevBucket = prevPublished?.daysGainedAnnuallyBucket ?? null
-      if (prevStable !== null && computedOverall !== null) {
+      if (prevStable !== null && computedOverall !== null && !versionChanged) {
         const alpha = computeEWMAAlpha(output.agingVelocity.confidence, output.dataCompleteness)
         const ewma = applyVelocityEWMA(prevStable, computedOverall, alpha)
 
@@ -2213,7 +2218,17 @@ async function storeSnapshot(
           }))
         }
       } else {
-        // First publish or no computed — use computed directly, set initial bucket
+        // First publish, no computed, or version change — use computed directly, set initial bucket
+        if (versionChanged) {
+          console.log(JSON.stringify({
+            event: 'brain_velocity_version_reset',
+            userId,
+            prevVersion,
+            newVersion: VELOCITY_PIPELINE_VERSION,
+            prevStable,
+            computedOverall,
+          }))
+        }
         if (output.agingVelocity.daysGainedAnnually != null) {
           smoothedVelocity.daysGainedAnnuallyBucket = quantizeDaysGained(
             output.agingVelocity.daysGainedAnnually, prevBucket
