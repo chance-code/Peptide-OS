@@ -65,7 +65,14 @@ export async function POST(request: NextRequest) {
     const labName = labNameOverride || parseResult.labName
 
     // Write to enriched LabUpload + LabBiomarker (single source of truth)
+    // Deduplicate by normalizedKey — prefer the non-derived (raw parsed) marker over [Derived] ones
     const recognizedMarkers = markers.filter(m => m.normalizedKey)
+    const seenKeys = new Set<string>()
+    const uniqueMarkers = recognizedMarkers.filter(m => {
+      if (seenKeys.has(m.normalizedKey!)) return false
+      seenKeys.add(m.normalizedKey!)
+      return true
+    })
     const upload = await prisma.labUpload.create({
       data: {
         userId,
@@ -77,7 +84,7 @@ export async function POST(request: NextRequest) {
         confidence: parseResult.overallConfidence,
         fileName: file.name,
         biomarkers: {
-          create: recognizedMarkers.map(m => ({
+          create: uniqueMarkers.map(m => ({
             biomarkerKey: m.normalizedKey!,
             rawName: m.rawName,
             value: m.value,
@@ -96,7 +103,7 @@ export async function POST(request: NextRequest) {
     })
 
     // Run pattern analysis
-    const biomarkerArray = recognizedMarkers.map(m => ({
+    const biomarkerArray = uniqueMarkers.map(m => ({
       biomarkerKey: m.normalizedKey!,
       value: m.value,
       unit: m.unit,
@@ -123,7 +130,7 @@ export async function POST(request: NextRequest) {
 
     // Summary stats
     const flagCounts = { optimal: 0, normal: 0, low: 0, high: 0, critical_low: 0, critical_high: 0 }
-    for (const m of recognizedMarkers) {
+    for (const m of uniqueMarkers) {
       if (m.flag in flagCounts) flagCounts[m.flag as keyof typeof flagCounts]++
     }
 

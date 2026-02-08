@@ -27,6 +27,7 @@ import {
   verifyPendingPredictions,
   generateObservationEntries,
   generateAttributionEntries,
+  generateSignificantDeltaEntries,
   computePredictionAccuracy,
   type EvidenceLedgerEntry,
 } from './lab-evidence-ledger'
@@ -228,6 +229,21 @@ export async function runComputePipeline(
     prevDateStr
   )
 
+  const significantDeltaEntries = generateSignificantDeltaEntries(
+    labUploadId,
+    markerDeltas,
+    attributionEntries,
+    activeProtocols.map(p => ({
+      id: p.id,
+      name: p.name,
+      type: p.type,
+      adherencePercent: p.adherencePercent,
+      daysOnProtocol: p.daysOnProtocol,
+    })),
+    labDateStr,
+    prevDateStr
+  )
+
   // Build prediction entries from trajectory predictions
   const predictionEntries: EvidenceLedgerEntry[] = predictions
     .filter(p => p.expectedDirection !== 'unknown' && p.expectedRange)
@@ -264,6 +280,7 @@ export async function runComputePipeline(
     ...verifiedEntries.filter(e => e.prediction?.outcome !== 'pending'),
     ...observationEntries,
     ...attributionEntries,
+    ...significantDeltaEntries,
     ...predictionEntries,
   ]
 
@@ -399,6 +416,28 @@ function computeVerdict(
     }
     for (const p of notWorkingProtocols.slice(0, 1)) {
       takeaways.push(`${p.protocolName}: ${p.labVerdictExplanation}`)
+    }
+
+    // Check for significant improving deltas not covered by any protocol's target markers
+    const allTargetMarkerKeys = new Set<string>()
+    for (const ps of protocolScores) {
+      for (const tm of ps.targetMarkers) {
+        allTargetMarkerKeys.add(tm.biomarkerKey)
+      }
+    }
+
+    const unmappedImprovingDeltas = significantDeltas.filter(
+      d => d.absoluteDelta > 0 && !allTargetMarkerKeys.has(d.biomarkerKey)
+    )
+    const activeProtocolNames = protocolScores.filter(
+      p => p.labVerdict === 'working' || p.labVerdict === 'early_signal' || p.labVerdict === 'unclear'
+    )
+
+    if (unmappedImprovingDeltas.length > 0 && activeProtocolNames.length > 0) {
+      for (const delta of unmappedImprovingDeltas.slice(0, 2)) {
+        const protocolName = activeProtocolNames[0].protocolName
+        takeaways.push(`Notable: ${delta.displayName} increased ${Math.abs(delta.percentDelta).toFixed(1)}% while ${protocolName} was active.`)
+      }
     }
 
     if (improvingDeltas.length > 0) {

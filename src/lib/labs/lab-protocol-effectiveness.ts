@@ -101,6 +101,114 @@ const PROTOCOL_MARKER_MAP: Record<string, ExpectedMarkerEffect[]> = {
   'thymosin alpha-1': [
     { biomarkerKey: 'wbc', expectedDirection: 'increase', description: 'support immune cell production' },
   ],
+
+  // ─── Hormonal / Peptide Protocols ──────────────────────────────────────────
+
+  'enclomiphene': [
+    { biomarkerKey: 'total_testosterone', expectedDirection: 'increase', description: 'stimulate endogenous testosterone production via SERM action' },
+    { biomarkerKey: 'free_testosterone', expectedDirection: 'increase', description: 'raise free testosterone through increased total production' },
+    { biomarkerKey: 'lh', expectedDirection: 'increase', description: 'increase LH release by blocking hypothalamic estrogen feedback' },
+    { biomarkerKey: 'fsh', expectedDirection: 'increase', description: 'increase FSH release by blocking estrogen negative feedback' },
+  ],
+  'clomiphene': [
+    { biomarkerKey: 'total_testosterone', expectedDirection: 'increase', description: 'stimulate testosterone via SERM mechanism' },
+    { biomarkerKey: 'free_testosterone', expectedDirection: 'increase', description: 'raise free testosterone' },
+    { biomarkerKey: 'lh', expectedDirection: 'increase', description: 'increase LH via estrogen receptor blockade' },
+    { biomarkerKey: 'fsh', expectedDirection: 'increase', description: 'increase FSH via estrogen receptor blockade' },
+    { biomarkerKey: 'estradiol', expectedDirection: 'increase', description: 'estradiol may rise due to increased testosterone aromatization' },
+  ],
+  'clomid': [
+    { biomarkerKey: 'total_testosterone', expectedDirection: 'increase', description: 'stimulate testosterone via SERM mechanism' },
+    { biomarkerKey: 'lh', expectedDirection: 'increase', description: 'increase LH via estrogen receptor blockade' },
+    { biomarkerKey: 'fsh', expectedDirection: 'increase', description: 'increase FSH via estrogen receptor blockade' },
+  ],
+  'testosterone': [
+    { biomarkerKey: 'total_testosterone', expectedDirection: 'increase', description: 'direct exogenous testosterone supplementation' },
+    { biomarkerKey: 'free_testosterone', expectedDirection: 'increase', description: 'raise free testosterone levels' },
+    { biomarkerKey: 'hematocrit', expectedDirection: 'increase', description: 'testosterone stimulates erythropoiesis' },
+    { biomarkerKey: 'hemoglobin', expectedDirection: 'increase', description: 'testosterone increases hemoglobin production' },
+    { biomarkerKey: 'lh', expectedDirection: 'decrease', description: 'exogenous testosterone suppresses endogenous LH' },
+    { biomarkerKey: 'fsh', expectedDirection: 'decrease', description: 'exogenous testosterone suppresses FSH' },
+    { biomarkerKey: 'estradiol', expectedDirection: 'increase', description: 'aromatization of exogenous testosterone increases estradiol' },
+  ],
+  'trt': [
+    { biomarkerKey: 'total_testosterone', expectedDirection: 'increase', description: 'direct testosterone replacement' },
+    { biomarkerKey: 'free_testosterone', expectedDirection: 'increase', description: 'raise free testosterone levels' },
+    { biomarkerKey: 'hematocrit', expectedDirection: 'increase', description: 'monitor for polycythemia' },
+    { biomarkerKey: 'estradiol', expectedDirection: 'increase', description: 'aromatization effect' },
+  ],
+  'hcg': [
+    { biomarkerKey: 'total_testosterone', expectedDirection: 'increase', description: 'stimulate testicular testosterone production' },
+    { biomarkerKey: 'free_testosterone', expectedDirection: 'increase', description: 'increase free testosterone' },
+    { biomarkerKey: 'estradiol', expectedDirection: 'increase', description: 'increased intratesticular testosterone raises estradiol' },
+  ],
+  'gonadorelin': [
+    { biomarkerKey: 'lh', expectedDirection: 'increase', description: 'pulsatile GnRH stimulates LH release' },
+    { biomarkerKey: 'fsh', expectedDirection: 'increase', description: 'GnRH stimulates FSH release' },
+    { biomarkerKey: 'total_testosterone', expectedDirection: 'increase', description: 'downstream testosterone increase via LH stimulation' },
+  ],
+  'anastrozole': [
+    { biomarkerKey: 'estradiol', expectedDirection: 'decrease', description: 'aromatase inhibitor reduces estrogen conversion' },
+    { biomarkerKey: 'total_testosterone', expectedDirection: 'increase', description: 'reduced aromatization preserves testosterone' },
+  ],
+  'arimidex': [
+    { biomarkerKey: 'estradiol', expectedDirection: 'decrease', description: 'aromatase inhibitor reduces estrogen' },
+  ],
+  'tamoxifen': [
+    { biomarkerKey: 'total_testosterone', expectedDirection: 'increase', description: 'SERM increases testosterone via HPG axis' },
+    { biomarkerKey: 'lh', expectedDirection: 'increase', description: 'blocks estrogen negative feedback on LH' },
+  ],
+  'dhea': [
+    { biomarkerKey: 'dhea_s', expectedDirection: 'increase', description: 'direct DHEA supplementation' },
+    { biomarkerKey: 'total_testosterone', expectedDirection: 'increase', description: 'DHEA is a testosterone precursor' },
+    { biomarkerKey: 'estradiol', expectedDirection: 'increase', description: 'DHEA converts to estradiol' },
+  ],
+  'pregnenolone': [
+    { biomarkerKey: 'dhea_s', expectedDirection: 'increase', description: 'pregnenolone converts to DHEA' },
+    { biomarkerKey: 'progesterone', expectedDirection: 'increase', description: 'direct conversion to progesterone' },
+    { biomarkerKey: 'cortisol', expectedDirection: 'increase', description: 'pregnenolone is a cortisol precursor' },
+  ],
+  'creatine': [
+    { biomarkerKey: 'creatinine', expectedDirection: 'increase', description: 'creatine supplementation increases serum creatinine' },
+  ],
+  'metformin': [
+    { biomarkerKey: 'hba1c', expectedDirection: 'decrease', description: 'improve glycemic control' },
+    { biomarkerKey: 'fasting_glucose', expectedDirection: 'decrease', description: 'reduce fasting glucose' },
+    { biomarkerKey: 'fasting_insulin', expectedDirection: 'decrease', description: 'improve insulin sensitivity' },
+  ],
+  'statin': [
+    { biomarkerKey: 'ldl_cholesterol', expectedDirection: 'decrease', description: 'HMG-CoA reductase inhibition reduces LDL' },
+    { biomarkerKey: 'total_cholesterol', expectedDirection: 'decrease', description: 'reduce total cholesterol' },
+    { biomarkerKey: 'apolipoprotein_b', expectedDirection: 'decrease', description: 'reduce atherogenic particle count' },
+  ],
+  'ezetimibe': [
+    { biomarkerKey: 'ldl_cholesterol', expectedDirection: 'decrease', description: 'reduce intestinal cholesterol absorption' },
+    { biomarkerKey: 'total_cholesterol', expectedDirection: 'decrease', description: 'reduce total cholesterol' },
+  ],
+  'levothyroxine': [
+    { biomarkerKey: 'tsh', expectedDirection: 'decrease', description: 'exogenous T4 suppresses TSH' },
+    { biomarkerKey: 'free_t4', expectedDirection: 'increase', description: 'direct T4 supplementation' },
+    { biomarkerKey: 'free_t3', expectedDirection: 'increase', description: 'T4 converts to T3' },
+  ],
+  'synthroid': [
+    { biomarkerKey: 'tsh', expectedDirection: 'decrease', description: 'thyroid replacement suppresses TSH' },
+    { biomarkerKey: 'free_t4', expectedDirection: 'increase', description: 'direct T4 supplementation' },
+  ],
+  'liothyronine': [
+    { biomarkerKey: 'free_t3', expectedDirection: 'increase', description: 'direct T3 supplementation' },
+    { biomarkerKey: 'tsh', expectedDirection: 'decrease', description: 'exogenous T3 suppresses TSH' },
+  ],
+  'ipamorelin': [
+    { biomarkerKey: 'fasting_glucose', expectedDirection: 'increase', description: 'GH secretagogue may transiently raise glucose' },
+  ],
+  'cjc-1295': [
+    { biomarkerKey: 'fasting_glucose', expectedDirection: 'increase', description: 'GH release may increase glucose' },
+  ],
+  'mk-677': [
+    { biomarkerKey: 'fasting_glucose', expectedDirection: 'increase', description: 'GH secretagogue raises fasting glucose' },
+    { biomarkerKey: 'fasting_insulin', expectedDirection: 'increase', description: 'may increase insulin resistance' },
+    { biomarkerKey: 'hba1c', expectedDirection: 'increase', description: 'chronic GH elevation may worsen glycemic control' },
+  ],
 }
 
 // ─── Score Protocol Effectiveness ───────────────────────────────────────────

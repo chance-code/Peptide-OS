@@ -255,6 +255,124 @@ export function generateAttributionEntries(
   return entries
 }
 
+/**
+ * Generate "significant change" entries for notable marker deltas that weren't
+ * already covered by protocol attribution entries.
+ * This catches unmapped protocols and unexpected effects.
+ */
+export function generateSignificantDeltaEntries(
+  labEventId: string,
+  deltas: MarkerDelta[],
+  attributionEntries: EvidenceLedgerEntry[],
+  activeProtocols: Array<{
+    id: string
+    name: string
+    type: string
+    adherencePercent: number
+    daysOnProtocol: number
+  }>,
+  labDate: string,
+  previousLabDate: string
+): EvidenceLedgerEntry[] {
+  const entries: EvidenceLedgerEntry[] = []
+
+  // Collect biomarker keys already covered by attribution entries
+  const coveredKeys = new Set<string>()
+  for (const entry of attributionEntries) {
+    for (const marker of entry.evidence.markers) {
+      coveredKeys.add(marker.biomarkerKey)
+    }
+  }
+
+  // Filter to significant deltas not already covered
+  const significantUncovered = deltas.filter(
+    d => d.isSignificant && Math.abs(d.percentDelta) >= 10 && !coveredKeys.has(d.biomarkerKey)
+  )
+
+  // Find protocols that qualify (sufficient duration and adherence)
+  const qualifiedProtocols = activeProtocols.filter(
+    p => p.daysOnProtocol >= 30 && p.adherencePercent >= 30
+  )
+
+  for (const delta of significantUncovered) {
+    const def = BIOMARKER_REGISTRY[delta.biomarkerKey]
+    if (!def) continue
+
+    const direction = delta.absoluteDelta > 0 ? 'increased' : 'decreased'
+    const percentStr = Math.abs(delta.percentDelta).toFixed(1)
+
+    if (qualifiedProtocols.length > 0) {
+      // Generate an attribution entry for each qualified protocol noting temporal correlation
+      for (const protocol of qualifiedProtocols) {
+        const claim = `${def.displayName} ${direction} ${percentStr}%. Temporal correlation with ${protocol.name} (${protocol.adherencePercent}% adherence, ${protocol.daysOnProtocol} days). No predefined marker mapping — verify if this is an expected or unexpected effect.`
+
+        const confounds: string[] = [
+          'No predefined protocol-marker mapping exists for this combination',
+        ]
+        if (protocol.adherencePercent < 70) confounds.push('Low adherence may limit observed effect')
+        if (protocol.daysOnProtocol < 60) confounds.push('Short time on protocol — effect may not be fully realized')
+        if (qualifiedProtocols.length > 1) confounds.push(`${qualifiedProtocols.length} protocols were active — cannot isolate cause`)
+
+        // Low or speculative confidence for unmapped correlations
+        const confidence: EvidenceLedgerEntry['confidence'] =
+          protocol.adherencePercent >= 70 && protocol.daysOnProtocol >= 60 ? 'low' : 'speculative'
+
+        entries.push({
+          id: generateId(),
+          createdAt: new Date().toISOString(),
+          labEventId,
+          claim,
+          claimType: 'attribution',
+          evidence: {
+            markers: [{
+              biomarkerKey: delta.biomarkerKey,
+              value: delta.currentValue,
+              flag: delta.currentFlag,
+              trend: delta.flagTransition === 'improved' ? 'improving' : delta.flagTransition === 'worsened' ? 'declining' : 'stable',
+            }],
+            protocols: [{
+              protocolId: protocol.id,
+              protocolName: protocol.name,
+              adherencePercent: protocol.adherencePercent,
+              daysOnProtocol: protocol.daysOnProtocol,
+            }],
+            timeWindow: { from: previousLabDate, to: labDate },
+          },
+          confounds,
+          confidence,
+          strengthScore: computeStrengthScore(protocol.adherencePercent, protocol.daysOnProtocol, Math.abs(delta.percentDelta)),
+        })
+      }
+    } else {
+      // No qualified protocols — generate a pure observation entry
+      const claim = `${def.displayName} ${direction} ${percentStr}% (${def.format(delta.previousValue)} → ${def.format(delta.currentValue)}). No active protocol with sufficient duration/adherence to attribute.`
+
+      entries.push({
+        id: generateId(),
+        createdAt: new Date().toISOString(),
+        labEventId,
+        claim,
+        claimType: 'observation',
+        evidence: {
+          markers: [{
+            biomarkerKey: delta.biomarkerKey,
+            value: delta.currentValue,
+            flag: delta.currentFlag,
+            trend: delta.flagTransition === 'improved' ? 'improving' : delta.flagTransition === 'worsened' ? 'declining' : 'stable',
+          }],
+          protocols: [],
+          timeWindow: { from: previousLabDate, to: labDate },
+        },
+        confounds: [],
+        confidence: Math.abs(delta.percentDelta) >= 15 ? 'medium' : 'low',
+        strengthScore: Math.min(1, Math.abs(delta.percentDelta) / 30),
+      })
+    }
+  }
+
+  return entries
+}
+
 // ─── Prediction Accuracy ────────────────────────────────────────────────────
 
 export function computePredictionAccuracy(allEntries: EvidenceLedgerEntry[]): PredictionAccuracy {
