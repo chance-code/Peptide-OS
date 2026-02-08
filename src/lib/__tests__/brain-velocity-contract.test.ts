@@ -92,7 +92,7 @@ function makeSnapshot(overrides: Record<string, unknown> = {}) {
     publishedVelocityAt: FIXED_ISO,
     velocityComputedAt: FIXED_ISO,
     velocityWindowDays: 90,
-    velocityVersion: '2.1.0',
+    velocityVersion: '3.0.0',
     ...overrides,
   }
 }
@@ -183,7 +183,7 @@ describe('GET /api/health/brain/velocity — stable contract', () => {
     expect(result.meta.confidence).toBe('low')
     expect(result.meta.publishedAt).toBeNull()
     expect(result.meta.computedAt).toBeNull()
-    expect(result.meta.version).toBe('2.1.0')
+    expect(result.meta.version).toBe('3.0.0')
     expect(result.meta.timezone).toBe('UTC')
     expect(result.meta.overallVelocityCI).toBeNull()
     expect(result.meta.missingDomains).toEqual([])
@@ -202,7 +202,7 @@ describe('GET /api/health/brain/velocity — stable contract', () => {
     expect(result.value.daysGainedAnnuallyExact).toBe(36.5) // (1 - 0.9) * 365
     expect(result.value.daysGainedAnnuallyLabel).toBe('Gaining')
     expect(result.value.systemVelocitiesStable).toHaveLength(2)
-    expect(result.meta.version).toBe('2.1.0')
+    expect(result.meta.version).toBe('3.0.0')
 
     // Legacy fields
     expect(result.agingVelocity).toBeDefined()
@@ -1155,24 +1155,24 @@ describe('missing data resilience', () => {
 })
 
 describe('version constant', () => {
-  it('VELOCITY_PIPELINE_VERSION is 2.1.0', async () => {
+  it('VELOCITY_PIPELINE_VERSION is 3.0.0', async () => {
     const actual = await vi.importActual<typeof import('@/lib/health-brain')>('@/lib/health-brain')
-    expect(actual.VELOCITY_PIPELINE_VERSION).toBe('2.1.0')
+    expect(actual.VELOCITY_PIPELINE_VERSION).toBe('3.0.0')
   })
 
   it('initializing response uses the constant version', async () => {
     vi.clearAllMocks()
     mockGetLatestSnapshot.mockResolvedValue(null)
     const result = await callGET()
-    expect(result.meta.version).toBe('2.1.0')
+    expect(result.meta.version).toBe('3.0.0')
   })
 
   it('published response carries version from snapshot', async () => {
     vi.clearAllMocks()
     mockGetLatestSnapshot.mockResolvedValue(makeSnapshot({
-      velocityVersion: '2.1.0',
+      velocityVersion: '3.0.0',
     }))
     const result = await callGET()
-    expect(result.meta.version).toBe('2.1.0')
+    expect(result.meta.version).toBe('3.0.0')
   })
 })

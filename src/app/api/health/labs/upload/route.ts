@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getAuthenticatedUserId } from '@/lib/api-auth'
-import { parseQuestPDF, extractTextFromPDF } from '@/lib/labs/lab-pdf-parser'
+import { extractTextFromPDF } from '@/lib/labs/lab-pdf-parser'
+import { routeLabPDF } from '@/lib/labs/lab-parser-router'
 import { analyzeLabPatterns } from '@/lib/labs/lab-analyzer'
 import { runComputePipeline } from '@/lib/labs/lab-compute-pipeline'
 import { handleLabUpload } from '@/lib/health-brain'
@@ -52,8 +53,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Parse biomarkers using Quest Diagnostics parser
-    const parseResult = parseQuestPDF(text)
+    // Parse biomarkers using auto-detected parser (Quest/Function Health or H&H Labs)
+    const parseResult = routeLabPDF(text)
     const markers = parseResult.markers
     const warnings = parseResult.parseWarnings
 

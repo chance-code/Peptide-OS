@@ -27,6 +27,17 @@ import {
   type PersonalBaselineRecord,
 } from './health-personal-baselines'
 import { scoreClinicalSignificance, type ClinicalWeight } from './labs/lab-clinical-significance'
+import {
+  computeCapacitySignals,
+  computeLoadSignals,
+  computeFatigueSignals,
+  computeLabModulation,
+  computeVelocityV3,
+  type CapacitySignal,
+  type FatigueSignal,
+  type LoadSignal,
+  type VelocityModelOutput,
+} from './health-velocity-model'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -278,7 +289,10 @@ interface LabScoreEntry {
 }
 
 interface WearableAssessment {
-  metrics: Map<string, { current: number; baseline: number; stdDev: number; trend: string; percentDiff: number }>
+  metrics: Map<string, {
+    current: number; baseline: number; stdDev: number; trend: string; percentDiff: number;
+    dailyValues: Array<{ date: string; value: number }>
+  }>
   overallScore: number | null
   dataPoints: number
   staleness: number  // hours since last data point
@@ -355,7 +369,7 @@ export const VELOCITY_STABILITY_WEIGHTS: Record<string, number> = {
 
 // ─── Pipeline Version ──────────────────────────────────────────────────────
 // Bump when mapping, weights, or smoothing logic changes.
-export const VELOCITY_PIPELINE_VERSION = '2.1.0'
+export const VELOCITY_PIPELINE_VERSION = '3.0.0'
 
 // ─── Output Safety Bounds ──────────────────────────────────────────────────
 const VELOCITY_OUTPUT_MIN = 0.75
@@ -671,8 +685,8 @@ export async function evaluate(userId: string, trigger: BrainTrigger): Promise<B
   // Step 7: Domain fusion — single truth per domain
   const domains = fuseDomains(labScores, wearableAssessment, latestUpload, personalBaselines)
 
-  // Step 8: Aging velocity
-  const agingVelocity = await computeAgingVelocity(userId, domains)
+  // Step 8: Aging velocity (v3 — capacity-first, load-conditioned)
+  const agingVelocity = await computeAgingVelocity(userId, domains, wearableAssessment, labScores, latestUpload)
 
   // Step 9: Allostatic load (with personal baselines + active protocol count)
   const activeProtocolCount = await prisma.protocol.count({
@@ -870,11 +884,14 @@ function scoreAllBiomarkers(
   }))
 }
 
-/** Analyze wearable metrics: fetch 30-day window, compute baselines */
+/** Analyze wearable metrics: fetch 90-day window (for capacity slopes), compute baselines */
 async function analyzeWearables(userId: string): Promise<WearableAssessment> {
   const now = new Date()
-  const thirtyDaysAgo = subDays(now, 30)
-  const metrics = new Map<string, { current: number; baseline: number; stdDev: number; trend: string; percentDiff: number }>()
+  const ninetyDaysAgo = subDays(now, 90)
+  const metrics = new Map<string, {
+    current: number; baseline: number; stdDev: number; trend: string; percentDiff: number;
+    dailyValues: Array<{ date: string; value: number }>
+  }>()
 
   const allMetricTypes: MetricType[] = [
     'sleep_score', 'deep_sleep', 'sleep_efficiency', 'sleep_duration',
@@ -891,7 +908,7 @@ async function analyzeWearables(userId: string): Promise<WearableAssessment> {
   try {
     const unifiedMetrics = await getUnifiedMetrics(
       userId,
-      thirtyDaysAgo,
+      ninetyDaysAgo,
       now,
       allMetricTypes
     )
@@ -936,10 +953,14 @@ async function analyzeWearables(userId: string): Promise<WearableAssessment> {
         stdDev: baseline.stdDev,
         trend,
         percentDiff: Math.round(percentDiff * 10) / 10,
+        dailyValues: dailyValues.map(d => ({ date: d.date, value: d.value })),
       })
 
       // Contribute to overall score (normalized 0-100 based on distance from baseline)
-      const normalizedScore = 50 + Math.max(-50, Math.min(50, percentDiff))
+      // FIX: Apply polarity correction — for lower_better metrics, flip sign
+      const polarity = METRIC_POLARITY[metricType as string] ?? 'higher_better'
+      const polarityCorrectedDiff = polarity === 'lower_better' ? -percentDiff : percentDiff
+      const normalizedScore = 50 + Math.max(-50, Math.min(50, polarityCorrectedDiff))
       scoreSum += normalizedScore
       scoreCount++
 
@@ -1023,7 +1044,10 @@ function fuseDomains(
       if (!data) continue
 
       wearableScoreCount++
-      const normalizedScore = 50 + Math.max(-50, Math.min(50, data.percentDiff))
+      // FIX: Apply polarity correction in domain scoring
+      const metricPolarity = METRIC_POLARITY[metricType] ?? 'higher_better'
+      const correctedDiff = metricPolarity === 'lower_better' ? -data.percentDiff : data.percentDiff
+      const normalizedScore = 50 + Math.max(-50, Math.min(50, correctedDiff))
       wearableScoreSum += normalizedScore
 
       topSignals.push({
@@ -1245,83 +1269,114 @@ function buildDomainNarrative(
   return `${scoreLabel} ${domain} — ${trendLabel}.`
 }
 
-/** Compute aging velocity from 90-day domain score trend and per-system velocities */
+/**
+ * Compute aging velocity v3: capacity-first, load-conditioned.
+ * Replaces the old scoreToVelocity() path with slope-based capacity signals,
+ * load-conditioned fatigue, hard constraints, and Bayesian shrinkage.
+ */
 async function computeAgingVelocity(
   userId: string,
-  domains: Record<string, DomainAssessment>
+  domains: Record<string, DomainAssessment>,
+  wearable: WearableAssessment,
+  labScores: LabScoreEntry[] | null,
+  latestUpload: { testDate: Date } | null,
 ): Promise<AgingVelocityAssessment> {
+  // ── v3 Signal Extraction ────────────────────────────────────────────────
+  // Build metric data map from wearable daily values
+  const metricData = new Map<string, Array<{ date: string; value: number }>>()
+  for (const [metricType, data] of wearable.metrics) {
+    if (data.dailyValues && data.dailyValues.length > 0) {
+      metricData.set(metricType, data.dailyValues)
+    }
+  }
+
+  // Compute capacity, load, and fatigue signals
+  const capacitySignals = computeCapacitySignals(metricData, METRIC_POLARITY)
+  const loadSignals = computeLoadSignals(metricData)
+  const fatigueSignals = computeFatigueSignals(metricData, loadSignals, capacitySignals, METRIC_POLARITY)
+
+  // Lab recency
+  let labRecencyDays = 999
+  if (latestUpload) {
+    labRecencyDays = differenceInDays(new Date(), new Date(latestUpload.testDate))
+  }
+
+  // Build lab score input for velocity model
+  const labScoreInput = labScores
+    ? labScores.map(s => ({ biomarkerKey: s.biomarkerKey, score: s.zone.score }))
+    : null
+
+  // ── v3 Velocity Computation ─────────────────────────────────────────────
+  const v3Result = computeVelocityV3({
+    capacitySignals,
+    fatigueSignals,
+    loadSignals,
+    labScores: labScoreInput,
+    labRecencyDays,
+  })
+
+  // ── Map v3 output to AgingVelocityAssessment (backward-compatible) ─────
+  const overallVelocity = v3Result.overallVelocity
+  const daysGainedAnnually = Math.round((1.0 - overallVelocity) * 365)
+
+  // Build systemVelocities from v3 per-system output
   const systemVelocities: AgingVelocityAssessment['systemVelocities'] = {}
-  const weightedEntries: Array<{ velocity: number; weight: number }> = []
   const missingDomains: string[] = []
   const totalDomainCount = Object.keys(DOMAIN_TO_VELOCITY_SYSTEM).length
 
-  for (const [domainKey, systemName] of Object.entries(DOMAIN_TO_VELOCITY_SYSTEM)) {
-    const domain = domains[domainKey]
-    if (domain?.score !== null && domain?.score !== undefined) {
-      const velocity = scoreToVelocity(domain.score)
-      const weight = computeDomainWeight(domain, systemName)
-      const domainTrend = domain.trend === 'improving' ? 'decelerating' as const
-        : domain.trend === 'declining' ? 'accelerating' as const
+  for (const [, systemName] of Object.entries(DOMAIN_TO_VELOCITY_SYSTEM)) {
+    const v3System = v3Result.systemVelocities[systemName]
+    if (v3System && v3System.velocity !== 1.00) {
+      const trend = v3System.trendDirection === 'improving' ? 'decelerating' as const
+        : v3System.trendDirection === 'declining' ? 'accelerating' as const
         : 'steady' as const
       systemVelocities[systemName] = {
-        velocity,
-        confidence: weight,
-        trend: domainTrend,
+        velocity: v3System.velocity,
+        confidence: v3System.confidence,
+        trend,
       }
-      weightedEntries.push({ velocity, weight })
+    } else if (v3System) {
+      systemVelocities[systemName] = {
+        velocity: v3System.velocity,
+        confidence: v3System.confidence,
+        trend: 'steady',
+      }
     } else {
       systemVelocities[systemName] = { velocity: null, confidence: 0, trend: 'steady' }
       missingDomains.push(systemName)
     }
   }
 
-  // Weighted mean
-  let overallVelocity: number | null = null
-  let daysGainedAnnually: number | null = null
-  const effectiveWeightSum = weightedEntries.reduce((s, e) => s + e.weight, 0)
-  const effectiveDomainsCount = weightedEntries.length
-
-  if (effectiveWeightSum > 0) {
-    const weightedSum = weightedEntries.reduce((s, e) => s + e.velocity * e.weight, 0)
-    const rawOverall = Math.round((weightedSum / effectiveWeightSum) * 100) / 100
-    overallVelocity = Math.max(VELOCITY_OUTPUT_MIN, Math.min(VELOCITY_OUTPUT_MAX, rawOverall))
-    if (rawOverall !== overallVelocity) {
-      console.log(JSON.stringify({
-        event: 'brain_velocity_guardrail',
-        guardrail: 'weighted_mean_clamp',
-        userId,
-        unclamped: rawOverall,
-        clamped: overallVelocity,
-        version: VELOCITY_PIPELINE_VERSION,
-      }))
-    }
-    daysGainedAnnually = Math.round((1.0 - overallVelocity) * 365)
-  }
-
-  // Concordance: how much systems agree (low stddev = high concordance)
+  // Concordance from v3 system velocities
+  const activeVelocities = Object.values(v3Result.systemVelocities)
+    .map(s => s.velocity)
+    .filter(v => v !== 1.00)
   let concordanceScore = 0
   let concordanceLabel: 'high' | 'moderate' | 'low' = 'low'
-  if (weightedEntries.length >= 2) {
-    const velocities = weightedEntries.map(e => e.velocity)
-    const mean = velocities.reduce((a, b) => a + b, 0) / velocities.length
-    const variance = velocities.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / velocities.length
+  if (activeVelocities.length >= 2) {
+    const mean = activeVelocities.reduce((a, b) => a + b, 0) / activeVelocities.length
+    const variance = activeVelocities.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / activeVelocities.length
     const stdDev = Math.sqrt(variance)
     concordanceScore = Math.round(Math.max(0, 1 - stdDev / 0.3) * 100) / 100
     if (concordanceScore >= 0.7) concordanceLabel = 'high'
     else if (concordanceScore >= 0.4) concordanceLabel = 'moderate'
   }
 
+  // Effective domains
+  const effectiveDomainsCount = Object.values(v3Result.systemVelocities)
+    .filter(s => s.confidence > 0).length
+  const effectiveWeightSum = Object.values(v3Result.systemVelocities)
+    .reduce((s, sv) => s + sv.confidence, 0)
+
   // Confidence interval
   let overallVelocityCI: [number, number] | null = null
-  if (overallVelocity !== null) {
-    const err = computeVelocityUncertainty(
-      concordanceScore, effectiveWeightSum, effectiveDomainsCount, totalDomainCount
-    )
-    overallVelocityCI = [
-      Math.round((overallVelocity - err) * 100) / 100,
-      Math.round((overallVelocity + err) * 100) / 100,
-    ]
-  }
+  const err = computeVelocityUncertainty(
+    concordanceScore, effectiveWeightSum, effectiveDomainsCount, totalDomainCount
+  )
+  overallVelocityCI = [
+    Math.round((overallVelocity - err) * 100) / 100,
+    Math.round((overallVelocity + err) * 100) / 100,
+  ]
 
   // Fetch last 28 days of published velocity history for trend
   const trendSnapshots = await prisma.healthBrainSnapshot.findMany({

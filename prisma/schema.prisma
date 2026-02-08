@@ -603,6 +603,13 @@ model HealthBrainSnapshot {
   confidenceJson       String   @default("{}")
   dataCompleteness     Float    @default(0)
 
+  // Aging velocity publish pipeline
+  agingVelocityPublishedJson  String    @default("{}")
+  agingVelocityPublishedAt    DateTime?
+  agingVelocityComputedAt     DateTime?
+  agingVelocityWindowDays     Int       @default(90)
+  agingVelocityVersion        String    @default("2.0.0")
+
   createdAt            DateTime @default(now())
   user                 UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
 

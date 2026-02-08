@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getAuthenticatedUserId } from '@/lib/api-auth'
-import { parseQuestPDF, extractTextFromPDF } from '@/lib/labs/lab-pdf-parser'
+import { extractTextFromPDF } from '@/lib/labs/lab-pdf-parser'
+import { routeLabPDF } from '@/lib/labs/lab-parser-router'
 
 // Force Node.js runtime for pdfjs-dist compatibility
 export const runtime = 'nodejs'
@@ -62,8 +63,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Parse the PDF content using Quest Diagnostics parser
-    const parseResult = parseQuestPDF(text)
+    // Parse the PDF content using auto-detected parser (Quest/Function Health or H&H Labs)
+    const parseResult = routeLabPDF(text)
 
     // Apply overrides
     const finalTestDate = testDateOverride
