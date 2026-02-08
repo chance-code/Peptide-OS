@@ -402,14 +402,25 @@ function computeVerdict(
     } else if (improvingDeltas.length > worseningDeltas.length && improvingDeltas.length >= 2) {
       headline = `Positive momentum: ${improvingDeltas.length} markers improving${workingProtocols.length > 0 ? `, ${workingProtocols.length} protocol${workingProtocols.length > 1 ? 's' : ''} working` : ''}.`
     } else if (workingProtocols.length > 0) {
-      headline = `${workingProtocols[0].protocolName} is showing lab-verified results.`
+      const hasOvershoot = workingProtocols.some(p => p.recommendation === 'decrease' || p.recommendation === 'discuss_with_clinician')
+      if (hasOvershoot) {
+        headline = `${workingProtocols[0].protocolName} is working — but some markers need attention.`
+      } else {
+        headline = `${workingProtocols[0].protocolName} is showing lab-verified results.`
+      }
     } else {
       headline = `${significantDeltas.length} significant changes since last labs.`
     }
 
-    // Takeaways
+    // Takeaways — include recommendation context for actionable protocols
     for (const p of workingProtocols.slice(0, 2)) {
-      takeaways.push(`${p.protocolName}: ${p.labVerdictExplanation}`)
+      const overshootMarkers = p.targetMarkers.filter((m: { overshoot?: boolean }) => m.overshoot)
+      if (overshootMarkers.length > 0) {
+        const names = overshootMarkers.map((m: { displayName: string }) => m.displayName).join(', ')
+        takeaways.push(`${p.protocolName}: Working, but ${names} now above optimal. ${p.recommendationRationale}`)
+      } else {
+        takeaways.push(`${p.protocolName}: ${p.labVerdictExplanation}`)
+      }
     }
     for (const p of adverseProtocols) {
       takeaways.push(`${p.protocolName}: ${p.labVerdictExplanation} ${p.recommendationRationale}`)
@@ -450,7 +461,13 @@ function computeVerdict(
     }
 
     // Focus
-    if (adverseProtocols.length > 0) {
+    const overshootProtocols = workingProtocols.filter(p => p.recommendation === 'decrease')
+    const clinicianProtocols = protocolScores.filter(p => p.recommendation === 'discuss_with_clinician')
+    if (clinicianProtocols.length > 0) {
+      focus = `Discuss ${clinicianProtocols[0].protocolName} dosing with your clinician`
+    } else if (overshootProtocols.length > 0) {
+      focus = `Consider reducing ${overshootProtocols[0].protocolName} dose`
+    } else if (adverseProtocols.length > 0) {
       focus = `Discuss ${adverseProtocols[0].protocolName} with your clinician`
     } else if (needsAttention.length > 0) {
       focus = needsAttention[0].displayName

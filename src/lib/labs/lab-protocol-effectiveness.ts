@@ -15,6 +15,9 @@ export interface TargetMarkerResult {
   expectedEffect: string
   actualEffect: string
   effectMatch: 'matched' | 'partial' | 'no_effect' | 'opposite'
+  currentFlag?: BiomarkerFlag
+  currentValue?: number
+  overshoot?: boolean // true if matched direction but pushed into high/critical range
 }
 
 export interface ProtocolLabEffectiveness {
@@ -244,6 +247,8 @@ export function scoreProtocolEffectiveness(
   let oppositeCount = 0
   let noEffectCount = 0
   let testedCount = 0
+  let overshootCount = 0
+  const overshootMarkers: string[] = []
 
   for (const expected of expectedEffects) {
     const delta = deltaMap.get(expected.biomarkerKey)
@@ -274,6 +279,16 @@ export function scoreProtocolEffectiveness(
       oppositeCount++
     }
 
+    // Detect overshoot: marker moved in expected direction but is now above/below optimal range
+    const isOvershoot = effectMatch === 'matched' && (
+      current.flag === 'high' || current.flag === 'critical_high' ||
+      current.flag === 'low' || current.flag === 'critical_low'
+    )
+    if (isOvershoot) {
+      overshootCount++
+      overshootMarkers.push(def.displayName)
+    }
+
     const actualEffect = `${actualDirection === 'stable' ? 'unchanged' : actualDirection + 'd'} ${Math.abs(delta.percentDelta).toFixed(1)}%`
 
     targetMarkers.push({
@@ -282,6 +297,9 @@ export function scoreProtocolEffectiveness(
       expectedEffect: expected.description,
       actualEffect,
       effectMatch,
+      currentFlag: current.flag,
+      currentValue: current.value,
+      overshoot: isOvershoot || undefined,
     })
   }
 
@@ -298,15 +316,25 @@ export function scoreProtocolEffectiveness(
       ? `${protocol.adherencePercent}% adherence over ${daysOnProtocol} days — moderate. Higher adherence may improve results.`
       : `${protocol.adherencePercent}% adherence over ${daysOnProtocol} days — low adherence limits interpretation.`
 
-  // Compute recommendation
-  const recommendation = computeRecommendation(verdict, protocol.adherencePercent, daysOnProtocol)
+  // Compute recommendation (with overshoot awareness)
+  const recommendation = computeRecommendation(verdict, protocol.adherencePercent, daysOnProtocol, {
+    overshootCount,
+    overshootMarkers,
+    targetMarkers,
+  })
+
+  // Enhance explanation if overshoot detected
+  let finalExplanation = explanation
+  if (verdict === 'working' && overshootCount > 0) {
+    finalExplanation += ` However, ${overshootMarkers.join(' and ')} ${overshootCount === 1 ? 'has' : 'have'} moved beyond optimal range.`
+  }
 
   return {
     protocolId: protocol.id,
     protocolName: protocol.name,
     protocolType: protocol.type as 'peptide' | 'supplement',
     labVerdict: verdict,
-    labVerdictExplanation: explanation,
+    labVerdictExplanation: finalExplanation,
     labVerdictConfidence: confidence,
     targetMarkers,
     adherencePercent: protocol.adherencePercent,
@@ -315,7 +343,7 @@ export function scoreProtocolEffectiveness(
     wearableAlignment: 'no_wearable_data', // Set by caller if wearable data available
     recommendation: recommendation.recommendation,
     recommendationRationale: recommendation.rationale,
-    nextCheckpoint: `Retest in ${verdict === 'early_signal' ? '60' : '90'} days to ${verdict === 'early_signal' ? 'confirm emerging trend' : 'verify continued effect'}.`,
+    nextCheckpoint: recommendation.nextCheckpoint || `Retest in ${verdict === 'early_signal' ? '60' : '90'} days to ${verdict === 'early_signal' ? 'confirm emerging trend' : 'verify continued effect'}.`,
   }
 }
 
@@ -391,18 +419,49 @@ function computeVerdict(
 function computeRecommendation(
   verdict: LabVerdict,
   adherencePercent: number,
-  daysOnProtocol: number
-): { recommendation: ProtocolLabEffectiveness['recommendation']; rationale: string } {
+  daysOnProtocol: number,
+  overshoot: {
+    overshootCount: number
+    overshootMarkers: string[]
+    targetMarkers: TargetMarkerResult[]
+  }
+): { recommendation: ProtocolLabEffectiveness['recommendation']; rationale: string; nextCheckpoint?: string } {
+  // Check for critical overshoot first — this overrides verdict-based logic
+  const criticalMarkers = overshoot.targetMarkers.filter(
+    m => m.currentFlag === 'critical_high' || m.currentFlag === 'critical_low'
+  )
+  if (criticalMarkers.length > 0) {
+    const names = criticalMarkers.map(m => m.displayName).join(', ')
+    return {
+      recommendation: 'discuss_with_clinician',
+      rationale: `${names} ${criticalMarkers.length === 1 ? 'is' : 'are'} in a critical range. Discuss dose adjustment with your healthcare provider before continuing.`,
+      nextCheckpoint: 'Retest in 30–60 days after adjusting protocol with clinician guidance.',
+    }
+  }
+
+  // Working + overshoot: protocol is effective but pushed markers too far
+  if (verdict === 'working' && overshoot.overshootCount > 0) {
+    const highMarkers = overshoot.targetMarkers.filter(
+      m => m.overshoot && (m.currentFlag === 'high' || m.currentFlag === 'low')
+    )
+    const names = highMarkers.map(m => m.displayName).join(', ')
+    return {
+      recommendation: 'decrease',
+      rationale: `Protocol is effective, but ${names} ${highMarkers.length === 1 ? 'has' : 'have'} moved beyond optimal range. Consider reducing dose to bring levels back into the optimal zone.`,
+      nextCheckpoint: 'Retest in 60 days after dose adjustment to verify levels normalize.',
+    }
+  }
+
   switch (verdict) {
     case 'working':
       return {
         recommendation: 'continue',
-        rationale: 'Lab data confirms expected effect. Continue current protocol.',
+        rationale: 'All target markers are responding as expected and within range. Continue current protocol.',
       }
     case 'early_signal':
       return {
         recommendation: 'continue',
-        rationale: 'Early positive signals. Continue and retest to confirm.',
+        rationale: 'Early positive signals. Continue and retest to confirm the trend.',
       }
     case 'unclear':
       if (adherencePercent < 50) {
