@@ -2127,10 +2127,13 @@ async function storeSnapshot(
     })
 
     const previousPublishedAt = previous?.agingVelocityPublishedAt ?? null
+    const prevVersion = previous?.agingVelocityVersion ?? null
+    const versionChanged = prevVersion !== null && prevVersion !== VELOCITY_PIPELINE_VERSION
     const computedAt = new Date()
     const canPublish = isVelocityPublishable(output.agingVelocity, output.dataCompleteness)
     const gateOpen = shouldPublishVelocity(previousPublishedAt)
-    const willPublish = canPublish && gateOpen
+    // Force publish gate open on pipeline version change — don't anchor to old model's output
+    const willPublish = canPublish && (gateOpen || versionChanged)
 
     let publishedJson: string
     let publishedAt: Date | null
@@ -2144,11 +2147,8 @@ async function storeSnapshot(
       const prevStable = prevPublished?.overallVelocity ?? null
       const computedOverall = output.agingVelocity.overallVelocity
 
-      // Detect pipeline version change — skip EWMA anchor from old model
-      const prevVersion = previous?.agingVelocityVersion ?? null
-      const versionChanged = prevVersion !== null && prevVersion !== VELOCITY_PIPELINE_VERSION
-
       // Apply EWMA smoothing if we have both previous stable and computed values
+      // (skipped when pipeline version changed — don't anchor to old model's output)
       let smoothedVelocity = { ...output.agingVelocity }
       const prevBucket = prevPublished?.daysGainedAnnuallyBucket ?? null
       if (prevStable !== null && computedOverall !== null && !versionChanged) {
