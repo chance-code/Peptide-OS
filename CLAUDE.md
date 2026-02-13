@@ -86,6 +86,23 @@ src/
 ios/App/              # iOS Capacitor project (xcodeproj, Info.plist)
 brand/                # Logo SVGs (logo.svg, logo-light.svg, logo-mark.svg)
 prisma/               # Schema and migrations
+
+docs/
+├── architecture/     # SYSTEM_DESIGN, DATA_MODEL, RECONSTITUTION_MATH, RUNBOOK
+└── product/          # HEALTH_REDESIGN_SPEC, HEALTH_REDESIGN_README, UI_REDESIGN_PLAN
+
+ios-native/
+├── docs/             # See ios-native/docs/README.md for full index
+│   ├── architecture/ # ARC_SYSTEM_SPEC, ARC_GROUNDING_FILE, DAY_BOUNDARY_RULES, INGESTION_RELIABILITY
+│   ├── scoring/      # NORMATIVE_SCORING, HEALTH_DS_SPEC
+│   ├── health/       # Sync model, UX contract, freshness rules, v2 spec
+│   ├── labs/         # Lab lifecycle, domain mapping, cadence, insights audit
+│   ├── body-comp/    # Implementation, confidence model, science
+│   ├── copilot/      # Copilot spec, DSL, acceptance tests, knowledge library
+│   ├── nutrition/    # Nutrition learning invariants
+│   └── archive/      # Stale audits, session artifacts (may be outdated)
+├── arc_spec_pack/    # Numbered architecture specs (00-15)
+└── audits/           # Web, iOS, features, design audits + improvement plan
 ```
 
 ---
