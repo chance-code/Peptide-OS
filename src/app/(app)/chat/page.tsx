@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Send, Bot, User, Loader2, Trash2, Sparkles } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { cn } from '@/lib/utils'
@@ -30,12 +31,112 @@ const WELCOME_MESSAGE: Message = {
   timestamp: new Date().toISOString(),
 }
 
-const SUGGESTED_PROMPTS = [
+const STATIC_PROMPTS = [
   { label: "Today's plan", prompt: "What should I take today and when?" },
   { label: "My adherence", prompt: "How's my adherence been lately?" },
   { label: "Stack ideas", prompt: "What peptides would complement my current stack?" },
   { label: "Explain protocol", prompt: "Break down my current protocol and why each timing matters" },
 ]
+
+interface HealthSummaryResponse {
+  score: {
+    overall: number | null
+    sleep: number | null
+    recovery: number | null
+    activity: number | null
+    bodyComp: number | null
+    breakdown: Array<{
+      metric: string
+      score: number
+      trend: 'up' | 'down' | 'stable'
+    }>
+  }
+  trends: Array<{
+    metricType: string
+    displayName: string
+    trend: 'improving' | 'declining' | 'stable'
+    changePercent: number
+  }>
+  insights: Array<{
+    id: string
+    type: string
+    relatedProtocol?: { id: string; name: string }
+  }>
+  recovery: {
+    score: number
+    status: 'excellent' | 'good' | 'moderate' | 'poor'
+  }
+  sleepArchitecture: {
+    recentTrend: 'improving' | 'declining' | 'stable'
+  }
+}
+
+const PILLAR_DISPLAY_NAMES: Record<string, string> = {
+  sleep: 'Sleep',
+  recovery: 'Recovery',
+  activity: 'Activity',
+  bodyComp: 'Body Composition',
+}
+
+function buildDynamicPrompts(summary: HealthSummaryResponse) {
+  const prompts: Array<{ label: string; prompt: string }> = []
+
+  // Check for declining pillars (score breakdown trends)
+  const decliningTrends = summary.trends.filter(t => t.trend === 'declining')
+  for (const trend of decliningTrends.slice(0, 2)) {
+    prompts.push({
+      label: `${trend.displayName} declining`,
+      prompt: `Your ${trend.displayName} is trending down \u2014 want to explore why?`,
+    })
+  }
+
+  // Check pillar-level scores for declining signals
+  const pillarKeys = ['sleep', 'recovery', 'activity', 'bodyComp'] as const
+  for (const key of pillarKeys) {
+    const score = summary.score[key]
+    if (score !== null && score < 50 && prompts.length < 3) {
+      const name = PILLAR_DISPLAY_NAMES[key]
+      // Avoid duplicating if we already have a declining prompt for this area
+      const already = prompts.some(p => p.label.toLowerCase().includes(name.toLowerCase()))
+      if (!already) {
+        prompts.push({
+          label: `${name} needs attention`,
+          prompt: `My ${name.toLowerCase()} score is low \u2014 what could be causing this?`,
+        })
+      }
+    }
+  }
+
+  // Check recovery status for adherence-like signals
+  if (summary.recovery.status === 'poor' || summary.recovery.status === 'moderate') {
+    prompts.push({
+      label: 'Improve adherence',
+      prompt: 'How can I improve my adherence?',
+    })
+  }
+
+  // Check if protocols exist
+  const hasProtocols = summary.insights.some(i => i.relatedProtocol)
+  if (hasProtocols) {
+    prompts.push({
+      label: 'Protocol check',
+      prompt: 'Is my protocol working?',
+    })
+  }
+
+  // Fill remaining slots with static prompts (up to 4 total)
+  for (const fallback of STATIC_PROMPTS) {
+    if (prompts.length >= 4) break
+    const alreadyUsed = prompts.some(
+      p => p.prompt === fallback.prompt || p.label === fallback.label
+    )
+    if (!alreadyUsed) {
+      prompts.push(fallback)
+    }
+  }
+
+  return prompts.slice(0, 4)
+}
 
 function getStorageKey(userId: string | null) {
   return `peptrack-chat-${userId || 'default'}`
@@ -204,6 +305,24 @@ export default function ChatPage() {
   const [isHydrated, setIsHydrated] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+
+  // Fetch health summary for dynamic suggested prompts
+  const { data: healthSummary } = useQuery<HealthSummaryResponse>({
+    queryKey: ['health-summary', currentUserId],
+    queryFn: async () => {
+      const res = await fetch(`/api/health/summary?userId=${currentUserId}`)
+      if (!res.ok) throw new Error('Failed to fetch health summary')
+      return res.json()
+    },
+    enabled: !!currentUserId,
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  })
+
+  const suggestedPrompts = useMemo(() => {
+    if (!healthSummary) return STATIC_PROMPTS
+    return buildDynamicPrompts(healthSummary)
+  }, [healthSummary])
 
   // Load messages from localStorage on mount
   useEffect(() => {
@@ -383,7 +502,7 @@ export default function ChatPage() {
               Try asking
             </div>
             <div className="flex flex-wrap gap-2">
-              {SUGGESTED_PROMPTS.map((item) => (
+              {suggestedPrompts.map((item) => (
                 <button
                   key={item.label}
                   onClick={() => handlePromptClick(item.prompt)}

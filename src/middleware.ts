@@ -13,6 +13,8 @@ export const config = {
      * Match all request paths except:
      * - /login (login page)
      * - /api/auth (NextAuth routes)
+     * - /api/nutrition (nutrition estimation - handles its own auth via userId;
+     *     middleware redirect converts POST→GET on 302, causing 405 at the route)
      * - /api/labs/import-pdf (PDF upload - handles its own auth)
      * - /_next/static (static files)
      * - /_next/image (image optimization files)
@@ -21,6 +23,6 @@ export const config = {
      * - /manifest.json (PWA manifest)
      * - /icon-*.png (PWA icons)
      */
-    '/((?!login|api/auth|api/push|api/debug|api/labs/import-pdf|api/health/labs/recompute|_next/static|_next/image|favicon.ico|sw.js|manifest.json|icon-).*)',
+    '/((?!login|api/auth|api/push|api/debug|api/nutrition|api/labs/import-pdf|api/health/labs/recompute|api/norms|_next/static|_next/image|favicon.ico|sw.js|manifest.json|icon-).*)',
   ],
 }

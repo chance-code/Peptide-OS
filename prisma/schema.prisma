@@ -844,6 +844,19 @@ model UserHypothesis {
 }
 
 // ============================================
+// PROTOCOL INSIGHT CACHE (GPT-4o response cache)
+// ============================================
+model ProtocolInsightCache {
+  id              String   @id @default(cuid())
+  protocolId      String   @unique
+  insightJson     String   // Full GPT-4o response JSON
+  protocolHash    String   // Hash of protocol params to detect changes
+  computedAt      DateTime @default(now())
+
+  @@index([protocolId])
+}
+
+// ============================================
 // INSIGHT ENGAGEMENT (A/B testing + analytics)
 // ============================================
 model InsightEngagement {

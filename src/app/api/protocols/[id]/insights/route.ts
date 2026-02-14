@@ -11,6 +11,20 @@ interface InsightsResponse {
   }
 }
 
+// Cache TTL: 7 days (insights are based on published research, not ephemeral data)
+const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
+
+function buildProtocolHash(
+  peptideName: string,
+  doseAmount: number,
+  doseUnit: string,
+  timing: string | null,
+  timings: string | null,
+  frequency: string
+): string {
+  return `${peptideName}|${doseAmount}|${doseUnit}|${timing ?? ''}|${timings ?? ''}|${frequency}`
+}
+
 function buildInsightsPrompt(
   peptideName: string,
   type: string,
@@ -86,6 +100,35 @@ export async function GET(
       return NextResponse.json({ error: 'Protocol not found' }, { status: 404 })
     }
 
+    const currentHash = buildProtocolHash(
+      protocol.peptide.name,
+      protocol.doseAmount,
+      protocol.doseUnit,
+      protocol.timing,
+      protocol.timings,
+      protocol.frequency
+    )
+
+    // Check cache first
+    const cached = await prisma.protocolInsightCache.findUnique({
+      where: { protocolId: id },
+    })
+
+    if (cached) {
+      const age = Date.now() - cached.computedAt.getTime()
+      if (age < CACHE_TTL_MS && cached.protocolHash === currentHash) {
+        // Cache hit — return immediately
+        const insights = JSON.parse(cached.insightJson)
+        return NextResponse.json(insights, {
+          headers: {
+            'Cache-Control': 'private, max-age=86400',
+            'X-Cache': 'HIT',
+          },
+        })
+      }
+    }
+
+    // Cache miss or stale — call OpenAI
     const prompt = buildInsightsPrompt(
       protocol.peptide.name,
       protocol.peptide.type || 'peptide',
@@ -129,9 +172,25 @@ export async function GET(
       )
     }
 
+    // Store in cache (upsert)
+    await prisma.protocolInsightCache.upsert({
+      where: { protocolId: id },
+      update: {
+        insightJson: JSON.stringify(insights),
+        protocolHash: currentHash,
+        computedAt: new Date(),
+      },
+      create: {
+        protocolId: id,
+        insightJson: JSON.stringify(insights),
+        protocolHash: currentHash,
+      },
+    })
+
     return NextResponse.json(insights, {
       headers: {
-        'Cache-Control': 'private, max-age=3600', // 1 hour cache - insights don't change often
+        'Cache-Control': 'private, max-age=86400',
+        'X-Cache': 'MISS',
       },
     })
   } catch (error) {

@@ -4,7 +4,7 @@ import { useState, useCallback, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
 import { format, differenceInDays } from 'date-fns'
-import { Plus, Play, Pause, Infinity, Syringe, Pill } from 'lucide-react'
+import { Plus, Play, Pause, Infinity, Syringe, Pill, Sparkles } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -122,6 +122,25 @@ interface ProtocolWithPeptide extends Protocol {
 
 type TypeFilter = 'all' | ItemType
 
+interface EvidenceVerdictData {
+  protocolId: string
+  verdict: string
+  daysOnProtocol: number
+  primaryEffect?: string
+  confidenceScore?: number
+}
+
+const VERDICT_DISPLAY: Record<string, { label: string; color: string; icon?: string }> = {
+  strong_positive: { label: 'Working', color: 'bg-[var(--success-muted)] text-[var(--success)]' },
+  likely_positive: { label: 'Positive', color: 'bg-[var(--success-muted)] text-[var(--success)]' },
+  weak_positive: { label: 'Signal', color: 'bg-[var(--accent-muted)] text-[var(--accent)]' },
+  accumulating: { label: 'Building...', color: 'bg-[var(--warning-muted)] text-[var(--warning)]' },
+  too_early: { label: 'Too early', color: 'bg-[var(--muted)] text-[var(--muted-foreground)]' },
+  no_detectable_effect: { label: 'No effect', color: 'bg-[var(--muted)] text-[var(--muted-foreground)]' },
+  possible_negative: { label: 'Watch', color: 'bg-[var(--danger-muted)] text-[var(--danger)]' },
+  confounded: { label: 'Unclear', color: 'bg-[var(--muted)] text-[var(--muted-foreground)]' },
+}
+
 export default function ProtocolsPage() {
   const { currentUserId } = useAppStore()
   const queryClient = useQueryClient()
@@ -138,6 +157,34 @@ export default function ProtocolsPage() {
     },
     staleTime: 1000 * 60 * 5, // 5 minutes - pull to refresh for updates
   })
+
+  // Fetch evidence verdicts for protocols (silent - doesn't block rendering)
+  const { data: evidenceData } = useQuery<EvidenceVerdictData[]>({
+    queryKey: ['protocol-evidence'],
+    queryFn: async () => {
+      const res = await fetch('/api/health/evidence')
+      if (!res.ok) return []
+      const json = await res.json()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (json.evidence || json || []).map((e: any) => ({
+        protocolId: e.protocolId as string,
+        verdict: e.verdict as string,
+        daysOnProtocol: e.daysOnProtocol as number,
+        primaryEffect: e.primaryEffect as string | undefined,
+        confidenceScore: (e.overallConfidence?.score ?? e.confidenceScore) as number | undefined,
+      }))
+    },
+    staleTime: 1000 * 60 * 5,
+    enabled: !!currentUserId && protocols.length > 0,
+  })
+
+  const evidenceByProtocol = useMemo(() => {
+    const map = new Map<string, EvidenceVerdictData>()
+    for (const e of evidenceData || []) {
+      map.set(e.protocolId, e)
+    }
+    return map
+  }, [evidenceData])
 
   const handleRefresh = useCallback(async () => {
     await refetch()
@@ -353,6 +400,18 @@ export default function ProtocolsPage() {
                                 {penUnits}u
                               </span>
                             )}
+                            {/* Evidence verdict badge */}
+                            {protocol.status === 'active' && evidenceByProtocol.get(protocol.id) && (() => {
+                              const ev = evidenceByProtocol.get(protocol.id)!
+                              const display = VERDICT_DISPLAY[ev.verdict]
+                              if (!display) return null
+                              return (
+                                <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-0.5', display.color)}>
+                                  <Sparkles className="w-2.5 h-2.5" />
+                                  {display.label}
+                                </span>
+                              )
+                            })()}
                           </div>
                           <div className="text-sm text-[var(--muted-foreground)] mt-0.5">
                             {protocol.servingSize
