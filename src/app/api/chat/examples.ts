@@ -371,7 +371,139 @@ export const FEW_SHOT_EXAMPLES: FewShotExample[] = [
     },
   },
 
-  // ── 12. Protocol with missing dose source ──
+  // ── 12. Health-aware: "How am I doing?" with pillar data ──
+  {
+    label: 'health_overview_with_pillars',
+    user_message: 'How am I doing overall?',
+    context_summary:
+      'Health scores: Overall 62/100, Sleep 48, Recovery 55, Activity 72, Body Comp 71. Key trends: HRV -8.3% (declining), deep sleep -12.1% (declining), steps +15.2% (improving). Recovery domain: 55/100 (declining, medium confidence). Active: BPC-157 500mcg daily (21d on protocol, likely_positive verdict). 30-day adherence: 82%.',
+    response: {
+      acknowledgment:
+        'Your overall health score is 62/100, with some areas doing well and others needing attention.',
+      assumptions: [],
+      questions: [],
+      recommendation_paragraphs: [
+        'The good news: your Activity score is strong at 72 and your step count is up 15% — that momentum is working for you. Your BPC-157 protocol is showing a likely positive verdict after 21 days, which aligns with the typical 3-6 week window for measurable effects.',
+        'The concern is your Recovery at 55 and declining. Your HRV is down 8% and deep sleep dropped 12% over the past month. These two signals often move together — when deep sleep suffers, HRV follows. This is likely limiting the full benefit you could be getting from BPC-157, since tissue repair happens primarily during deep sleep.',
+        'I would focus on sleep quality before adding anything new to your stack. Small changes like consistent bed/wake times and reducing screen exposure 60 minutes before bed can move deep sleep meaningfully within 1-2 weeks.',
+      ],
+      timeline_notes: [
+        'Sleep improvements: expect HRV to follow within 5-10 days of better deep sleep',
+        'BPC-157: continue current protocol — effects compound through week 6',
+      ],
+      watch_for: [
+        'Track your HRV trend over the next 2 weeks — it should stabilize or improve if sleep quality improves',
+        'Deep sleep percentage — aim for above 15% of total sleep time',
+        'If Recovery continues declining despite sleep improvements, that warrants reassessment',
+      ],
+      caveat:
+        'These scores reflect trends, not absolutes — focus on the direction of change rather than the exact numbers.',
+    },
+  },
+
+  // ── 13. Protocol effectiveness question with evidence data ──
+  {
+    label: 'protocol_effectiveness_with_evidence',
+    user_message: 'Is my BPC-157 working?',
+    context_summary:
+      'Active: BPC-157 500mcg daily subQ (28d on protocol). Evidence: likely_positive verdict (72/100). Primary effect: HRV improving +6.2%. Mechanisms: Parasympathetic Recovery. Phase: building. Recovery domain: 58/100 (stable). Adherence: 91%.',
+    response: {
+      acknowledgment:
+        'Based on 28 days of data, your BPC-157 protocol is showing a likely positive verdict with a score of 72/100.',
+      assumptions: [
+        'Comparing your metrics from before the protocol to the last 2 weeks',
+        'No major confounding changes (new supplements, illness, travel) during this period',
+      ],
+      questions: [],
+      recommendation_paragraphs: [
+        'The strongest signal is your HRV, which has improved 6.2% since starting. The system detected a "Parasympathetic Recovery" mechanism pattern, which means your autonomic nervous system is responding — this is exactly what you want to see with BPC-157 for tissue repair.',
+        'You are in the "building" phase right now. This means the initial loading period is over and the compound is accumulating therapeutic effect. Weeks 4-6 are typically when users report the most noticeable functional improvements — reduced pain, better range of motion, faster recovery between workouts.',
+        'Your adherence at 91% is excellent and directly supports consistent tissue-level concentration. Keep it up through week 6 before deciding whether to extend or taper.',
+      ],
+      timeline_notes: [
+        'Weeks 4-6 (now): expect most noticeable functional improvements',
+        'Week 6-8: reassess whether to continue based on symptom improvement',
+      ],
+      watch_for: [
+        'Continued HRV improvement — if it plateaus, the protocol may be reaching peak benefit',
+        'Functional markers: pain levels, range of motion, recovery time between sessions',
+        'Any injection site reactions or new symptoms — report to your clinician',
+      ],
+      caveat:
+        'A "likely positive" verdict means the data supports benefit, but individual response varies — track how you feel alongside the numbers.',
+    },
+  },
+
+  // ── 14. Multi-signal health concern ──
+  {
+    label: 'health_concern_multi_signal',
+    user_message: 'My sleep has been terrible lately.',
+    context_summary:
+      'Sleep domain: 38/100 (declining, high confidence). Drivers: sleep_duration -18% vs baseline, deep_sleep -22% vs baseline, sleep_efficiency -9% vs baseline. Recovery domain: 44/100 (declining). RHR: +5.1% (worsening). Active: Magnesium glycinate 400mg evening (adherence: 52%). Today status: recovery_priority.',
+    response: {
+      acknowledgment:
+        'Your sleep score is at 38/100 and declining — the data confirms what you are feeling.',
+      assumptions: [
+        'No recent changes to sleep environment or schedule',
+      ],
+      questions: [
+        'Has anything changed recently — stress, travel, screen habits, or a new supplement/medication?',
+      ],
+      recommendation_paragraphs: [
+        'Three signals are converging: sleep duration is down 18%, deep sleep dropped 22%, and sleep efficiency fell 9%. Your resting heart rate is also up 5%, which often tracks with poor sleep — when you do not recover overnight, your cardiovascular system stays elevated.',
+        'One thing that stands out: your Magnesium glycinate adherence is at 52%. Magnesium is one of the most evidence-backed supplements for sleep quality (Grade A), but it needs consistent daily use to maintain effective levels. At 52%, you are below the threshold where most people see a difference. Getting to 80%+ adherence should be the first thing to fix.',
+        'Your daily status is flagged as "recovery priority" today, which means your system is suggesting you prioritize rest over intense training.',
+      ],
+      timeline_notes: [
+        'If adherence improves to 80%+: expect sleep improvements within 5-7 days',
+        'Deep sleep percentage should respond within 1-2 weeks of consistent magnesium',
+      ],
+      watch_for: [
+        'Track magnesium adherence this week — anchor it to an existing bedtime habit',
+        'Monitor your RHR trend — it should come down as sleep improves',
+        'If sleep does not improve after 2 weeks at 80%+ adherence, we should explore other factors',
+        'Sleep efficiency below 80% suggests time-in-bed may be too high relative to actual sleep',
+      ],
+      caveat:
+        'Sleep is the highest-leverage health behavior — fixing it often improves Recovery, HRV, and protocol effectiveness simultaneously.',
+    },
+  },
+
+  // ── 15. Lab results with cross-signal analysis ──
+  {
+    label: 'lab_cross_signal_analysis',
+    user_message: 'My labs just came back. What do you think?',
+    context_summary:
+      'Lab: Quest Diagnostics | 2/1/2026 (12d ago). 18 markers: 12 optimal, 4 normal, 2 flagged. Flagged: Testosterone 340 ng/dL (low) [ref: 264-916], Vitamin D 22 ng/mL (low) [ref: 30-100]. Recovery domain: 50/100 (declining). HRV: declining -6%. Sleep: 52/100. Active: BPC-157 500mcg daily (35d). No Vitamin D protocol active.',
+    response: {
+      acknowledgment:
+        'Your labs from Quest show 12 of 18 markers optimal, which is solid — but two flagged values deserve attention.',
+      assumptions: [
+        'This was a fasting morning blood draw',
+        'No testosterone-related protocols currently active',
+      ],
+      questions: [],
+      recommendation_paragraphs: [
+        'Testosterone at 340 ng/dL is within the reference range but on the lower end. Combined with your declining Recovery score (50/100) and HRV dropping 6%, this paints a pattern — your body may be under-recovering. Poor sleep (your Sleep score is 52) directly suppresses testosterone production, so this could be a downstream effect rather than a standalone issue.',
+        'Vitamin D at 22 ng/mL is below the optimal range of 30-100. This is one of the easiest wins — supplementing 5000 IU daily with a fat-containing meal typically brings levels into the 40-60 range within 6-8 weeks. Low Vitamin D also contributes to poor sleep quality and immune function, so addressing it may help your overall Recovery picture.',
+        'I would prioritize: (1) Add Vitamin D 5000 IU daily, (2) Focus on sleep quality to support testosterone, (3) Retest in 6-8 weeks to see if testosterone improves with better recovery. If it does not, that warrants a conversation with your clinician about further investigation.',
+      ],
+      timeline_notes: [
+        'Vitamin D: retest in 6-8 weeks — expect levels to reach 40-60 ng/mL',
+        'Testosterone: retest in 8-12 weeks — may improve with better sleep and Vitamin D',
+      ],
+      watch_for: [
+        'Fatigue, low motivation, poor workout recovery — symptoms of low testosterone',
+        'Track your sleep score and HRV trend — if they improve, testosterone often follows',
+        'Vitamin D should be taken with a fat-containing meal for absorption',
+        'If testosterone does not improve after addressing sleep and Vitamin D, discuss with your clinician',
+      ],
+      caveat:
+        'Lab values in isolation are snapshots — the combination of labs, wearable trends, and how you feel tells the complete story.',
+    },
+  },
+
+  // ── 16. Protocol with missing dose source ──
   {
     label: 'dosing_no_source',
     user_message: 'I want to start a GHK-Cu protocol. What dose should I use?',
@@ -407,12 +539,15 @@ export function buildFewShotMessages(): Array<{
 }> {
   const messages: Array<{ role: 'user' | 'assistant'; content: string }> = []
 
-  // Include 4 diverse examples (balancing quality with token cost)
+  // Include 6 diverse examples (GPT-4o handles the extra context well)
+  // Mix of classic patterns + health-aware reasoning with pillar/evidence data
   const selected = [
-    FEW_SHOT_EXAMPLES[0], // missing timeline
-    FEW_SHOT_EXAMPLES[1], // full context
-    FEW_SHOT_EXAMPLES[4], // side effects
-    FEW_SHOT_EXAMPLES[9], // vague question
+    FEW_SHOT_EXAMPLES[0],  // missing timeline — ask questions + conditional
+    FEW_SHOT_EXAMPLES[1],  // full context — direct answer
+    FEW_SHOT_EXAMPLES[4],  // side effects — safety pattern
+    FEW_SHOT_EXAMPLES[9],  // vague question — clarification pattern
+    FEW_SHOT_EXAMPLES[11], // health overview — pillar scores + trends
+    FEW_SHOT_EXAMPLES[13], // sleep concern — multi-signal analysis
   ]
 
   for (const ex of selected) {

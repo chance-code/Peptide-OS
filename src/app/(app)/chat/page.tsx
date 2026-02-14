@@ -5,11 +5,22 @@ import { Send, Bot, User, Loader2, Trash2, Sparkles } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { cn } from '@/lib/utils'
 
+interface StructuredResponse {
+  acknowledgment: string
+  assumptions: string[]
+  questions: string[]
+  recommendation_paragraphs: string[]
+  timeline_notes: string[]
+  watch_for: string[]
+  caveat: string
+}
+
 interface Message {
   id: string
   role: 'user' | 'assistant'
   content: string
   timestamp: string
+  structured?: StructuredResponse | null
 }
 
 const WELCOME_MESSAGE: Message = {
@@ -125,6 +136,66 @@ function renderMarkdown(text: string) {
   return <div className="space-y-0">{elements}</div>
 }
 
+function renderStructured(response: StructuredResponse) {
+  return (
+    <div className="space-y-3">
+      {/* Acknowledgment */}
+      <p className="font-medium">{response.acknowledgment}</p>
+
+      {/* Assumptions */}
+      {response.assumptions.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground)] mb-1">Assuming</p>
+          <ul className="list-disc list-inside space-y-0.5 text-sm text-[var(--muted-foreground)]">
+            {response.assumptions.map((a, i) => <li key={i}>{a}</li>)}
+          </ul>
+        </div>
+      )}
+
+      {/* Questions */}
+      {response.questions.length > 0 && (
+        <div className="border-l-2 border-[var(--accent)] pl-3">
+          {response.questions.map((q, i) => (
+            <p key={i} className="text-sm">{q}</p>
+          ))}
+        </div>
+      )}
+
+      {/* Recommendation paragraphs */}
+      {response.recommendation_paragraphs.map((p, i) => (
+        <p key={i} className="text-sm leading-relaxed">{p}</p>
+      ))}
+
+      {/* Timeline notes */}
+      {response.timeline_notes.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground)] mb-1">Timeline</p>
+          <ul className="space-y-0.5 text-sm">
+            {response.timeline_notes.map((t, i) => <li key={i}>&#8226; {t}</li>)}
+          </ul>
+        </div>
+      )}
+
+      {/* Watch for */}
+      {response.watch_for.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-[var(--muted-foreground)] mb-1">Watch for</p>
+          <ul className="space-y-0.5 text-sm">
+            {response.watch_for.map((w, i) => <li key={i}>&#8226; {w}</li>)}
+          </ul>
+        </div>
+      )}
+
+      {/* Caveat */}
+      {response.caveat && (
+        <p className="text-xs text-[var(--muted-foreground)] italic border-t border-[var(--border)] pt-2 mt-2">
+          {response.caveat}
+        </p>
+      )}
+    </div>
+  )
+}
+
 export default function ChatPage() {
   const { currentUserId } = useAppStore()
   const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE])
@@ -208,6 +279,7 @@ export default function ChatPage() {
         role: 'assistant',
         content: data.reply || 'Sorry, something went wrong.',
         timestamp: new Date().toISOString(),
+        structured: data.structured || null,
       }
 
       setMessages((prev) => [...prev, assistantMessage])
@@ -293,7 +365,9 @@ export default function ChatPage() {
               )}
             >
               {message.role === 'assistant' ? (
-                renderMarkdown(message.content)
+                message.structured
+                  ? renderStructured(message.structured)
+                  : renderMarkdown(message.content)
               ) : (
                 <div className="whitespace-pre-wrap">{message.content}</div>
               )}

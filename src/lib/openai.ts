@@ -7,7 +7,7 @@ export function getOpenAI(): OpenAI {
   if (!openai) {
     openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
-      timeout: 15000, // 15 second timeout
+      timeout: 25000, // 25 second timeout (gpt-4o needs more time)
       maxRetries: 2,  // Retry up to 2 times on transient errors
     })
   }
