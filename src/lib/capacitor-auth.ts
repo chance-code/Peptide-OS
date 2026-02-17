@@ -9,7 +9,7 @@
  * then exchanged for session cookies in the WKWebView.
  */
 
-const BASE_URL = 'https://peptide-os.vercel.app'
+const BASE_URL = 'https://peptide-os-production.up.railway.app'
 
 // Check if we're running in Capacitor
 export function isCapacitor(): boolean {

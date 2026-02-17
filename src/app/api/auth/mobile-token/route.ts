@@ -17,7 +17,7 @@ export async function GET() {
   const session = await getServerSession(authOptions)
 
   if (!session?.user) {
-    const loginUrl = `${process.env.NEXTAUTH_URL || 'https://peptide-os.vercel.app'}/login?error=no_session`
+    const loginUrl = `${process.env.NEXTAUTH_URL || 'https://peptide-os-production.up.railway.app'}/login?error=no_session`
     return NextResponse.redirect(loginUrl)
   }
 

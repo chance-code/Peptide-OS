@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 
-// Lazy initialize to avoid build-time errors
-let openai: OpenAI | null = null
-function getOpenAI() {
-  if (!openai) {
-    openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+// Create a new OpenAI client per request to avoid stale/cached state
+// and ensure the current env var value is always used.
+function createOpenAI() {
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) {
+    throw new Error('OPENAI_API_KEY environment variable is not configured')
   }
-  return openai
+  return new OpenAI({ apiKey })
 }
 
 const NUTRITION_ESTIMATE_PROMPT = `You are a nutrition expert. Analyze the food and estimate macronutrients.
@@ -52,6 +53,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const client = createOpenAI()
+
     const userContent: OpenAI.Chat.Completions.ChatCompletionContentPart[] = []
 
     if (description) {
@@ -77,13 +80,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const response = await getOpenAI().chat.completions.create({
-      model: 'gpt-4o',
+    // Use gpt-4o-mini: 16x cheaper than gpt-4o, excellent for nutrition estimation.
+    // gpt-4o-mini handles both text and image inputs.
+    const response = await client.chat.completions.create({
+      model: 'gpt-4o-mini',
       messages: [
         { role: 'system', content: NUTRITION_ESTIMATE_PROMPT },
         { role: 'user', content: userContent }
       ],
-      max_tokens: 500,
+      max_completion_tokens: 500,
       temperature: 0.1,
     })
 
@@ -106,11 +111,37 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(result)
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Nutrition estimate error:', error)
-    return NextResponse.json(
-      { error: 'Failed to estimate nutrition' },
-      { status: 500 }
-    )
+
+    // Surface actionable error details instead of swallowing them
+    let message = 'Failed to estimate nutrition'
+    let status = 500
+
+    if (error instanceof OpenAI.APIError) {
+      status = error.status || 500
+      const detail = typeof error.error === 'object' && error.error !== null
+        ? JSON.stringify(error.error)
+        : error.message
+      console.error('OpenAI API error detail:', detail)
+      if (error.status === 401) {
+        message = 'OpenAI API key is invalid or expired'
+      } else if (error.status === 429) {
+        message = `OpenAI rate limit: ${error.message}`
+        status = 429
+      } else if (error.status === 402) {
+        message = 'OpenAI API billing issue — check account credits'
+      } else {
+        message = `OpenAI API error: ${error.message}`
+      }
+    } else if (error instanceof Error) {
+      if (error.message.includes('OPENAI_API_KEY')) {
+        message = 'Server configuration error: API key not set'
+      } else {
+        message = error.message
+      }
+    }
+
+    return NextResponse.json({ error: message }, { status })
   }
 }

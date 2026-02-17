@@ -5,13 +5,13 @@ const config: CapacitorConfig = {
   appName: 'Arc Protocol Web',
   webDir: 'out',
   server: {
-    // Load from Vercel in production (your app has API routes that need a server)
-    url: 'https://peptide-os.vercel.app',
+    // Load from Railway in production (your app has API routes that need a server)
+    url: 'https://peptide-os-production.up.railway.app',
     cleartext: false,
     // Allow navigation to OAuth providers and back
     allowNavigation: [
-      'peptide-os.vercel.app',
-      '*.vercel.app',
+      'peptide-os-production.up.railway.app',
+      '*.railway.app',
       'accounts.google.com',
       '*.google.com',
       'appleid.apple.com',

@@ -122,10 +122,16 @@ export async function buildRichHealthContext(userId: string): Promise<RichHealth
   // 8. Lab context
   sections.push(buildLabContext(labUpload, labResult))
 
-  // 9. Inventory
+  // 9. Nutrition (energy balance from wearable data)
+  const nutritionSection = await buildNutritionSection(userId, today)
+  if (nutritionSection) {
+    sections.push(nutritionSection)
+  }
+
+  // 10. Inventory
   sections.push(buildInventorySection(inventory, today))
 
-  // 10. Action items (from Brain)
+  // 11. Action items (from Brain)
   if (brainSnapshot?.actionItems && brainSnapshot.actionItems.length > 0) {
     sections.push(buildActionItemsSection(brainSnapshot.actionItems))
   }
@@ -498,6 +504,48 @@ function buildInventorySection(
   })
 
   return `Inventory: ${items.join('; ')}`
+}
+
+async function buildNutritionSection(userId: string, today: Date): Promise<string | null> {
+  try {
+    const todayStart = startOfDay(today)
+    const todayEnd = endOfDay(today)
+
+    const metrics = await prisma.healthMetric.findMany({
+      where: {
+        userId,
+        metricType: { in: ['active_calories', 'basal_calories'] },
+        recordedAt: { gte: todayStart, lte: todayEnd },
+      },
+      orderBy: { recordedAt: 'desc' },
+    })
+
+    if (metrics.length === 0) return null
+
+    const activeCal = metrics.find(m => m.metricType === 'active_calories')
+    const basalCal = metrics.find(m => m.metricType === 'basal_calories')
+
+    const parts: string[] = ["Today's nutrition/energy:"]
+
+    if (activeCal) {
+      parts.push(`  Active calories burned: ${Math.round(activeCal.value)} kcal`)
+    }
+    if (basalCal) {
+      parts.push(`  Basal metabolic rate: ${Math.round(basalCal.value)} kcal`)
+    }
+    if (activeCal && basalCal) {
+      const total = Math.round(activeCal.value + basalCal.value)
+      parts.push(`  Total energy expenditure: ${total} kcal`)
+    }
+
+    // Note: detailed macros (protein, carbs, fats) are sent from the iOS client
+    // via the system message when available. This section covers wearable energy data.
+
+    return parts.length > 1 ? parts.join('\n') : null
+  } catch (e) {
+    console.warn('[Chat] Nutrition data unavailable:', (e as Error).message)
+    return null
+  }
 }
 
 function buildActionItemsSection(

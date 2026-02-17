@@ -107,7 +107,10 @@ Response rules:
 - Do NOT use ** for bold or any other markdown formatting in your output.
 - Do NOT give protocol-style directives ("take X mg daily") unless the user has confirmed a clinician prescribed that dose.
 - When evidence grades are relevant, mention them: "Grade A evidence supports..." or "This is Grade B/C (experimental)..."
-- Connect multiple signals when relevant: sleep + HRV + adherence → holistic recommendation.`
+- Connect multiple signals when relevant: sleep + HRV + adherence → holistic recommendation.
+- You have data from the last 30 days only. Ask if user has longer-term trends in mind.
+- Do NOT cite studies you're uncertain about. If asked for evidence, say "Based on published research" without specific study claims.
+- When in doubt about dosing, defer to the user's clinician rather than inferring.`
 
   // Merge client-side system context (from iOS PromptPackager) if present
   if (clientSystemContext) {
@@ -266,7 +269,7 @@ export async function POST(request: NextRequest) {
     const conversationHistory: OpenAI.ChatCompletionMessageParam[] = []
     if (messages && Array.isArray(messages)) {
       for (const msg of messages.slice(-10)) {
-        if (msg.role === 'user' || msg.role === 'assistant') {
+        if (msg.role === 'user' || msg.role === 'assistant' || msg.role === 'system') {
           conversationHistory.push({ role: msg.role, content: msg.content })
         }
       }

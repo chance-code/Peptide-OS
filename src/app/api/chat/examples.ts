@@ -503,7 +503,43 @@ export const FEW_SHOT_EXAMPLES: FewShotExample[] = [
     },
   },
 
-  // ── 16. Protocol with missing dose source ──
+  // ── 16. Evidence-based protocol progress assessment ──
+  {
+    label: 'evidence_based_protocol_progress',
+    user_message:
+      'My BPC-157 has been going for 4 weeks. Is it actually working?',
+    context_summary:
+      'Active: BPC-157 500mcg daily (28d, likely_positive verdict 72/100). Primary effect: HRV improving +6.2%. Recovery domain: 58/100. Adherence: 88%.',
+    response: {
+      acknowledgment:
+        'Four weeks in, your data is telling a clear story — BPC-157 is showing a likely positive verdict at 72/100.',
+      assumptions: [
+        'No major confounding changes (new supplements, illness, travel) during this period',
+        'HRV improvement is the primary tracked signal for this protocol',
+      ],
+      questions: [],
+      recommendation_paragraphs: [
+        'The strongest signal is your HRV, which is up 6.2% since you started. That lines up with the "Parasympathetic Recovery" mechanism pattern the system detected — your autonomic nervous system is responding to the tissue-repair signaling. This is a textbook BPC-157 response at the 4-week mark.',
+        'Your Recovery domain is at 58/100, which is moderate. The HRV improvement suggests this should continue climbing over the next 2 weeks if you maintain your current 88% adherence. Weeks 4-6 are typically when users report the most noticeable functional improvements — less pain, better range of motion, faster bounce-back between sessions.',
+        'Based on published research, BPC-157 tissue repair effects compound with consistent dosing through week 6-8. I would continue your current protocol through at least week 6 before making any changes.',
+      ],
+      timeline_notes: [
+        'Weeks 4-6 (now): peak functional improvement window',
+        'Week 6-8: reassess based on symptom trajectory and Recovery score trend',
+        'If Recovery domain climbs above 65/100, the protocol is clearly delivering',
+      ],
+      watch_for: [
+        'HRV trend — if it plateaus or reverses, the protocol may be reaching peak benefit',
+        'Recovery domain trajectory — watch for it to cross 65/100 in the next 2 weeks',
+        'Functional markers you can feel: pain levels, range of motion, post-workout soreness duration',
+        'Any new side effects — report to your clinician',
+      ],
+      caveat:
+        'A 72/100 verdict is encouraging but not conclusive — continue tracking and reassess at week 6 with your clinician.',
+    },
+  },
+
+  // ── 17. Protocol with missing dose source ──
   {
     label: 'dosing_no_source',
     user_message: 'I want to start a GHK-Cu protocol. What dose should I use?',
@@ -539,7 +575,7 @@ export function buildFewShotMessages(): Array<{
 }> {
   const messages: Array<{ role: 'user' | 'assistant'; content: string }> = []
 
-  // Include 6 diverse examples (GPT-4o handles the extra context well)
+  // Include 7 diverse examples (GPT-4o handles the extra context well)
   // Mix of classic patterns + health-aware reasoning with pillar/evidence data
   const selected = [
     FEW_SHOT_EXAMPLES[0],  // missing timeline — ask questions + conditional
@@ -548,6 +584,7 @@ export function buildFewShotMessages(): Array<{
     FEW_SHOT_EXAMPLES[9],  // vague question — clarification pattern
     FEW_SHOT_EXAMPLES[11], // health overview — pillar scores + trends
     FEW_SHOT_EXAMPLES[13], // sleep concern — multi-signal analysis
+    FEW_SHOT_EXAMPLES[15], // evidence-based protocol progress assessment
   ]
 
   for (const ex of selected) {
