@@ -69,7 +69,8 @@ This file defines the workflow gates and defaults Claude Code must follow on eve
 - **AI**: OpenAI GPT-4o for insights/chat
 - **Push notifications**: APNs (HTTP/2 with JWT), Web Push (VAPID)
 - **Mobile wrapper**: Capacitor 8 for iOS native
-- **Deployment**: Vercel (Hobby plan, daily cron only)
+- **Deployment**: Railway (production backend, auto-deploy on push)
+- **Cron**: `node-cron` in `src/lib/cron.ts`, registered via `src/instrumentation.ts`
 
 ### Project Structure
 
@@ -128,7 +129,8 @@ ios-native/
 - Database: `npx prisma studio` (GUI), `npx prisma migrate dev` (migrations)
 
 ### Deploy
-- `vercel --prod` (deploy to production)
+- Production deploys via Railway (auto-deploy on push to main)
+- Cron jobs run in-process via `node-cron` (see `src/lib/cron.ts`)
 
 ---
 
@@ -262,8 +264,8 @@ The app must clearly show:
 
 After ANY file modification:
 1. `npm run build` - Verify no errors
-2. `vercel --prod` - Deploy immediately
-3. Confirm deployment URL in output
+2. Push to `main` — Railway auto-deploys on push
+3. Verify deployment at https://peptide-os-production.up.railway.app
 4. If iOS changes: `npx cap sync ios` + xcodebuild
 
 **Do NOT end a task without deploying.** If build fails, fix it before moving on.
@@ -277,7 +279,7 @@ After ANY file modification:
 3. **Date queries** - use `startOfDay()`/`endOfDay()` from date-fns
 4. **Don't over-engineer** - simple > clever
 5. **NextResponse.redirect() doesn't work with custom URL schemes** - use HTML page with `window.location.href` instead
-6. **Vercel Hobby plan** - cron limited to daily, no `*/15` schedules
+6. **Cron jobs** - managed in `src/lib/cron.ts` via `node-cron`; `vercel.json` crons are legacy/ignored
 7. **`.vercelignore`** - Must exclude `ios/`, `android/`, `brand/`, `.claude/` to avoid 4000+ file uploads
 
 ---
