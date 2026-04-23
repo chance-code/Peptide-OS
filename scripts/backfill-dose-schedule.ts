@@ -13,9 +13,21 @@
 
 import 'dotenv/config'
 import { PrismaClient } from '@prisma/client'
+import { PrismaLibSQL } from '@prisma/adapter-libsql'
+import { createClient } from '@libsql/client'
 import { materializeScheduleForAllActive } from '../src/lib/schedule-materializer'
 
-const prisma = new PrismaClient()
+// Auto-detect Turso (prod) vs local SQLite, mirroring src/lib/prisma.ts.
+const prisma = (() => {
+  if (process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN) {
+    const libsql = createClient({
+      url: process.env.TURSO_DATABASE_URL,
+      authToken: process.env.TURSO_AUTH_TOKEN,
+    })
+    return new PrismaClient({ adapter: new PrismaLibSQL(libsql) })
+  }
+  return new PrismaClient()
+})()
 
 async function main() {
   const beforeCount = await prisma.doseSchedule.count()
