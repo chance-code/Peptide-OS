@@ -1,15 +1,55 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { sendAPNsNotification, isAPNsConfigured } from '@/lib/native-push'
+import { countPendingDoseSlots } from '@/lib/pending-doses'
 
-// Vercel Cron: runs every 15 minutes
-// Checks for users with pending doses and sends reminders based on their configured times
+// Runs every 15 minutes (via node-cron; see src/lib/cron.ts).
+// Checks for users with pending doses and sends reminders at their configured times.
+//
+// Refocus Phase 1.H (2026-04-23):
+//   Pending count now derives from protocols + resolveDose() (cycle + titration aware),
+//   not from pre-existing DoseLog rows. Cycled protocols correctly suppress reminders
+//   on off-phase days; titrated protocols still fire at whatever step is active.
 
 // Check if a configured time (e.g., "08:07") falls within the current 15-minute window
 function timeMatchesWindow(configuredTime: string, windowStartMinute: number): boolean {
   const minute = parseInt(configuredTime.split(':')[1] || '0', 10)
   const roundedConfigMinute = Math.floor(minute / 15) * 15
   return roundedConfigMinute === windowStartMinute
+}
+
+/**
+ * Fetch a user's active protocols (with cycle + titration) + today's completed logs,
+ * then compute how many doses are due-but-not-logged.
+ */
+async function pendingDosesForUser(userId: string, today: Date): Promise<number> {
+  const [protocols, completedLogs] = await Promise.all([
+    prisma.protocol.findMany({
+      where: {
+        userId,
+        status: 'active',
+        startDate: { lte: today },
+        OR: [{ endDate: null }, { endDate: { gte: today } }],
+      },
+      include: {
+        cycle: true,
+        titrationSteps: { orderBy: { weekOffset: 'asc' } },
+      },
+    }),
+    prisma.doseLog.findMany({
+      where: {
+        userId,
+        scheduledDate: {
+          gte: new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())),
+          lt: new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() + 1)),
+        },
+        status: 'completed',
+      },
+      select: { protocolId: true, timing: true },
+    }),
+  ])
+
+  return countPendingDoseSlots(today, protocols, completedLogs)
 }
 
 export async function GET(request: NextRequest) {
@@ -57,19 +97,10 @@ export async function GET(request: NextRequest) {
       const eveningMatch = dt.eveningTime && timeMatchesWindow(dt.eveningTime, roundedMinute)
       if (!morningMatch && !eveningMatch) continue
 
-      // Check for pending doses today
+      // Count pending doses (due per resolveDose minus already-completed)
       const today = new Date()
       today.setUTCHours(0, 0, 0, 0)
-      const tomorrow = new Date(today)
-      tomorrow.setDate(tomorrow.getDate() + 1)
-
-      const pendingDoses = await prisma.doseLog.count({
-        where: {
-          userId: dt.userId,
-          scheduledDate: { gte: today, lt: tomorrow },
-          status: 'pending',
-        },
-      })
+      const pendingDoses = await pendingDosesForUser(dt.userId, today)
 
       if (pendingDoses === 0) continue
 
@@ -107,19 +138,10 @@ export async function GET(request: NextRequest) {
       const eveningMatch = sub.eveningTime && timeMatchesWindow(sub.eveningTime, roundedMinute)
       if (!morningMatch && !eveningMatch) continue
 
-      // Check for pending doses today
+      // Count pending doses (due per resolveDose minus already-completed)
       const today = new Date()
       today.setUTCHours(0, 0, 0, 0)
-      const tomorrow = new Date(today)
-      tomorrow.setDate(tomorrow.getDate() + 1)
-
-      const pendingDoses = await prisma.doseLog.count({
-        where: {
-          userId: sub.userId,
-          scheduledDate: { gte: today, lt: tomorrow },
-          status: 'pending',
-        },
-      })
+      const pendingDoses = await pendingDosesForUser(sub.userId, today)
 
       if (pendingDoses === 0) continue
 
