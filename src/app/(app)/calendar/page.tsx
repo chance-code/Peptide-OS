@@ -295,6 +295,12 @@ export default function CalendarPage() {
             actualUnit: null,
             scheduleId: null,
             timing,
+            // Refocus Phase 1 additions (optimistic-update placeholder; real values arrive on server response)
+            vialId: null,
+            volumeDrawnMl: null,
+            concentrationAtDose: null,
+            injectionSite: null,
+            phase: null,
           }
           return [...prev, newLog]
         }
