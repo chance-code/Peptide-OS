@@ -42,6 +42,12 @@ export const createDoseSchema = z.object({
   actualDose: z.number().positive().nullable().optional(),
   actualUnit: z.string().max(10).nullable().optional(),
   notes: z.string().max(1000).nullable().optional(),
+  // Refocus Phase 1 additions (2026-04-23): vial + site + phase linkage
+  vialId: cuidSchema.nullable().optional(),
+  volumeDrawnMl: z.number().positive().nullable().optional(),
+  concentrationAtDose: z.number().positive().nullable().optional(),
+  injectionSite: z.string().max(30).nullable().optional(),
+  phase: z.string().max(40).nullable().optional(),
 })
 
 // Inventory schemas
