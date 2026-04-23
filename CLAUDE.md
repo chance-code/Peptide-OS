@@ -58,17 +58,20 @@ This file defines the workflow gates and defaults Claude Code must follow on eve
 
 ## 2) Project Map
 
-- **Platform**: iOS (Capacitor 8), Web (Next.js PWA)
+- **Repo location (as of 2026-04-23):** `~/Desktop/Claude Code/Arc Protocol/peptide-os/` (moved from `~/peptide-os/`)
+- **Canonical iOS client:** native Swift app **`ArcProtocolNative`** at `~/Desktop/Claude Code/Arc Protocol/ArcProtocolNative/` — separate repo (github.com/chance-code/arc-protocol-ios), 173K SLOC, actively developed. This is what ships to users.
+- **Legacy iOS wrapper:** Capacitor PWA under `ios/App/` in this repo — stale since 2026-02-02, no longer the shipping client. Do NOT treat Capacitor-specific code paths as canonical.
+- **Platform**: Web (Next.js PWA) + native iOS (via `ArcProtocolNative` over REST). Capacitor wrapper retained only for legacy web-to-native parity until formally removed.
 - **Framework**: Next.js 16 with App Router, TypeScript
 - **Auth**: NextAuth.js (JWT strategy) — Google, Apple, Credentials providers
 - **Database**: PostgreSQL via Prisma ORM
-- **Health data**: Apple HealthKit (via `@flomentumsolutions/capacitor-health-extended`), Oura (OAuth2)
+- **Health data**: Apple HealthKit (native, via `ArcProtocolNative/Managers/HealthKitManager.swift`), Oura (OAuth2)
 - **State management**: Zustand (client), React Query / TanStack Query (server)
 - **UI**: Tailwind CSS, shadcn/ui components
-- **Networking layer**: Next.js API routes, `fetch()` from client
+- **Networking layer**: Next.js API routes, `fetch()` from client (web) + `URLSession` (native iOS)
 - **AI**: OpenAI GPT-4o for insights/chat
 - **Push notifications**: APNs (HTTP/2 with JWT), Web Push (VAPID)
-- **Mobile wrapper**: Capacitor 8 for iOS native
+- **Mobile wrapper**: ~~Capacitor 8 for iOS native~~ — **legacy**; native Swift `ArcProtocolNative` is canonical.
 - **Deployment**: Railway (production backend, auto-deploy on push)
 - **Cron**: `node-cron` in `src/lib/cron.ts`, registered via `src/instrumentation.ts`
 
@@ -295,3 +298,5 @@ This file is a living document. Update it when:
 - 2026-02-03 — Added rule: NextResponse.redirect() fails with custom URL schemes; use HTML page redirect instead
 - 2026-02-03 — Added rule: .vercelignore must exclude ios/android/brand/.claude directories
 - 2026-02-03 — Added rule: Vercel Hobby plan limits cron to daily frequency
+- 2026-04-23 — Repo relocated from `~/peptide-os/` to `~/Desktop/Claude Code/Arc Protocol/peptide-os/`. `~/.railway/config.json` updated to new projectPath.
+- 2026-04-23 — §2 Project Map corrected: the canonical iOS client is the native Swift `ArcProtocolNative` app (separate repo), not the Capacitor wrapper under `ios/App/`. Capacitor is legacy (last touched 2026-02-02). See `~/.claude/plans/enumerated-beaming-emerson.md` for the refocus plan this correction supports.
