@@ -19,11 +19,31 @@ function timeMatchesWindow(configuredTime: string, windowStartMinute: number): b
 }
 
 /**
- * Fetch a user's active protocols (with cycle + titration) + today's completed logs,
- * then compute how many doses are due-but-not-logged.
+ * Count pending doses for a user today by reading from the materialized DoseSchedule.
+ * Refocus Phase 1.J: DoseSchedule is authoritative. Falls back to on-the-fly resolveDose
+ * only when the schedule is empty (protocols pre-materialization).
  */
 async function pendingDosesForUser(userId: string, today: Date): Promise<number> {
-  const [protocols, completedLogs] = await Promise.all([
+  const dayStart = new Date(
+    Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()),
+  )
+  const dayEnd = new Date(
+    Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() + 1),
+  )
+
+  const [scheduleCount, protocols, completedLogs] = await Promise.all([
+    prisma.doseSchedule.count({
+      where: {
+        scheduledDate: { gte: dayStart, lt: dayEnd },
+        protocol: {
+          userId,
+          status: 'active',
+          startDate: { lte: dayEnd },
+          OR: [{ endDate: null }, { endDate: { gte: dayStart } }],
+        },
+      },
+    }),
+    // Still fetch protocols for the fallback path + to count multi-timing correctness
     prisma.protocol.findMany({
       where: {
         userId,
@@ -39,16 +59,29 @@ async function pendingDosesForUser(userId: string, today: Date): Promise<number>
     prisma.doseLog.findMany({
       where: {
         userId,
-        scheduledDate: {
-          gte: new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())),
-          lt: new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() + 1)),
-        },
+        scheduledDate: { gte: dayStart, lt: dayEnd },
         status: 'completed',
       },
       select: { protocolId: true, timing: true },
     }),
   ])
 
+  // Use schedule-based count (fast path) — it reflects the authoritative materialization.
+  // Expand to per-timing slots using protocol.timings metadata, subtract completed logs.
+  if (scheduleCount > 0) {
+    const scheduledProtocolIds = await prisma.doseSchedule.findMany({
+      where: {
+        scheduledDate: { gte: dayStart, lt: dayEnd },
+        protocol: { userId, status: 'active' },
+      },
+      select: { protocolId: true },
+    })
+    const scheduledSet = new Set(scheduledProtocolIds.map((s) => s.protocolId))
+    const protocolsScheduledToday = protocols.filter((p) => scheduledSet.has(p.id))
+    return countPendingDoseSlots(today, protocolsScheduledToday, completedLogs)
+  }
+
+  // Fallback: no materialized rows — derive on the fly
   return countPendingDoseSlots(today, protocols, completedLogs)
 }
 

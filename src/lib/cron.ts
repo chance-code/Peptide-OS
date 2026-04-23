@@ -38,5 +38,9 @@ export function startCronJobs() {
   // Cohort insights — Mondays at 3:00 AM UTC
   cron.schedule('0 3 * * 1', () => callCronEndpoint('/api/cron/cohort-insights', 'POST'))
 
-  console.log('[cron] 4 cron jobs registered')
+  // DoseSchedule rolling-window materialization — daily at 2:00 AM UTC
+  // Refocus Phase 1.J: extends each active protocol's 90-day schedule by 1 day each night.
+  cron.schedule('0 2 * * *', () => callCronEndpoint('/api/cron/schedule-materialize'))
+
+  console.log('[cron] 5 cron jobs registered')
 }

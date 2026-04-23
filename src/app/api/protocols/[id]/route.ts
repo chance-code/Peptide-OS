@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getAuthenticatedUserId } from '@/lib/api-auth'
+import { materializeScheduleForProtocol } from '@/lib/schedule-materializer'
 
 // GET /api/protocols/[id] - Get a single protocol with details
 export async function GET(
@@ -159,24 +160,41 @@ export async function PUT(
       }
     }
 
-    const protocol = await prisma.protocol.update({
-      where: { id },
-      data: updateData,
-      include: {
-        peptide: true,
-      },
-    })
+    // Update + history + rematerialize DoseSchedule atomically when
+    // scheduling-relevant fields change
+    const scheduleRelevantChanged =
+      'startDate' in updateData ||
+      'endDate' in updateData ||
+      'frequency' in updateData ||
+      'customDays' in updateData ||
+      'doseAmount' in updateData ||
+      'doseUnit' in updateData ||
+      'timing' in updateData ||
+      'status' in updateData
 
-    // Create history entry if there were changes
-    if (Object.keys(changes).length > 0) {
-      await prisma.protocolHistory.create({
-        data: {
-          protocolId: id,
-          changeType,
-          changeData: JSON.stringify(changes),
-        },
+    const protocol = await prisma.$transaction(async (tx) => {
+      const p = await tx.protocol.update({
+        where: { id },
+        data: updateData,
+        include: { peptide: true },
       })
-    }
+
+      if (Object.keys(changes).length > 0) {
+        await tx.protocolHistory.create({
+          data: {
+            protocolId: id,
+            changeType,
+            changeData: JSON.stringify(changes),
+          },
+        })
+      }
+
+      if (scheduleRelevantChanged) {
+        await materializeScheduleForProtocol(tx, id)
+      }
+
+      return p
+    })
 
     return NextResponse.json(protocol)
   } catch (error) {

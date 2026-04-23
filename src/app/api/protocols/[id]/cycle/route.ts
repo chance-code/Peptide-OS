@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getAuthenticatedUserId } from '@/lib/api-auth'
 import { protocolCycleSchema, validate } from '@/lib/validations'
+import { materializeScheduleForProtocol } from '@/lib/schedule-materializer'
 
 // 0..1 ProtocolCycle per protocol. Upsert via PUT, clear via DELETE.
 // Also toggles protocol.cycleMode ('cycled' when PUT, 'continuous' when DELETE).
@@ -80,6 +81,9 @@ export async function PUT(
         data: { cycleMode: 'cycled' },
       })
 
+      // Refocus Phase 1.J: cycle changes shift off-phase days → rematerialize
+      await materializeScheduleForProtocol(tx, id)
+
       return cycle
     })
 
@@ -109,6 +113,8 @@ export async function DELETE(
         where: { id },
         data: { cycleMode: 'continuous' },
       })
+      // Protocol reverts to continuous — rematerialize with the new (simpler) schedule
+      await materializeScheduleForProtocol(tx, id)
     })
 
     return NextResponse.json({ ok: true })

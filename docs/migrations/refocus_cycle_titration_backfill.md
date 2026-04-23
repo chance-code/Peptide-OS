@@ -52,6 +52,10 @@ When this refocus ships to Turso, run in this order:
    (Applies `20260423191806_refocus_cycle_titration` — adds new tables + columns, preserves data via SQLite table-rebuild.)
 3. `DATABASE_URL=<turso-libsql-url> TURSO_AUTH_TOKEN=<token> npx tsx scripts/backfill-vial-volume.ts`
    (Backfills `remainingVolumeMl` for production vials.)
-4. Spot-check via `prisma studio` or direct SQL: verify `remainingVolumeMl` is non-null for active peptide vials and within tolerance of `diluentVolume × (remainingAmount/totalAmount)`.
+4. `DATABASE_URL=<turso-libsql-url> TURSO_AUTH_TOKEN=<token> npx tsx scripts/backfill-dose-schedule.ts`
+   (Populates the 90-day DoseSchedule rolling window for every active protocol — refocus Phase 1.J.)
+5. Spot-check via `prisma studio` or direct SQL:
+   - `remainingVolumeMl` is non-null for active peptide vials and within tolerance of `diluentVolume × (remainingAmount/totalAmount)`.
+   - `DoseSchedule` has rows for every active protocol whose `endDate > today()`. The nightly cron `/api/cron/schedule-materialize` keeps the window extending — verify `src/lib/cron.ts` registered it at `0 2 * * *` UTC.
 
 Hold until Phase 2 verification is complete per `~/.claude/plans/enumerated-beaming-emerson.md`.

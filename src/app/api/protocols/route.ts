@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getAuthenticatedUserId } from '@/lib/api-auth'
 import { createProtocolSchema, validate } from '@/lib/validations'
+import { materializeScheduleForProtocol } from '@/lib/schedule-materializer'
 
 // GET /api/protocols - List protocols for the authenticated user
 export async function GET(request: NextRequest) {
@@ -52,46 +53,51 @@ export async function POST(request: NextRequest) {
     if (!auth.success) return auth.response
     const { userId } = auth
 
-    const protocol = await prisma.protocol.create({
-      data: {
-        userId,
-        peptideId: data.peptideId,
-        startDate: new Date(data.startDate),
-        endDate: data.endDate ? new Date(data.endDate) : null,
-        frequency: data.frequency,
-        customDays: data.customDays ? JSON.stringify(data.customDays) : null,
-        doseAmount: data.doseAmount,
-        doseUnit: data.doseUnit,
-        timing: data.timing || null,
-        timings: data.timings || null,
-        notes: data.notes || null,
-        status: 'active',
-        vialAmount: data.vialAmount || null,
-        vialUnit: data.vialUnit || null,
-        diluentVolume: data.diluentVolume || null,
-        servingSize: data.servingSize || null,
-        servingUnit: data.servingUnit || null,
-      },
-      include: {
-        peptide: true,
-      },
-    })
-
-    // Create protocol history entry
-    await prisma.protocolHistory.create({
-      data: {
-        protocolId: protocol.id,
-        changeType: 'created',
-        changeData: JSON.stringify({
+    // Create protocol + history + materialize DoseSchedule atomically
+    const protocol = await prisma.$transaction(async (tx) => {
+      const p = await tx.protocol.create({
+        data: {
+          userId,
           peptideId: data.peptideId,
-          startDate: data.startDate,
-          endDate: data.endDate,
+          startDate: new Date(data.startDate),
+          endDate: data.endDate ? new Date(data.endDate) : null,
           frequency: data.frequency,
+          customDays: data.customDays ? JSON.stringify(data.customDays) : null,
           doseAmount: data.doseAmount,
           doseUnit: data.doseUnit,
-          timing: data.timing,
-        }),
-      },
+          timing: data.timing || null,
+          timings: data.timings || null,
+          notes: data.notes || null,
+          status: 'active',
+          vialAmount: data.vialAmount || null,
+          vialUnit: data.vialUnit || null,
+          diluentVolume: data.diluentVolume || null,
+          servingSize: data.servingSize || null,
+          servingUnit: data.servingUnit || null,
+        },
+        include: { peptide: true },
+      })
+
+      await tx.protocolHistory.create({
+        data: {
+          protocolId: p.id,
+          changeType: 'created',
+          changeData: JSON.stringify({
+            peptideId: data.peptideId,
+            startDate: data.startDate,
+            endDate: data.endDate,
+            frequency: data.frequency,
+            doseAmount: data.doseAmount,
+            doseUnit: data.doseUnit,
+            timing: data.timing,
+          }),
+        },
+      })
+
+      // Refocus Phase 1.J: pre-populate DoseSchedule for the 90-day horizon
+      await materializeScheduleForProtocol(tx, p.id)
+
+      return p
     })
 
     return NextResponse.json(protocol, { status: 201 })

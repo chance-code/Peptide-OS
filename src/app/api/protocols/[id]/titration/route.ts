@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getAuthenticatedUserId } from '@/lib/api-auth'
 import { titrationStepsPutSchema, validate } from '@/lib/validations'
+import { materializeScheduleForProtocol } from '@/lib/schedule-materializer'
 
 // 0..N TitrationStep per protocol. PUT replaces the whole set atomically.
 // Also toggles protocol.cycleMode ('titrated' when PUT with steps, 'continuous' when empty or DELETE).
@@ -91,6 +92,9 @@ export async function PUT(
         data: { cycleMode: steps.length > 0 ? 'titrated' : 'continuous' },
       })
 
+      // Refocus Phase 1.J: titration changes override doses — rematerialize
+      await materializeScheduleForProtocol(tx, id)
+
       return tx.titrationStep.findMany({
         where: { protocolId: id },
         orderBy: { weekOffset: 'asc' },
@@ -123,6 +127,7 @@ export async function DELETE(
         where: { id },
         data: { cycleMode: 'continuous' },
       })
+      await materializeScheduleForProtocol(tx, id)
     })
 
     return NextResponse.json({ ok: true })

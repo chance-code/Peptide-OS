@@ -90,42 +90,62 @@ export async function GET(request: NextRequest) {
     const dayEnd = endOfDay(targetDate)
 
     const today = new Date()
-    // Parallel load: protocols (with cycle + titration), today's logs, inventory, last logged site per protocol
-    const [protocols, existingLogs, allInventory, recentLogsWithSite] = await Promise.all([
-      prisma.protocol.findMany({
-        where: {
-          userId,
-          status: 'active',
-          startDate: { lte: dayEnd },
-          OR: [{ endDate: null }, { endDate: { gte: dayStart } }],
-        },
-        include: {
-          peptide: true,
-          cycle: true,
-          titrationSteps: { orderBy: { weekOffset: 'asc' } },
-        },
-      }),
-      prisma.doseLog.findMany({
-        where: {
-          userId,
-          scheduledDate: { gte: dayStart, lte: dayEnd },
-        },
-      }),
-      prisma.inventoryVial.findMany({
-        where: { userId, isExhausted: false },
-        orderBy: [{ dateReconstituted: 'desc' }, { createdAt: 'desc' }],
-      }),
-      // Last dose-log per protocol that has an injectionSite set — for rotation suggestion
-      prisma.doseLog.findMany({
-        where: {
-          userId,
-          injectionSite: { not: null },
-        },
-        orderBy: { scheduledDate: 'desc' },
-        take: 100, // cap for perf; we only need one per protocol
-        select: { protocolId: true, injectionSite: true, scheduledDate: true },
-      }),
-    ])
+    // Parallel load: scheduled rows for the date, protocols (for metadata), logs, inventory, sites
+    // Refocus Phase 1.J: DoseSchedule is authoritative for "is this due today and at what dose."
+    //   Protocol data still needed for non-scheduling fields (peptide, timings, serving info, site rotation).
+    const [scheduleRows, protocols, existingLogs, allInventory, recentLogsWithSite] =
+      await Promise.all([
+        prisma.doseSchedule.findMany({
+          where: {
+            scheduledDate: { gte: dayStart, lte: dayEnd },
+            protocol: {
+              userId,
+              status: 'active',
+              startDate: { lte: dayEnd },
+              OR: [{ endDate: null }, { endDate: { gte: dayStart } }],
+            },
+          },
+        }),
+        prisma.protocol.findMany({
+          where: {
+            userId,
+            status: 'active',
+            startDate: { lte: dayEnd },
+            OR: [{ endDate: null }, { endDate: { gte: dayStart } }],
+          },
+          include: {
+            peptide: true,
+            cycle: true,
+            titrationSteps: { orderBy: { weekOffset: 'asc' } },
+          },
+        }),
+        prisma.doseLog.findMany({
+          where: {
+            userId,
+            scheduledDate: { gte: dayStart, lte: dayEnd },
+          },
+        }),
+        prisma.inventoryVial.findMany({
+          where: { userId, isExhausted: false },
+          orderBy: [{ dateReconstituted: 'desc' }, { createdAt: 'desc' }],
+        }),
+        // Last dose-log per protocol that has an injectionSite set — for rotation suggestion
+        prisma.doseLog.findMany({
+          where: {
+            userId,
+            injectionSite: { not: null },
+          },
+          orderBy: { scheduledDate: 'desc' },
+          take: 100,
+          select: { protocolId: true, injectionSite: true, scheduledDate: true },
+        }),
+      ])
+
+    // Build a set of protocolIds with a scheduled row for this date → "is due" gate.
+    // Also capture the resolved dose/phase from the schedule row for downstream use.
+    const scheduledByProtocol = new Map<string, (typeof scheduleRows)[number]>(
+      scheduleRows.map((s) => [s.protocolId, s]),
+    )
 
     // Log lookup (protocolId-timing → DoseLog) for today
     const logsByProtocolAndTiming = new Map(
@@ -158,7 +178,7 @@ export async function GET(request: NextRequest) {
     const todayItems: TodayDoseItem[] = []
 
     for (const protocol of protocols) {
-      // Parse customDays from the stored JSON string
+      // Parse customDays from the stored JSON string (for phase/banner metadata even when scheduled)
       let customDaysArr: DayOfWeek[] | undefined
       if (protocol.customDays) {
         try {
@@ -168,17 +188,43 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // Use the shared resolver (handles frequency + cycle + titration)
-      const resolved = resolveDose(targetDate, {
-        startDate: protocol.startDate,
-        frequency: protocol.frequency as FrequencyType,
-        customDays: customDaysArr,
-        cycleMode: (protocol.cycleMode ?? 'continuous') as 'continuous' | 'cycled' | 'titrated',
-        cycle: protocol.cycle,
-        titrationSteps: protocol.titrationSteps,
-        doseAmount: protocol.doseAmount,
-        doseUnit: protocol.doseUnit,
-      })
+      // Primary gate: is this protocol scheduled for today?
+      const scheduleRow = scheduledByProtocol.get(protocol.id)
+
+      // Fallback: if no schedule row exists (new/migrated protocol, cache not yet populated),
+      // compute on-the-fly via resolveDose. This keeps the response correct during the
+      // brief window between protocol create and the first materialization run.
+      let resolved
+      if (scheduleRow) {
+        // Still call resolveDose to get phase + daysUntilNextPhaseBoundary metadata
+        // (these aren't cached in DoseSchedule, only the resolved dose is)
+        resolved = resolveDose(targetDate, {
+          startDate: protocol.startDate,
+          frequency: protocol.frequency as FrequencyType,
+          customDays: customDaysArr,
+          cycleMode: (protocol.cycleMode ?? 'continuous') as 'continuous' | 'cycled' | 'titrated',
+          cycle: protocol.cycle,
+          titrationSteps: protocol.titrationSteps,
+          // Prefer the materialized doseAmount (correct for titration windows)
+          doseAmount: scheduleRow.doseAmount,
+          doseUnit: scheduleRow.doseUnit,
+        })
+        // Trust the schedule: force isDue=true even if resolveDose disagrees
+        // (e.g. schedule was materialized yesterday when cycle said on-phase; today
+        //  the user hasn't migrated. Schedule is authoritative.)
+        resolved.isDue = true
+      } else {
+        resolved = resolveDose(targetDate, {
+          startDate: protocol.startDate,
+          frequency: protocol.frequency as FrequencyType,
+          customDays: customDaysArr,
+          cycleMode: (protocol.cycleMode ?? 'continuous') as 'continuous' | 'cycled' | 'titrated',
+          cycle: protocol.cycle,
+          titrationSteps: protocol.titrationSteps,
+          doseAmount: protocol.doseAmount,
+          doseUnit: protocol.doseUnit,
+        })
+      }
 
       if (!resolved.isDue) continue
 
