@@ -45,6 +45,17 @@ describe('isDoseDay — continuous protocol', () => {
     expect(isDoseDay(d('2026-01-07'), 'custom', starts, ['mon', 'wed', 'fri'])).toBe(true) // Wed
     expect(isDoseDay(d('2026-01-05'), 'custom', starts, [])).toBe(false) // empty list
   })
+
+  it('every_other_day: fires on days 0, 2, 4, ... from start', () => {
+    const starts = d('2026-01-01')
+    expect(isDoseDay(d('2026-01-01'), 'every_other_day', starts)).toBe(true) // day 0
+    expect(isDoseDay(d('2026-01-02'), 'every_other_day', starts)).toBe(false) // day 1
+    expect(isDoseDay(d('2026-01-03'), 'every_other_day', starts)).toBe(true) // day 2
+    expect(isDoseDay(d('2026-01-15'), 'every_other_day', starts)).toBe(true) // day 14 (even)
+    expect(isDoseDay(d('2026-01-16'), 'every_other_day', starts)).toBe(false) // day 15 (odd)
+    // Before start
+    expect(isDoseDay(d('2025-12-31'), 'every_other_day', starts)).toBe(false)
+  })
 })
 
 // ────────────────────────────────────────────────────────────────────────────

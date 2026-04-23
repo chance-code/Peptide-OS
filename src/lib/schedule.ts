@@ -102,6 +102,12 @@ export function isDoseDay(
     case 'daily':
       return true
 
+    case 'every_other_day': {
+      // Dose on days 0, 2, 4, ... from protocol start
+      const daysDiff = differenceInDays(targetDate, protocolStart)
+      return daysDiff >= 0 && daysDiff % 2 === 0
+    }
+
     case 'weekly':
       // Same day of week as start date
       return getDay(targetDate) === getDay(protocolStart)

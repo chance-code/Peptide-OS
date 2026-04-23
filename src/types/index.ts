@@ -11,8 +11,8 @@ export type {
   Note,
 } from '@prisma/client'
 
-// Frequency options
-export type FrequencyType = 'daily' | 'weekly' | 'custom'
+// Frequency options (matches validations.ts zod enum)
+export type FrequencyType = 'daily' | 'every_other_day' | 'weekly' | 'custom'
 
 // Protocol status
 export type ProtocolStatus = 'active' | 'paused' | 'completed'
@@ -51,6 +51,15 @@ export interface TodayDoseItem {
   // Serving info - supplements only
   servingSize?: number | null
   servingUnit?: string | null
+  // Refocus Phase 1 additions (2026-04-23): vial + site linkage
+  // Optional for backwards compatibility with iOS clients that don't know about them yet.
+  vialId?: string | null
+  vialLabel?: string | null
+  volumeDrawnMl?: number | null
+  injectionSiteSuggestion?: string | null
+  // Cycle/phase info (peptides with cycleMode='cycled' or 'titrated')
+  phase?: string | null
+  daysUntilNextPhaseBoundary?: number | null
 }
 
 // Adherence stats
