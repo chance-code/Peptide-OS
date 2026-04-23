@@ -31,6 +31,27 @@ export const updateProtocolSchema = createProtocolSchema.partial().extend({
   status: z.enum(['active', 'paused', 'completed']).optional(),
 })
 
+// Protocol cycle (on/off phases) — 2026-04-23 refocus Phase 1
+export const protocolCycleSchema = z.object({
+  onDays: z.number().int().positive().max(365),
+  offDays: z.number().int().nonnegative().max(365),
+  cycleStartDate: dateStringSchema,
+  repeatCount: z.number().int().min(-1).max(100).optional(), // -1 = indefinite
+})
+
+// Titration steps (gradual dose ramp) — 2026-04-23 refocus Phase 1
+export const titrationStepSchema = z.object({
+  stepIndex: z.number().int().nonnegative(),
+  weekOffset: z.number().int().nonnegative().max(520), // 10 years safety bound
+  doseAmount: z.number().positive(),
+  doseUnit: z.enum(['mcg', 'mg', 'IU']),
+  notes: z.string().max(500).nullable().optional(),
+})
+
+export const titrationStepsPutSchema = z.object({
+  steps: z.array(titrationStepSchema).max(52), // 52 weeks = 1 year cap
+})
+
 // Dose schemas
 export const createDoseSchema = z.object({
   userId: cuidSchema,
