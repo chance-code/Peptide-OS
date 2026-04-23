@@ -100,6 +100,10 @@ model Protocol {
   status      String    @default("active") // 'active', 'paused', 'completed'
   pausedAt    DateTime?
 
+  // Cycling / titration (2026-04-23 refocus)
+  cycleMode            String   @default("continuous") // "continuous" | "cycled" | "titrated"
+  siteRotationEnabled  Boolean  @default(false)
+
   notes       String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -111,6 +115,8 @@ model Protocol {
   schedules   DoseSchedule[]
   history     ProtocolHistory[]
   labExpectations ProtocolLabExpectation[]
+  cycle          ProtocolCycle?  // 0..1 when cycleMode="cycled"
+  titrationSteps TitrationStep[] // 0..n when cycleMode="titrated"
 
   // Indexes for query performance
   @@index([userId])
@@ -158,6 +164,13 @@ model DoseLog {
   actualDose   Float?   // If different from scheduled
   actualUnit   String?
 
+  // Vial + site linkage (2026-04-23 refocus)
+  vialId              String?
+  volumeDrawnMl       Float?
+  concentrationAtDose Float?
+  injectionSite       String?  // "left_abdomen" | "right_thigh" | ...
+  phase               String?  // "on" | "off" | "titration_step_0" | ...
+
   notes        String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -166,12 +179,14 @@ model DoseLog {
   user        UserProfile   @relation(fields: [userId], references: [id], onDelete: Cascade)
   protocol    Protocol      @relation(fields: [protocolId], references: [id], onDelete: Cascade)
   schedule    DoseSchedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+  vial        InventoryVial? @relation(fields: [vialId], references: [id], onDelete: SetNull)
 
   // Indexes for query performance
   @@index([userId])
   @@index([userId, scheduledDate])
   @@index([protocolId])
   @@index([protocolId, scheduledDate])
+  @@index([vialId])
 }
 
 // ============================================
@@ -206,6 +221,9 @@ model InventoryVial {
   itemCount       Int?      // Total items (e.g., 60 capsules)
   remainingCount  Int?      // Remaining items
 
+  // Volume tracking (peptides, 2026-04-23 refocus)
+  remainingVolumeMl Float?  // current mL remaining; server decrements on dose log
+
   notes           String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -213,6 +231,8 @@ model InventoryVial {
   // Relations
   user            UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
   peptide         Peptide     @relation(fields: [peptideId], references: [id])
+  doseLogs        DoseLog[]
+  reconstitutions Reconstitution[]
 
   // Indexes for query performance
   @@index([userId])
@@ -243,16 +263,21 @@ model Reconstitution {
   targetUnit    String?  // Unit for target dose
   volumePerDose Float?   // ml to draw for target dose
 
+  // Physical vial linkage (2026-04-23 refocus)
+  inventoryVialId String?  // which physical InventoryVial this recipe produced
+
   notes         String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   // Relations
-  user          UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
-  peptide       Peptide     @relation(fields: [peptideId], references: [id])
+  user          UserProfile    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  peptide       Peptide        @relation(fields: [peptideId], references: [id])
+  vial          InventoryVial? @relation(fields: [inventoryVialId], references: [id], onDelete: SetNull)
 
   // Indexes for query performance
   @@index([userId])
+  @@index([inventoryVialId])
 }
 
 // ============================================
@@ -872,4 +897,42 @@ model InsightEngagement {
 
   @@index([userId, insightId])
   @@index([insightType, action])
+}
+
+// ============================================
+// PROTOCOL CYCLE — on/off phases (2026-04-23 refocus)
+// e.g. BPC-157: onDays=28, offDays=14 (4w on, 2w off, indefinite)
+// ============================================
+model ProtocolCycle {
+  id             String   @id @default(cuid())
+  protocolId     String   @unique           // 0..1 per protocol
+  onDays         Int                         // days in on-phase
+  offDays        Int                         // days in off-phase
+  cycleStartDate DateTime                    // anchors phase math
+  repeatCount    Int      @default(-1)       // -1 = indefinite repeat
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  protocol       Protocol @relation(fields: [protocolId], references: [id], onDelete: Cascade)
+}
+
+// ============================================
+// TITRATION STEP — gradual dose ramp (2026-04-23 refocus)
+// e.g. Retatrutide: week 0 = 2 mg, week 4 = 4 mg, week 8 = 6 mg
+// ============================================
+model TitrationStep {
+  id         String   @id @default(cuid())
+  protocolId String
+  stepIndex  Int                              // 0-based ordering
+  weekOffset Int                              // weeks from protocol start
+  doseAmount Float
+  doseUnit   String                           // 'mcg' | 'mg' | 'IU'
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  protocol   Protocol @relation(fields: [protocolId], references: [id], onDelete: Cascade)
+
+  @@unique([protocolId, stepIndex])
+  @@index([protocolId])
 }
