@@ -39,17 +39,20 @@ export function volumePerDoseMl(
   return Math.round(ml * 1000) / 1000
 }
 
+// 4-site rotation sequence for subcutaneous peptide injection
+const INJECTION_ROTATION = ['left_abdomen', 'right_abdomen', 'left_thigh', 'right_thigh']
+
 /**
- * Suggest the next injection site based on the last logged site for this protocol.
- * Minimal Phase-1 rotation: alternate left ↔ right on the same body part.
+ * Suggest the next injection site by cycling through a 4-site rotation:
+ * left_abdomen → right_abdomen → left_thigh → right_thigh → repeat.
  *
  * Exported for unit testing.
  */
 export function suggestInjectionSite(lastSite: string | null | undefined): string | null {
-  if (!lastSite) return 'left_abdomen' // default starting site
-  if (lastSite.startsWith('left_')) return lastSite.replace('left_', 'right_')
-  if (lastSite.startsWith('right_')) return lastSite.replace('right_', 'left_')
-  return lastSite
+  if (!lastSite) return INJECTION_ROTATION[0]
+  const idx = INJECTION_ROTATION.indexOf(lastSite)
+  if (idx === -1) return INJECTION_ROTATION[0] // unknown site → start from beginning
+  return INJECTION_ROTATION[(idx + 1) % INJECTION_ROTATION.length]
 }
 
 // Sorting: peptides before supplements, then by timing of day
