@@ -228,13 +228,6 @@ export async function DELETE(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    if (protocol.status === 'completed') {
-      return NextResponse.json(
-        { error: 'Cannot delete completed protocols. They are kept for historical records.' },
-        { status: 403 }
-      )
-    }
-
     await prisma.protocol.delete({
       where: { id },
     })
