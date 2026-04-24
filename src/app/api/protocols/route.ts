@@ -53,6 +53,15 @@ export async function POST(request: NextRequest) {
     if (!auth.success) return auth.response
     const { userId } = auth
 
+    // Return existing active/paused protocol for same user+peptide instead of creating a duplicate
+    const existing = await prisma.protocol.findFirst({
+      where: { userId, peptideId: data.peptideId, status: { in: ['active', 'paused'] } },
+      include: { peptide: true },
+    })
+    if (existing) {
+      return NextResponse.json(existing, { status: 200 })
+    }
+
     // Create protocol + history + materialize DoseSchedule atomically
     const protocol = await prisma.$transaction(async (tx) => {
       const p = await tx.protocol.create({
