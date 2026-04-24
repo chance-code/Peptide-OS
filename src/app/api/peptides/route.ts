@@ -82,19 +82,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 })
     }
 
-    // Classify the canonical name for mechanism lookups
-    const canonicalName = await classifyCanonicalName(name)
-
     const peptide = await prisma.peptide.create({
       data: {
         name,
-        canonicalName,
-        type: type || 'peptide', // 'peptide' | 'supplement'
+        canonicalName: null, // classified asynchronously below
+        type: type || 'peptide',
         category,
         description,
         storageNotes,
       },
     })
+
+    // Classify canonical name in the background — never block the response on AI
+    classifyCanonicalName(name)
+      .then(async (canonical) => {
+        if (canonical) {
+          await prisma.peptide.update({ where: { id: peptide.id }, data: { canonicalName: canonical } })
+        }
+      })
+      .catch(() => {})
 
     return NextResponse.json(peptide, { status: 201 })
   } catch (error: unknown) {
