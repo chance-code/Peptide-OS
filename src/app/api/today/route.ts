@@ -231,49 +231,53 @@ export async function GET(request: NextRequest) {
 
       if (!resolved.isDue) continue
 
-      // Active vial (peptides only — supplements use itemCount/remainingCount, no volume math)
-      const activeVial = vialsByPeptide.get(protocol.peptideId)
-      const hasExpiredVial = expiredPeptideIds.has(protocol.peptideId) && !activeVial
+      const itemType = (protocol.peptide.type || 'peptide') as ItemType
 
-      // Volume to draw (peptides w/ reconstituted vial)
+      // Vial/volume/site data — peptides only (medications are oral, no injection math)
       let volumeDrawnMl: number | null = null
       let vialId: string | null = null
       let vialLabel: string | null = null
       let concentration: string | null = null
       let penUnits: number | null = null
+      let injectionSiteSuggestion: string | null = null
+      let hasExpiredVial = false
 
-      if (activeVial && activeVial.concentration && activeVial.totalUnit) {
-        vialId = activeVial.id
-        vialLabel = activeVial.identifier ?? null
-        concentration = `${activeVial.concentration.toFixed(2)} ${activeVial.totalUnit}/mL`
-        volumeDrawnMl = volumePerDoseMl(
-          resolved.doseAmount,
-          resolved.doseUnit,
-          activeVial.concentration,
-          activeVial.totalUnit,
-        )
-        if (volumeDrawnMl !== null) {
-          penUnits = Math.round(volumeDrawnMl * 100)
+      if (itemType !== 'medication') {
+        const activeVial = vialsByPeptide.get(protocol.peptideId)
+        hasExpiredVial = expiredPeptideIds.has(protocol.peptideId) && !activeVial
+
+        if (activeVial && activeVial.concentration && activeVial.totalUnit) {
+          vialId = activeVial.id
+          vialLabel = activeVial.identifier ?? null
+          concentration = `${activeVial.concentration.toFixed(2)} ${activeVial.totalUnit}/mL`
+          volumeDrawnMl = volumePerDoseMl(
+            resolved.doseAmount,
+            resolved.doseUnit,
+            activeVial.concentration,
+            activeVial.totalUnit,
+          )
+          if (volumeDrawnMl !== null) {
+            penUnits = Math.round(volumeDrawnMl * 100)
+          }
+        } else if (protocol.vialAmount && protocol.diluentVolume) {
+          // Legacy fallback: compute from protocol-level reconstitution fields
+          const conc = protocol.vialAmount / protocol.diluentVolume
+          concentration = `${conc.toFixed(2)} ${protocol.vialUnit || 'mg'}/mL`
+          volumeDrawnMl = volumePerDoseMl(
+            resolved.doseAmount,
+            resolved.doseUnit,
+            conc,
+            protocol.vialUnit || null,
+          )
+          if (volumeDrawnMl !== null) {
+            penUnits = Math.round(volumeDrawnMl * 100)
+          }
         }
-      } else if (protocol.vialAmount && protocol.diluentVolume) {
-        // Legacy fallback: compute from protocol-level reconstitution fields
-        const conc = protocol.vialAmount / protocol.diluentVolume
-        concentration = `${conc.toFixed(2)} ${protocol.vialUnit || 'mg'}/mL`
-        volumeDrawnMl = volumePerDoseMl(
-          resolved.doseAmount,
-          resolved.doseUnit,
-          conc,
-          protocol.vialUnit || null,
-        )
-        if (volumeDrawnMl !== null) {
-          penUnits = Math.round(volumeDrawnMl * 100)
-        }
+
+        injectionSiteSuggestion = protocol.siteRotationEnabled
+          ? suggestInjectionSite(lastSiteByProtocol.get(protocol.id))
+          : null
       }
-
-      // Injection site (only when the protocol opts in)
-      const injectionSiteSuggestion = protocol.siteRotationEnabled
-        ? suggestInjectionSite(lastSiteByProtocol.get(protocol.id))
-        : null
 
       // Timings - new JSON array or legacy single timing
       let timingsToProcess: (string | null)[] = [protocol.timing]
@@ -295,7 +299,7 @@ export async function GET(request: NextRequest) {
           protocolId: protocol.id,
           scheduleId: existingLog?.scheduleId || undefined,
           peptideName: protocol.peptide.name,
-          itemType: (protocol.peptide.type || 'peptide') as ItemType,
+          itemType,
           // Use resolved.doseAmount/Unit so titration overrides take effect
           doseAmount: resolved.doseAmount,
           doseUnit: resolved.doseUnit,
@@ -318,8 +322,11 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    const TYPE_ORDER: Record<string, number> = { peptide: 0, supplement: 1, medication: 2 }
     todayItems.sort((a, b) => {
-      if (a.itemType !== b.itemType) return a.itemType === 'peptide' ? -1 : 1
+      const typeA = TYPE_ORDER[a.itemType] ?? 3
+      const typeB = TYPE_ORDER[b.itemType] ?? 3
+      if (typeA !== typeB) return typeA - typeB
       const aOrder = a.timing ? TIMING_ORDER[a.timing.toLowerCase()] || 50 : 50
       const bOrder = b.timing ? TIMING_ORDER[b.timing.toLowerCase()] || 50 : 50
       return aOrder - bOrder

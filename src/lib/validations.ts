@@ -98,7 +98,7 @@ export const updateInventorySchema = createInventorySchema.partial().extend({
 // Peptide schemas
 export const createPeptideSchema = z.object({
   name: z.string().min(1).max(100),
-  type: z.enum(['peptide', 'supplement']).default('peptide'),
+  type: z.enum(['peptide', 'supplement', 'medication']).default('peptide'),
   category: z.string().max(50).nullable().optional(),
   description: z.string().max(1000).nullable().optional(),
   storageNotes: z.string().max(500).nullable().optional(),

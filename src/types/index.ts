@@ -23,8 +23,8 @@ export type DoseLogStatus = 'pending' | 'completed' | 'skipped' | 'missed'
 // Unit options
 export type DoseUnit = 'mcg' | 'mg' | 'IU'
 
-// Item type (peptide or supplement)
-export type ItemType = 'peptide' | 'supplement'
+// Item type (peptide, supplement, or medication)
+export type ItemType = 'peptide' | 'supplement' | 'medication'
 
 // Serving unit options for supplements
 export type ServingUnit = 'capsule' | 'tablet' | 'softgel' | 'scoop' | 'drop' | 'spray'
