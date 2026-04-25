@@ -26,31 +26,43 @@ import { getAuthenticatedUserId } from '@/lib/api-auth'
 
 interface ParseResult {
   name: string | null
+  type: 'supplement' | 'medication' | 'peptide'
   doseAmount: number | null
   doseUnit: 'mcg' | 'mg' | 'IU' | null
   servingSize: number | null
   servingUnit: string | null
   brand: string | null
   confidence: 'high' | 'medium' | 'low'
+  timing: 'morning' | 'evening' | 'before bed' | null
+  vialAmount: number | null
+  vialUnit: string | null
 }
 
-const SYSTEM_PROMPT = `You read supplement bottle labels and extract structured dose data.
+const SYSTEM_PROMPT = `You identify and extract dose information from supplement bottles, medication bottles, and peptide vials.
 
 Return ONLY a JSON object (no prose, no markdown). Include every field with null when unknown.
 
 Fields:
-- name         (canonical supplement name, e.g. "Magnesium Glycinate", "Fish Oil", "Vitamin D3")
-- doseAmount   (numeric, the amount of active ingredient per serving — e.g. 400 for "400 mg")
-- doseUnit     ("mcg" | "mg" | "IU" only; use "IU" for vitamins A/D/E, "mg" or "mcg" otherwise)
-- servingSize  (integer, units per serving — e.g. 2 for "2 capsules")
-- servingUnit  ("capsule" | "tablet" | "softgel" | "scoop" | "drop" | "spray" | "gummy")
-- brand        (manufacturer, e.g. "Nordic Naturals", "Thorne", "NOW Foods")
-- confidence   ("high" | "medium" | "low" based on how much of the label was legible)
+- name        (canonical name, e.g. "Citalopram", "BPC-157", "Magnesium Glycinate")
+- type        ("medication" | "supplement" | "peptide")
+              medication = pharmaceutical drug: SSRIs, antidepressants, blood pressure, statins, antibiotics, hormones, sleep aids, pain meds, diabetes drugs
+              supplement = vitamins, minerals, herbs, amino acids, adaptogens (e.g. Vitamin D, Fish Oil, Ashwagandha, Creatine)
+              peptide = research peptides or GLP-1/GIP agonists in lyophilized vials (e.g. BPC-157, Semaglutide, Tirzepatide, TB-500)
+- doseAmount  (numeric, active ingredient per serving or per injection for peptides)
+- doseUnit    ("mcg" | "mg" | "IU" only; use "IU" for vitamins A/D/E)
+- servingSize (integer, units per serving; null for peptide vials)
+- servingUnit ("capsule" | "tablet" | "softgel" | "scoop" | "injection" | null)
+- brand       (manufacturer name)
+- confidence  ("high" | "medium" | "low" based on label legibility)
+- timing      typical administration: "morning" | "evening" | "before bed" | null
+- vialAmount  (peptides only: total mg in vial, e.g. 5 for a "5 mg" vial; null otherwise)
+- vialUnit    (peptides only: "mg"; null otherwise)
 
 Rules:
-- doseAmount is PER SERVING, not per bottle.
-- If multiple ingredients are listed, pick the primary active ingredient in the product name.
-- If the label shows "500 mg EPA + 250 mg DHA", return doseAmount: 750, doseUnit: "mg" (total EPA+DHA).
+- doseAmount is PER SERVING for oral items, or PER INJECTION for peptides — not total vial content.
+- For peptides, doseAmount is the injection dose in mcg (e.g. 250 for a typical 250 mcg BPC-157 injection).
+- If multiple ingredients listed, use the primary active ingredient matching the product name.
+- For medications, use the labeled dose shown on the bottle.
 - Ignore "Daily Value %" numbers.`
 
 let openai: OpenAI | null = null
@@ -97,7 +109,7 @@ export async function POST(request: NextRequest) {
 
     const response = await client.chat.completions.create({
       model: 'gpt-4o',
-      max_tokens: 300,
+      max_tokens: 400,
       temperature: 0,
       response_format: { type: 'json_object' },
       messages: [
@@ -133,6 +145,8 @@ export async function POST(request: NextRequest) {
     // Coerce types defensively
     const result: ParseResult = {
       name: typeof parsed.name === 'string' ? parsed.name.trim() || null : null,
+      type:
+        parsed.type === 'medication' || parsed.type === 'peptide' ? parsed.type : 'supplement',
       doseAmount:
         typeof parsed.doseAmount === 'number' && parsed.doseAmount > 0
           ? parsed.doseAmount
@@ -151,6 +165,13 @@ export async function POST(request: NextRequest) {
         parsed.confidence === 'high' || parsed.confidence === 'medium' || parsed.confidence === 'low'
           ? parsed.confidence
           : 'low',
+      timing:
+        parsed.timing === 'morning' || parsed.timing === 'evening' || parsed.timing === 'before bed'
+          ? parsed.timing
+          : null,
+      vialAmount:
+        typeof parsed.vialAmount === 'number' && parsed.vialAmount > 0 ? parsed.vialAmount : null,
+      vialUnit: typeof parsed.vialUnit === 'string' ? parsed.vialUnit.trim() || null : null,
     }
 
     return NextResponse.json(result)
