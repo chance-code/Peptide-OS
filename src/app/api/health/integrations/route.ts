@@ -163,6 +163,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Check OAuth credentials are configured before attempting redirect
+    if (provider === 'oura' && (!process.env.OURA_CLIENT_ID || !process.env.OURA_CLIENT_SECRET)) {
+      console.error('[health/integrations] OURA_CLIENT_ID or OURA_CLIENT_SECRET not set')
+      return NextResponse.json(
+        { error: 'Oura integration is not configured on the server. Set OURA_CLIENT_ID and OURA_CLIENT_SECRET in Railway environment variables.' },
+        { status: 503 }
+      )
+    }
+
     // Build redirect URI - use provider-specific short paths
     const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000'
     let redirectUri: string
@@ -183,7 +192,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error initiating health integration:', error)
     return NextResponse.json(
-      { error: 'Failed to initiate integration' },
+      { error: error instanceof Error ? error.message : 'Failed to initiate integration' },
       { status: 500 }
     )
   }
