@@ -25,9 +25,10 @@ export function handleOpenAIError(error: unknown): {
     console.error(`OpenAI API error: status=${error.status} code=${error.code ?? 'n/a'} type=${error.type ?? 'n/a'} message=${error.message}`)
     if (error.status === 429) {
       // OpenAI uses 429 for both rate limits (retry) and exhausted billing (don't).
-      if (error.code === 'insufficient_quota') {
+      // Seen in the wild: code=credit_balance_exhausted type=insufficient_quota
+      if (error.type === 'insufficient_quota' || error.code === 'insufficient_quota' || error.code === 'credit_balance_exhausted') {
         return {
-          message: 'OpenAI quota exhausted for this API key. Check billing at platform.openai.com.',
+          message: 'OpenAI account has no credits remaining. Add credits at platform.openai.com/settings/organization/billing.',
           status: 429,
           isRetryable: false,
         }

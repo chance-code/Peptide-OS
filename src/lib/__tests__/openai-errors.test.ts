@@ -2,16 +2,18 @@ import { describe, it, expect } from 'vitest'
 import OpenAI from 'openai'
 import { handleOpenAIError } from '../openai'
 
-function apiError(status: number, code: string | null, message = 'boom') {
-  return new OpenAI.APIError(status, { code, message, type: 'x' }, message, new Headers())
+function apiError(status: number, code: string | null, message = 'boom', type = 'x') {
+  return new OpenAI.APIError(status, { code, message, type }, message, new Headers())
 }
 
 describe('handleOpenAIError', () => {
   it('flags exhausted quota as non-retryable with a billing hint', () => {
-    const r = handleOpenAIError(apiError(429, 'insufficient_quota'))
-    expect(r.status).toBe(429)
-    expect(r.isRetryable).toBe(false)
-    expect(r.message).toMatch(/quota/i)
+    for (const e of [apiError(429, 'insufficient_quota'), apiError(429, 'credit_balance_exhausted', 'no credits', 'insufficient_quota')]) {
+      const r = handleOpenAIError(e)
+      expect(r.status).toBe(429)
+      expect(r.isRetryable).toBe(false)
+      expect(r.message).toMatch(/credits/i)
+    }
   })
 
   it('keeps plain rate limits retryable', () => {
