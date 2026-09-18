@@ -166,7 +166,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ baselines: results, signals }, {
       headers: {
-        'Cache-Control': 'private, max-age=60',
+        'Cache-Control': 'no-store', // per-user data; clients must never see a stale list
       },
     })
   } catch (error) {

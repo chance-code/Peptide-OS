@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(inventory, {
       headers: {
-        'Cache-Control': 'private, max-age=60', // 1 min cache
+        'Cache-Control': 'no-store', // per-user data; clients must never see a stale list
       },
     })
   } catch (error) {
