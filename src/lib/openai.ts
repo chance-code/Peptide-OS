@@ -21,11 +21,28 @@ export function handleOpenAIError(error: unknown): {
   isRetryable: boolean
 } {
   if (error instanceof OpenAI.APIError) {
+    // Log the real reason server-side; clients only get the friendly message.
+    console.error(`OpenAI API error: status=${error.status} code=${error.code ?? 'n/a'} type=${error.type ?? 'n/a'} message=${error.message}`)
     if (error.status === 429) {
+      // OpenAI uses 429 for both rate limits (retry) and exhausted billing (don't).
+      if (error.code === 'insufficient_quota') {
+        return {
+          message: 'OpenAI quota exhausted for this API key. Check billing at platform.openai.com.',
+          status: 429,
+          isRetryable: false,
+        }
+      }
       return {
         message: 'AI service is busy. Please try again in a moment.',
         status: 429,
         isRetryable: true,
+      }
+    }
+    if (error.status === 404) {
+      return {
+        message: 'AI model unavailable. The configured model may have been retired.',
+        status: 500,
+        isRetryable: false,
       }
     }
     if (error.status === 503 || error.status === 502) {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { handleOpenAIError } from '@/lib/openai'
 import {
   EMPTY_SCAN_RESULT,
   VIAL_SCAN_SYSTEM_PROMPT,
@@ -68,9 +69,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(result)
   } catch (error) {
     console.error('Scan error:', error)
-    return NextResponse.json(
-      { error: 'Failed to analyze image' },
-      { status: 500 }
-    )
+    // Surface the real reason (quota, rate limit, retired model, timeout) instead of a blanket 500.
+    const { message, status } = handleOpenAIError(error)
+    return NextResponse.json({ error: `Failed to analyze image: ${message}` }, { status })
   }
 }
