@@ -14,7 +14,14 @@ export const createProtocolSchema = z.object({
   startDate: dateStringSchema,
   endDate: dateStringSchema.nullable().optional(),
   frequency: z.enum(['daily', 'weekly', 'every_other_day', 'custom']),
-  customDays: z.array(z.enum(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'])).optional(),
+  // iOS sends customDays as a JSON string ('["mon","wed"]'); the web app sends an array. Accept both.
+  customDays: z.preprocess(
+    (v) => {
+      if (typeof v !== 'string') return v
+      try { return JSON.parse(v) } catch { return v }
+    },
+    z.array(z.enum(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'])).nullable().optional()
+  ),
   doseAmount: z.number().positive('Dose must be positive'),
   doseUnit: z.string().min(1).max(10),
   timing: z.string().max(50).nullable().optional(),

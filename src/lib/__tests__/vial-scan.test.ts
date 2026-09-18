@@ -3,6 +3,7 @@ import {
   COMPOUNDED_MG_TAURATE_NAME,
   inferCompoundName,
   normalizeScannedPeptideName,
+  namesAppearInRawText,
   normalizeVialScanResult,
   parseScanJson,
   scanKey,
@@ -140,5 +141,23 @@ describe('parseScanJson', () => {
   })
   it('returns null on invalid JSON', () => {
     expect(parseScanJson('not json')).toBeNull()
+  })
+})
+
+describe('rawText sanity check', () => {
+  it('drops confidence when a reported name is absent from the label text', () => {
+    const result = normalizeVialScanResult({
+      productName: 'Tirzepatide',
+      ingredients: [{ name: 'Tirzepatide', amount: 25, unit: 'mg/mL' }],
+      volumeMl: 2,
+      confidence: 'high',
+      rawText: 'Magnesium Taurate 25mg/mL Pyridoxine 25mg/mL Glycine 5mg/mL 2mL',
+    })
+    expect(result.confidence).toBe('low')
+  })
+
+  it('keeps confidence when names are on the label', () => {
+    expect(namesAppearInRawText(['Magnesium Taurate', 'Vitamin B6'], 'MAGNESIUM TAURATE 25 MG/ML VITAMIN B6 25 MG/ML')).toBe(true)
+    expect(namesAppearInRawText(['BPC-157'], 'BPC 157 10mg lyophilized')).toBe(true)
   })
 })

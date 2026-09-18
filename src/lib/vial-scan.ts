@@ -232,6 +232,14 @@ export function normalizeVialScanResult(raw: unknown): VialScanResult {
   // A concentration unit is never a valid vial unit — collapse 'mg/mL' → 'mg'.
   if (unit) unit = splitUnit(unit).base
 
+  const rawText = asString(r.rawText)
+  let confidence = asConfidence(r.confidence)
+  // A name the model reports but that does not appear anywhere in the transcribed label text is
+  // a likely substitution (e.g. reading "Tirzepatide" off a magnesium taurate vial). Flag it.
+  if (rawText && !namesAppearInRawText([productName, ...ingredients.map((i) => i.name)], rawText)) {
+    confidence = 'low'
+  }
+
   return {
     peptideName,
     productName,
@@ -243,9 +251,21 @@ export function normalizeVialScanResult(raw: unknown): VialScanResult {
     manufacturer: asString(r.manufacturer),
     lotNumber: asString(r.lotNumber),
     expirationDate: asString(r.expirationDate),
-    confidence: asConfidence(r.confidence),
-    rawText: asString(r.rawText),
+    confidence,
+    rawText,
   }
+}
+
+/** True when every non-empty name has its first word somewhere in the label text (loose OCR tolerance). */
+export function namesAppearInRawText(names: (string | null)[], rawText: string): boolean {
+  const haystack = scanKey(rawText)
+  return names
+    .filter((n): n is string => !!n && n.trim().length > 0)
+    .every((name) => {
+      const firstWord = name.trim().split(/[\s/+,()-]+/)[0] ?? ''
+      const key = scanKey(firstWord)
+      return key.length < 3 || haystack.includes(key)
+    })
 }
 
 /** Strip ```json fences and parse; null when the content isn't JSON. */
@@ -322,7 +342,8 @@ Return ONLY a JSON object with these fields (use null for anything you can't det
 }
 
 Rules:
-- Standardize peptide names (e.g. "BPC 157" → "BPC-157", "MOTC" → "MOTS-c").
+- Copy ingredient and product names EXACTLY as printed. Never substitute a peptide from the list above for a similar-looking word — if the label says "Magnesium Taurate", report "Magnesium Taurate", not a peptide. The lists above are hints for standardizing spelling, not a menu to choose from.
+- Standardize peptide names only when the printed text clearly is that peptide (e.g. "BPC 157" → "BPC-157", "MOTC" → "MOTS-c").
 - For single-peptide dry vials, leave ingredients as an empty array and report the total content as amount (not a concentration). Common sizes: 2mg, 5mg, 10mg.
 - For compounded / pre-mixed vials, list EVERY ingredient with its concentration exactly as printed (e.g. Magnesium Taurate 25 mg/mL, Pyridoxine 25 mg/mL, Glycine 5 mg/mL), set volumeMl from the fill volume (e.g. "2 mL" → 2), set isPreMixed to true, and set amount = primary ingredient concentration × volumeMl with unit "mg" (25 mg/mL × 2 mL → 50, "mg").
 - If unsure about the product, set confidence to "low" and include rawText.

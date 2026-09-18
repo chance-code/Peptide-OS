@@ -66,6 +66,7 @@ export async function POST(request: NextRequest) {
       ? normalizeVialScanResult(parsed)
       : { ...EMPTY_SCAN_RESULT, rawText: content }
 
+    console.log(`[scan] name=${result.peptideName} product=${result.productName} amount=${result.amount}${result.unit ?? ''} volumeMl=${result.volumeMl} ingredients=${JSON.stringify(result.ingredients)} confidence=${result.confidence} raw=${JSON.stringify(result.rawText?.slice(0, 300) ?? null)}`)
     return NextResponse.json(result)
   } catch (error) {
     console.error('Scan error:', error)
