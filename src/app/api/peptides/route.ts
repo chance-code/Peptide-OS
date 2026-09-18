@@ -82,9 +82,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 })
     }
 
+    // Upsert-by-name: clients stage a peptide and POST it on save, so a name that already
+    // exists (any casing) must return the existing row, not a constraint error.
+    const trimmed = name.trim()
+    const existing =
+      (await prisma.peptide.findUnique({ where: { name: trimmed } })) ??
+      (await prisma.peptide.findMany({ select: { id: true, name: true } }))
+        .filter((p) => p.name.toLowerCase() === trimmed.toLowerCase())
+        .map((p) => p.id)
+        .map((id) => ({ id }))[0]
+    if (existing) {
+      const row = await prisma.peptide.findUnique({ where: { id: existing.id } })
+      return NextResponse.json(row, { status: 200 })
+    }
+
     const peptide = await prisma.peptide.create({
       data: {
-        name,
+        name: trimmed,
         canonicalName: null, // classified asynchronously below
         type: type || 'peptide',
         category,
@@ -94,7 +108,7 @@ export async function POST(request: NextRequest) {
     })
 
     // Classify canonical name in the background — never block the response on AI
-    classifyCanonicalName(name)
+    classifyCanonicalName(trimmed)
       .then(async (canonical) => {
         if (canonical) {
           await prisma.peptide.update({ where: { id: peptide.id }, data: { canonicalName: canonical } })
