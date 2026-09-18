@@ -1042,7 +1042,7 @@ export const PEPTIDE_REFERENCE: PeptideReference[] = [
   },
   {
     name: 'MOTS-c',
-    aliases: ['MOTS-C', 'Mitochondrial ORF of the 12S rRNA type-c'],
+    aliases: ['MOTS-C', 'MOTSc', 'MOTC', 'Mitochondrial ORF of the 12S rRNA type-c'],
     category: 'weight-loss',
     typicalVialSizes: [
       { amount: 5, unit: 'mg' },
@@ -1639,6 +1639,68 @@ export const PEPTIDE_REFERENCE: PeptideReference[] = [
         { outcome: 'Inflammation', confidence: 'medium' },
       ],
       stopSignals: ['No symptom improvement after 4 weeks', 'Blood pressure changes', 'GI discomfort'],
+    },
+  },
+
+  // MARK: Blends & Compounded Injectables
+
+  {
+    name: 'KLOW',
+    aliases: ['KLOW Blend', 'KLOW Peptide Blend', 'KPV + GHK-Cu + BPC-157 + TB-500'],
+    category: 'healing',
+    typicalVialSizes: [{ amount: 80, unit: 'mg' }],
+    recommendedDiluentMl: 3,
+    typicalDose: { min: 4, max: 8, unit: 'mg' },
+    typicalDurationWeeks: 6,
+    description: 'Healing blend of KPV, GHK-Cu, BPC-157, and TB-500. Component ratios vary by compounder — dose from the label.',
+    guidance: {
+      cycleType: 'cycled',
+      cycleLengthWeeks: { min: 4, max: 8 },
+      offCycleLengthWeeks: { min: 4, max: 4 },
+      reassessment: 'end_of_cycle',
+      reassessmentNote: 'Reassess healing targets at the end of each cycle; blend ratios differ between vendors.',
+      timeToEffect: [
+        { phase: 'Week 1–2', description: 'Reduced inflammation, early tissue repair' },
+        { phase: 'Week 3–6', description: 'Healing and skin/gut effects' },
+      ],
+      primaryOutcomes: [
+        { outcome: 'Injury recovery', confidence: 'medium' },
+        { outcome: 'Inflammation', confidence: 'medium' },
+        { outcome: 'Skin quality', confidence: 'low' },
+      ],
+      stopSignals: ['No improvement after 6 weeks', 'Injection site reactions'],
+    },
+  },
+  {
+    name: 'Magnesium Taurate + B6 + Glycine (Compounded)',
+    aliases: [
+      'Magnesium Taurate B6 Glycine',
+      'Magnesium Taurate / B6 / Glycine',
+      'Mag Taurate B6 Glycine',
+      'Mg Taurate B6 Glycine',
+      'Taurate B6 Glycine',
+    ],
+    category: 'other',
+    // Supplied pre-mixed: 25 mg/mL magnesium taurate, 25 mg/mL pyridoxine (B6), 5 mg/mL glycine in 2 mL.
+    // Vial size is the magnesium taurate total (25 mg/mL x 2 mL); dose range is 0.5-1 mL of solution.
+    typicalVialSizes: [{ amount: 50, unit: 'mg' }],
+    recommendedDiluentMl: 2,
+    typicalDose: { min: 12.5, max: 25, unit: 'mg' },
+    typicalDurationWeeks: null,
+    description: 'Compounded injectable: magnesium taurate 25 mg/mL, vitamin B6 (pyridoxine) 25 mg/mL, glycine 5 mg/mL, pre-mixed in a 2 mL vial. No reconstitution needed.',
+    guidance: {
+      cycleType: 'continuous',
+      reassessment: 'periodic',
+      reassessmentNote: 'Reassess with sleep, HRV, and magnesium/B6 labs; long-term high-dose B6 can cause neuropathy.',
+      timeToEffect: [
+        { phase: 'Week 1–2', description: 'Sleep and relaxation effects' },
+        { phase: 'Week 3–8', description: 'HRV and blood pressure trends' },
+      ],
+      primaryOutcomes: [
+        { outcome: 'Sleep quality', confidence: 'medium' },
+        { outcome: 'HRV', confidence: 'low' },
+      ],
+      stopSignals: ['Numbness or tingling (B6 neuropathy)', 'Loose stools', 'Injection site reactions'],
     },
   },
 ]
