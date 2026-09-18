@@ -353,13 +353,28 @@ export function getToday(): Date {
   return startOfDay(new Date())
 }
 
+const DAY_KEYS: DayOfWeek[] = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+
 /**
- * Parse custom days from JSON string
+ * Normalize any reasonable day spelling to DayOfWeek: 'Monday', 'monday', 'MON', 'mon' → 'mon'.
+ * Returns null for anything unrecognized.
+ */
+export function normalizeDayOfWeek(value: unknown): DayOfWeek | null {
+  if (typeof value !== 'string') return null
+  const key = value.trim().toLowerCase().slice(0, 3)
+  return (DAY_KEYS as string[]).includes(key) ? (key as DayOfWeek) : null
+}
+
+/**
+ * Parse custom days from JSON string. Tolerates full day names (the iOS app
+ * stores 'monday'), dropping anything unrecognized.
  */
 export function parseCustomDays(customDaysJson?: string | null): DayOfWeek[] {
   if (!customDaysJson) return []
   try {
-    return JSON.parse(customDaysJson) as DayOfWeek[]
+    const parsed: unknown = JSON.parse(customDaysJson)
+    if (!Array.isArray(parsed)) return []
+    return parsed.map(normalizeDayOfWeek).filter((d): d is DayOfWeek => d !== null)
   } catch {
     return []
   }

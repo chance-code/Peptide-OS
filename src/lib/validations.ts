@@ -1,3 +1,4 @@
+import { normalizeDayOfWeek } from './schedule'
 import { z } from 'zod'
 
 // Common field schemas
@@ -14,11 +15,16 @@ export const createProtocolSchema = z.object({
   startDate: dateStringSchema,
   endDate: dateStringSchema.nullable().optional(),
   frequency: z.enum(['daily', 'weekly', 'every_other_day', 'custom']),
-  // iOS sends customDays as a JSON string ('["mon","wed"]'); the web app sends an array. Accept both.
+  // iOS sends customDays as a JSON string of full names ('["monday","wednesday"]'); the web app
+  // sends an array of 'mon'/'wed'. Accept both shapes and both spellings.
   customDays: z.preprocess(
     (v) => {
-      if (typeof v !== 'string') return v
-      try { return JSON.parse(v) } catch { return v }
+      let value: unknown = v
+      if (typeof value === 'string') {
+        try { value = JSON.parse(value) } catch { return v }
+      }
+      if (!Array.isArray(value)) return value
+      return value.map((d) => normalizeDayOfWeek(d) ?? d)
     },
     z.array(z.enum(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'])).nullable().optional()
   ),
